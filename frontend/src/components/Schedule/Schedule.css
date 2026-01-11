@@ -1,0 +1,24 @@
+/* remove any .layout { position: fixed } */
+
+/* keep the page content flowing normally */
+.schedule-root {
+  /* nothing fixed here — header is handled in JS with position: fixed */
+}
+
+/* optional small style for the fixed header if you want */
+.schedule-fixed-strip {
+  /* not required if you use sx on the element; left here for reference */
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 1400;
+  background: #fff;
+}
+
+@font-face {
+  font-family: 'RecklessNeue';
+  src: url('../../assets/fonts/RecklessCollectionVF-TRIAL.woff2') format('woff2');
+  font-weight: 100 900;  /* variable weight range */
+  font-style: normal;
+  font-display: swap;
+}

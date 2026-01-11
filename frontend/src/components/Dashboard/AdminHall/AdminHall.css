@@ -1,0 +1,89 @@
+@font-face {
+  font-family: 'RecklessNeue';
+  src: url('../../../assets/fonts/RecklessCollectionVF-TRIAL.woff2') format('woff2');
+  font-weight: 100 900;  /* variable weight range */
+  font-style: normal;
+  font-display: swap;
+}
+:root {
+  --appbar-height: 64px;      /* change if AppBar height changes */
+  --content-gap: 12px;        /* 🔥 MAIN CONTROL: gap below AppBar */
+}
+
+.admin-hall-body{
+    background: linear-gradient(243.81deg, #25354F 0.9%, #1B2033 100%);
+min-height: 100vh;
+    box-sizing: border-box;
+    padding-top: calc(var(--appbar-height) + var(--content-gap));
+  
+  /* ONLY offset for fixed AppBar */
+  padding-left: 70px;
+  padding-right: 70px;
+  padding-bottom: 40px;
+
+  overflow-y: auto;
+}
+
+.btn-admin-hall{
+    background: #8d6850 !important;
+    border-radius: 1rem !important;
+    font-family: 'RecklessNeue';
+    width: 30%;
+    color: white !important;
+    font-size: large;
+    margin-bottom: 1rem !important;
+    margin-top: 2rem !important;
+    justify-content: center;
+    /* margin-right: 1rem !important; */
+}
+
+.hall-admin-card{
+    /* background: linear-gradient(246.64deg, #4B84B7 0%, #1B2033 100%); */
+    background: #303C5C !important;
+    border-radius: 1.5rem !important;
+    box-shadow: 0px 0px 34px rgba(0, 0, 0, 0.25) !important;
+}
+
+
+.hall-card-text{
+    font-family: 'RecklessNeue' , !important;
+    color:white !important;
+
+}
+
+.number-seat{
+    margin-left: 0.5rem;
+    font-size: 1.3rem;
+}
+
+
+.modal{
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 50%;
+    background: linear-gradient(264.79deg, #3A517C 0%, #314064 100%);
+    /* border: 2px solid #000; */
+    padding: 1rem;
+    border-radius: 1rem;
+}
+
+.modal-text{
+    color:white !important;
+    font-family: 'RecklessNeue' !important;
+}
+
+
+
+@media only screen and (max-width: 500px) {
+    .modal{
+        width: 70%;
+    }
+  }
+
+  @media only screen and (max-width: 300px) {
+    .modal{
+        width: 80%;
+    }
+  }

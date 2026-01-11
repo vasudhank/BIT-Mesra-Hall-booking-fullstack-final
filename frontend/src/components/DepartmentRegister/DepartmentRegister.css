@@ -1,0 +1,75 @@
+@import url('https://fonts.googleapis.com/css2?family=Julee&display=swap');
+@font-face {
+  font-family: 'RecklessNeue';
+  src: url('../../assets/fonts/RecklessCollectionVF-TRIAL.woff2') format('woff2');
+  font-weight: 100 900;  /* variable weight range */
+  font-style: normal;
+  font-display: swap;
+}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+
+.department-register-body{
+    
+    background: linear-gradient(243.18deg, #242C2C 0%, #11151A 100%);
+    bottom: 0;
+    /* margin-top: 3rem; */
+    height: 100vh;
+    box-sizing: border-box;
+    overflow: auto;
+}
+
+
+
+.department-register-card{
+    background: #2B3539 !important;
+    box-shadow: 0px 0px 9px 24px rgba(54, 52, 52, 0.14) !important;
+    border-radius: 50px !important;
+}
+
+
+.department-card-register-title{
+    font-family: 'RecklessNeue' !important;
+    color: white;
+    margin-left: 1rem !important;
+    margin-top: 2rem !important;
+    margin-bottom: 2rem !important;
+}
+
+
+.department-register-input{
+    background: #717171;
+    border-radius: 30px !important;
+    margin-bottom: 2rem;
+    color: white !important;
+    height: 3rem !important;
+    font-family:'Times New Roman', Times, serif !important;
+    font-size: large !important;
+    text-transform: capitalize !important;
+}
+
+
+.btn-department-register-card{
+    background: #D76A28 !important;
+    border-radius: 1rem !important;
+    font-family:'Times New Roman', Times, serif !important;
+    color: white !important;
+    font-size: large;
+    margin-bottom: 1rem !important;
+}
+
+
+
+@media only screen and (max-width: 300px) {
+    .department-card-register-title{
+        font-size: larger !important;
+    }
+    
+  }
+
+  
+@media only screen and (max-width: 190px) {
+    .department-card-register-title{
+        font-size: small !important;
+    }
+    
+  }

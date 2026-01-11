@@ -1,0 +1,26 @@
+@font-face {
+  font-family: 'RecklessNeue';
+  src: url('../../../assets/fonts/RecklessCollectionVF-TRIAL.woff2') format('woff2');
+  font-weight: 100 900;  /* variable weight range */
+  font-style: normal;
+  font-display: swap;
+}
+
+.department-booking-body{
+    background: linear-gradient(243.81deg, #25354F 0.9%, #1B2033 100%);
+    height: 100vh;
+    box-sizing: border-box;
+    overflow: auto;
+}
+
+
+.department-booking-title{
+    font-family: 'RecklessNeue' !important;
+    font-size: 2rem;
+    color: white;
+    text-align: center;
+    margin-top: 5rem;
+    margin-bottom: 2rem;
+}
+
+

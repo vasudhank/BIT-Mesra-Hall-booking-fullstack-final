@@ -1,0 +1,44 @@
+/* ================= FEATURE LIST ================= */
+.feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0;                 /* remove background container feel */
+  background: transparent;    /* ❌ remove #09121e */
+}
+
+/* ================= FEATURE ITEM ================= */
+.feature-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* ================= NEUMORPHIC TICK ================= */
+.tick-circle {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.95rem;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  /* 🔥 TRUE NEUMORPHIC INSET (pressed) */
+  box-shadow:
+    inset 3px 3px 6px var(--inset-dark),
+    inset -3px -3px 6px var(--inset-light);
+}
+
+/* ================= FEATURE TEXT ================= */
+.feature-text {
+  font-size: 1rem;
+  font-family: 'Inter', sans-serif;
+  color: var(--text);   /* ✅ auto light/dark */
+}

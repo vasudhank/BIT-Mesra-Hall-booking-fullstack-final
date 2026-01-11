@@ -1,0 +1,248 @@
+@import url('https://fonts.googleapis.com/css2?family=Julee&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+
+@font-face {
+  font-family: 'RecklessNeue';
+  src: url('../../assets/fonts/RecklessCollectionVF-TRIAL.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'RecklessNeue';
+  src: url('../../assets/fonts/RecklessItalicCollectionVF-TRIAL.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* =============================
+   LOCAL NEUMORPHIC VARIABLES
+   ============================= */
+.home-card-scope {
+  --surface: #edf0f2;
+
+  --raise-dark: rgba(160,166,172,0.45);
+  --raise-light: rgba(255,255,255,0.9);
+
+  --inset-dark: rgba(140,145,150,0.45);
+  --inset-light: rgba(255,255,255,0.9);
+
+  --text: #0b0b0b;
+}
+
+/* Dark mode inherited from HomeLower */
+.lower-div.dark .home-card-scope {
+  --surface: #232528;
+
+  --raise-dark: rgba(0,0,0,0.7);
+  --raise-light: rgba(90,94,100,0.6);
+
+  --inset-dark: rgba(0,0,0,0.75);
+  --inset-light: rgba(70,74,80,0.35);
+
+  --text: #f3f3f3;
+}
+
+
+
+
+/* ================= BASE GRID ================= */
+
+.grid-card-home {
+  font-family: 'RecklessNeue', serif !important;
+}
+
+/* ================= NEUMORPHIC CARD ================= */
+
+.home-card {
+  background: var(--surface) !important;
+  margin-bottom: 3rem;
+  border-radius: 22px;
+  width: 70%;
+  z-index: 3;
+  position: relative;
+
+  /* Raised neumorphism (card should float) */
+  box-shadow:
+    4px 4px 12px var(--raise-dark),
+    -4px -4px 12px var(--raise-light);
+
+  transition: transform 240ms ease, box-shadow 240ms ease;
+}
+
+/* Slight lift when visible */
+.scroll-row.in-view .home-card {
+  transform: translateY(-6px);
+}
+
+/* ================= POSITIONING ================= */
+
+.pos-left {
+  left: 159px;
+  margin-bottom: 15px;
+  margin-top: 200px;
+  height: 350px;
+  padding-left: 25px;
+}
+
+.pos-right {
+  right: -259px;
+  height: 350px;
+}
+
+.right-text {
+  text-align: right;
+}
+
+/* ================= TEXT ================= */
+
+.text-card-home {
+  margin-top: 3rem !important;
+  color: var(--text) !important;
+  font-family: 'RecklessNeue', serif;
+}
+
+/* ================= LOTTIE ================= */
+
+.lottie-dept-wrapper {
+  margin-top: 30px;
+  position: relative;
+  width: 300px;
+  height: 300px;
+  overflow: hidden;
+  margin-left: 260px;
+}
+
+.lottie-admin-wrapper {
+  margin-top: 200px;
+  position: relative;
+  width: 300px;
+  height: 300px;
+  overflow: hidden;
+  margin-right: 200px;
+}
+
+/* Fade-slide animation */
+
+.lottie-admin-slide,
+.lottie-dept-slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.9s ease, transform 0.9s ease;
+}
+
+.lottie-admin-slide.active,
+.lottie-dept-slide.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.lottie-admin-slide.next,
+.lottie-dept-slide.next {
+  opacity: 0.6;
+  transform: translateY(10px);
+}
+
+/* ================= SCROLL ANIMATIONS ================= */
+
+.scroll-row {
+  opacity: 0;
+  transition: transform 1s cubic-bezier(.2, .9, .2, 1), opacity 1s ease;
+}
+
+.scroll-row.from-left {
+  transform: translateX(-120px);
+}
+
+.scroll-row.from-right {
+  transform: translateX(120px);
+}
+
+.scroll-row.in-view {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+/* ================= LOGIN BUTTON (NEUMORPHIC INSET) ================= */
+
+.btn-card-home {
+  display: flex !important;
+  justify-content: center !important;
+  margin-top: 0.7rem;
+}
+
+.btn-home-card-btn {
+  background: var(--surface) !important;
+  border-radius: 10px !important;
+  font-family: 'Inter' !important;
+  width: 30%;
+  color: var(--text) !important;
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 10px 18px;
+  margin-bottom: 0.7rem !important;
+  border: none !important;
+  cursor: pointer;
+
+  /* INSET NEUMORPHISM (pressed by default) */
+  box-shadow:
+    inset 6px 6px 12px var(--inset-dark),
+    inset -6px -6px 12px var(--inset-light);
+
+  transition: box-shadow 200ms ease, transform 160ms ease;
+}
+
+/* Hover → raised */
+.btn-home-card-btn:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    8px 8px 18px var(--raise-dark),
+    -2px -2px 10px var(--raise-light);
+}
+
+/* Active → pressed again */
+.btn-home-card-btn:active {
+  transform: translateY(0);
+  box-shadow:
+    inset 6px 6px 12px var(--inset-dark),
+    inset -6px -6px 12px var(--inset-light);
+}
+
+/* ================= RESPONSIVE ================= */
+
+@media (max-width: 768px) {
+  .pos-left,
+  .pos-right {
+    left: 0;
+    right: 0;
+    margin-top: 40px;
+  }
+
+  .home-card {
+    width: 92%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .btn-home-card-btn {
+    width: 50%;
+  }
+
+  .lottie-admin-wrapper,
+  .lottie-dept-wrapper {
+    width: 200px;
+    height: 200px;
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
+@media only screen and (max-width: 350px) {
+  .btn-home-card-btn {
+    width: 70%;
+  }
+}

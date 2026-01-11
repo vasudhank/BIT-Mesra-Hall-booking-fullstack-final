@@ -1,0 +1,205 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+/* =============================
+   BASE VARIABLES (ALWAYS ON)
+   ============================= */
+.lower-div {
+  --bg: #e6e9ec;        /* page background */
+  --surface: #edf0f2;   /* raised surface */
+
+  --raise-dark: rgba(160,166,172,0.45);
+  --raise-light: rgba(255,255,255,0.9);
+
+  --inset-dark: rgba(140,145,150,0.45);
+  --inset-light: rgba(255,255,255,0.9);
+
+  --text: #0b0b0b;
+  --muted: #5b6166;
+
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  position: relative;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+}
+
+/* =============================
+   DARK MODE OVERRIDES
+   ============================= */
+.lower-div.dark {
+  --bg: #1f2226;
+  --surface: #232528;
+
+  --raise-dark: rgba(0,0,0,0.7);
+  --raise-light: rgba(90,94,100,0.6);
+
+  --inset-dark: rgba(0,0,0,0.75);
+  --inset-light: rgba(70,74,80,0.35);
+
+  --text: #f3f3f3;
+}
+
+/* =============================
+   BOOK NOW WRAPPER
+   ============================= */
+.lower-book-btn {
+  display: flex;
+  justify-content: center;
+  padding: 7.5rem 0 2.5rem;
+}
+
+/* =============================
+   NEUMORPHIC BUTTON (FORCE MUI)
+   ============================= */
+.hero-btn,
+.hero-btn.MuiButton-root {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  border-radius: 24px !important;
+  padding: 16px 56px !important;
+  font-size: 1.2rem !important; /* Made slightly larger to see the 3D effect */
+  font-weight: 800;             /* Thicker text holds the extrusion effect better */
+  border: none !important;
+  text-transform: none !important;
+  transition: all 200ms ease;
+
+  /* 1. THE BUTTON (Indented / Pressed In) */
+  /* Top-Left is dark (shadow), Bottom-Right is bright (light reflection) */
+  box-shadow:
+    inset 6px 6px 10px var(--inset-dark),
+    inset -6px -6px 10px var(--inset-light);
+
+  /* 2. THE TEXT (Extruded / Popping Out) */
+  /* Top-Left is bright (light hitting the raised letter) */
+  /* Bottom-Right is dark (shadow cast by the letter) */
+  text-shadow:
+    -1px -1px 1px var(--inset-light),
+    1px 1px 1px var(--inset-dark);
+}
+
+.hero-btn:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    14px 14px 28px var(--raise-dark),
+    -6px -6px 10px var(--raise-light);
+}
+
+.hero-btn:active {
+  transform: translateY(0);
+  box-shadow:
+    inset 10px 10px 18px var(--inset-dark),
+    inset -10px -10px 18px var(--inset-light);
+}
+
+.hero-btn a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* =============================
+   THEME TOGGLE
+   ============================= */
+/* =============================
+   MODERN THEME TOGGLE (PRO)
+   ============================= */
+
+.theme-toggle {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  --sun-size: 14px;
+  --moon-size: 14px;
+}
+
+/* Track */
+.toggle-track {
+  position: relative;
+  width: 64px;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--surface);
+
+  box-shadow:
+    inset 4px 4px 8px var(--inset-dark),
+    inset -4px -4px 8px var(--inset-light);
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+}
+
+/* Thumb */
+.toggle-thumb {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display:flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+
+  box-shadow:
+    4px 4px 10px var(--raise-dark),
+    -4px -4px 10px var(--raise-light);
+
+  transition: transform 280ms cubic-bezier(.4,0,.2,1);
+}
+
+/* Icons */
+.toggle-svg {
+  position: absolute;
+  fill: currentColor;
+  transition: opacity 200ms ease;
+}
+
+
+.toggle-svg.sun {
+  width: var(--sun-size);
+  height: var(--sun-size);
+  color: #111;
+}
+
+.toggle-svg.moon {
+  width: var(--moon-size);
+  height: var(--moon-size);
+  color: #ffffff;
+}
+
+/* DARK MODE STATE */
+.theme-toggle.dark .toggle-thumb {
+  transform: translateX(30px);
+}
+
+.theme-toggle.light .toggle-svg.sun {
+  opacity: 1;
+}
+
+.theme-toggle.light .toggle-svg.moon {
+  opacity: 0;
+}
+
+.theme-toggle.dark .toggle-svg.sun {
+  opacity: 0;
+}
+
+.theme-toggle.dark .toggle-svg.moon {
+  opacity: 1;
+}
+
+/* =============================
+   RESPONSIVE
+   ============================= */
+@media (max-width: 600px) {
+  .hero-btn {
+    width: 80%;
+    padding: 14px 36px !important;
+  }
+}

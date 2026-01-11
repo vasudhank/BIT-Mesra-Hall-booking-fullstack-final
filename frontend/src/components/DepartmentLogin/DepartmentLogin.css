@@ -1,0 +1,268 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+@font-face {
+  font-family: 'RecklessNeue';
+  src: url('../../assets/fonts/RecklessCollectionVF-TRIAL.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* =========================================================
+   BACKGROUND
+   ========================================================= */
+.department-login-body{
+  height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  position:relative;
+  overflow:hidden;
+  font-family:'Inter', sans-serif;
+  background:#05080c;
+}
+
+.department-login-body::before,
+.department-login-body::after{
+  content:"";
+  position:absolute;
+  inset:-40%;
+  background:
+    conic-gradient(
+      from 0deg,
+      cyan,
+      #FF00FF,
+      yellow,
+      black
+    );
+  animation:
+    spin 90s linear infinite,
+    drift 60s ease-in-out infinite alternate,
+    hue 30s linear infinite;
+  filter: blur(140px) saturate(200%);
+  opacity:0.75;
+  mix-blend-mode: screen;
+}
+
+.department-login-body::after{
+  animation:
+    spin 140s linear infinite reverse,
+    drift 90s ease-in-out infinite alternate-reverse,
+    hue 45s linear infinite;
+  opacity:0.65;
+}
+
+@keyframes spin{ to{ transform: rotate(360deg); } }
+@keyframes drift{
+  0%{ transform: translate(-10%, -10%) scale(1); }
+  50%{ transform: translate(10%, -5%) scale(1.15); }
+  100%{ transform: translate(-5%, 10%) scale(1.05); }
+}
+@keyframes hue{
+  to{ filter: blur(140px) saturate(220%) hue-rotate(360deg); }
+}
+
+/* =========================================================
+   GLASS CARD
+   ========================================================= */
+.glass{
+  background: rgba(255,255,255,0.099) !important;
+  backdrop-filter: blur(60px) saturate(220%);
+  -webkit-backdrop-filter: blur(60px) saturate(220%);
+  border:1px solid rgba(255,255,255,0.25);
+
+  box-shadow:
+    inset 0 0 1px rgba(255,255,255,0.4),
+    inset 0 0 28px rgba(255,255,255,0.08);
+}
+
+.login-card{
+  padding:3.1rem 3rem;
+  border-radius:36px !important;
+  position:relative;
+  z-index:2;
+
+  box-shadow:
+    0 70px 140px rgba(0,0,0,0.75),
+    inset 0 0 0 1px rgba(255,255,255,0.12);
+
+  animation: fadeIn 0.7s ease;
+}
+
+/* =========================================================
+   TITLE
+   ========================================================= */
+.login-title{
+  text-align:center;
+  color:#ffffff;
+  font-family:'RecklessNeue' !important;
+  font-weight:600 !important;
+  letter-spacing:1.6px !important;
+}
+
+.divider{
+  height:2px;
+  width:60px;
+  background: linear-gradient(90deg,#ff8a00,#e52e71);
+  margin:14px auto 30px;
+  border-radius:10px;
+}
+
+/* =========================================================
+   INPUT GROUP
+   ========================================================= */
+.input-group{
+  display:flex;
+  justify-content:center;
+  margin-bottom:24px;
+}
+
+/* =========================================================
+   TRUE NEUMORPHIC INSET INPUTS (MATCHING GFG LEVEL)
+   ========================================================= */
+.login-input{
+  width:100% !important;
+  height:58px !important;
+  padding:0 22px !important;
+
+  background:#ecf0f3 !important;
+  border-radius:22px !important;
+
+  display:flex !important;
+  align-items:center !important;
+
+  box-shadow:
+    inset 6px 6px 8px rgba(203,206,209,0.95),
+    inset -6px -6px 8px rgba(255,255,255,0.9);
+
+  transition: box-shadow 220ms ease;
+}
+
+.login-input.Mui-focused{
+  box-shadow:
+    inset 8px 8px 12px rgba(190,193,196,1),
+    inset -4px -4px 6px rgba(255,255,255,0.95);
+}
+
+.login-input .MuiInputAdornment-root{
+  margin-right:12px;
+  color:#b83232;
+}
+
+/* =========================================================
+   INPUT TEXT — EMBOSSED
+   ========================================================= */
+.login-input input{
+  padding:0 !important;
+  height:100% !important;
+
+  background:transparent !important;
+  border:none !important;
+
+  font-size:1rem !important;
+  color:#555 !important;
+
+  text-shadow:
+    0 1px 0 rgba(255,255,255,0.85);
+
+  caret-color:#777;
+}
+
+/* =========================================================
+   PLACEHOLDER — MATCH INNER SURFACE (INTRUDED)
+   ========================================================= */
+.login-input input::placeholder{
+  color:#9aa0a6;
+  text-shadow:
+    0 1px 0 rgba(255,255,255,0.9),
+    0 -1px 0 rgba(0,0,0,0.12);
+  opacity:1;
+}
+
+/* =========================================================
+   BUTTON (UNTOUCHED)
+   ========================================================= */
+.login-btn{
+  margin-top:22px !important;
+  padding:16px !important;
+  border-radius:28px !important;
+
+  font-size:1rem !important;
+  font-weight:600 !important;
+  color:#ffffff !important;
+
+  background: linear-gradient(135deg,#ff8a00,#e52e71) !important;
+
+  box-shadow:
+    inset 6px 6px 14px rgba(0,0,0,0.4),
+    inset -3px -3px 8px rgba(255,255,255,0.25);
+
+  transition: box-shadow 280ms ease, transform 200ms ease !important;
+}
+
+.login-btn:hover{
+  transform: translateY(-6px);
+  box-shadow:
+    8px 8px 14px rgba(0,0,0,0.85),
+    -3px -3px 12px rgba(255,255,255,0.45);
+}
+
+.login-btn:active{
+  transform: translateY(0);
+  box-shadow:
+    inset 12px 12px 28px rgba(0,0,0,0.6),
+    inset -4px -4px 12px rgba(255,255,255,0.3);
+}
+
+/* =========================================================
+   LINKS
+   ========================================================= */
+.forgot-wrap{
+  text-align:center;
+  margin-top:14px;
+}
+
+.forgot-link{
+  color:#05080c;
+  text-decoration:none;
+  font-size:0.95rem;
+}
+.forgot-link:hover{ text-decoration:underline; }
+
+.home-btn,
+.register-btn{
+  background:transparent !important;
+  box-shadow:none !important;
+}
+
+.home-btn{ margin-top:60px !important; }
+
+.home-link,
+.register-link{
+  color:rgb(0, 0, 0);
+  text-decoration:none;
+  z-index: 15;
+  font-family:'RecklessNeue', sans-serif;
+  font-size:0.9rem;
+  text-shadow: 0 0 0.5px currentColor;
+  transition: color 0.3s ease;
+  
+}
+
+.register-link{
+  font-size:1.1rem;
+  word-spacing: 6px;
+}
+
+.home-link:hover,
+.register-link:hover{
+  color:#ffffff;
+}
+
+/* =========================================================
+   ANIMATION
+   ========================================================= */
+@keyframes fadeIn{
+  from{ opacity:0; transform: translateY(26px); }
+  to{ opacity:1; transform: translateY(0); }
+}
