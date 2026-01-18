@@ -77,6 +77,10 @@
 }
 .navbar {
   background: rgba(255, 255, 255, 1);
+  display:flex;
+  justify-content: center;
+  align-items: center;
+  width:100%;
   padding: 13px 44px;
   border-radius: 16px;
   transition: padding 0.35s ease, background 0.35s ease, backdrop-filter 0.35s ease, box-shadow 0.35s ease;
@@ -121,6 +125,7 @@
 .list-item {
   list-style: none;
   display: flex;
+  flex-direction: row;
   justify-content: space-evenly;
   align-items: center;
   width: 100%;
