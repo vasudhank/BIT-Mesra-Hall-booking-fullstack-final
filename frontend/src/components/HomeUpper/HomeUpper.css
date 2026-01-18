@@ -64,9 +64,9 @@
   margin-right: 0 !important;
 }
 .navbar-shell {
-  width: 72vw;
+  width: auto;
   max-width: 800px;
-  min-width: 500px;
+  min-width: 700px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -86,7 +86,7 @@
   align-items: center;
   width:100%;
   white-space: nowrap;
-  padding: 13px 44px;
+  padding: 12px 26px;
   border-radius: 16px;
   transition: padding 0.35s ease, background 0.35s ease, backdrop-filter 0.35s ease, box-shadow 0.35s ease;
 }
@@ -139,10 +139,12 @@
   font-weight: 500;
   font-size: 1.1rem;
   color: #0f172a;
+  gap:28px;
 }
 .list-item-children a {
   position: relative;
   padding: 6px 10px;
+  flex: 0 0 auto;
   transition: color 0.25s ease;
 }
 .list-item-children a::after {
