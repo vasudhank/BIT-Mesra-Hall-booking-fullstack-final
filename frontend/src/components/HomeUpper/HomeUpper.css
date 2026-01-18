@@ -127,7 +127,7 @@
 }
 
 /* ===== NAVBAR ITEMS ===== */
-.list-item {
+.nav-links-container {
   list-style: none;
   display: flex;
   flex-direction: row;
@@ -141,13 +141,13 @@
   color: #0f172a;
   gap:28px;
 }
-.list-item-children a {
+.nav-link-item a {
   position: relative;
   padding: 6px 10px;
   flex: 0 0 auto;
   transition: color 0.25s ease;
 }
-.list-item-children a::after {
+.nav-link-item a::after {
   content: "";
   position: absolute;
   left: 0;
@@ -157,8 +157,8 @@
   background: rgb(247, 57, 15);
   transition: width 0.25s ease;
 }
-.list-item-children a:hover::after { width: 100%; }
-.list-item-children a:hover, .list-item-children a.active { color: rgb(231, 28, 28); }
+.nav-link-item a:hover::after { width: 100%; }
+.nav-link-item a:hover, .nav-link-item a.active { color: rgb(231, 28, 28); }
 
 /* ===== HERO CONTENT ===== */
 .hero-content {

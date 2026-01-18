@@ -483,23 +483,23 @@ export default function HomeUpper() {
           <Grid item display="flex" justifyContent="center">
             <div className={`navbar-shell ${scrolled ? "navbar-shell--scrolled" : ""}`}>
               <div className="navbar">
-                <div className="list-item">
-                  <div className="list-item-children">
+                <div className="nav-links-container">
+                  <div className="nav-link-item">
                     <Link to="/" className={location.pathname === "/" ? "active" : ""}>
                       Home
                     </Link>
                   </div>
-                  <div className="list-item-children">
+                  <div className="nav-link-item">
                     <Link to={auth.status === "Authenticated" && auth.user === "Admin" ? "/admin/hall" : "/admin_login"}>
                       Admin
                     </Link>
                   </div>
-                  <div className="list-item-children">
+                  <div className="nav-link-item">
                     <Link to={auth.status === "Authenticated" && auth.user === "Department" ? "/department/booking" : "/department_login"}>
                       Department
                     </Link>
                   </div>
-                  <div className="list-item-children">
+                  <div className="nav-link-item">
                     <Link to="/schedule">Schedule</Link>
                   </div>
                 </div>
