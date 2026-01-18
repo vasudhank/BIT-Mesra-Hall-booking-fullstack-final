@@ -5,7 +5,7 @@ import Grid from '@mui/material/Grid';
 import AdminBookingCard from './AdminBookingCard';
 import Backdrop from '@mui/material/Backdrop';
 import CircularProgress from '@mui/material/CircularProgress';
-import axios from 'axios';
+import api from '../../../api/axiosInstance';
 
 
 // const list = number.map(()=>{
@@ -23,7 +23,7 @@ export default function AdminBooking() {
     const get_booking_requests = async ()=>{
         setOpen(true)
         try{
-          const response = await axios.get('http://localhost:8000/api/booking/show_booking_requests',{
+          const response = await api.get('/booking/show_booking_requests',{
             withCredentials:true
           })
           let temp = response.data.booking_requests.map((data)=>{
@@ -80,22 +80,13 @@ export default function AdminBooking() {
                 </Grid>
                 
                 </Grid>
-
-
-
+                
             <Grid container spacing={6} justifyContent={'center'}> 
                 {list}
             
             </Grid>
 
-
-
-
-
-
         </div>
-
-
 
     </>
   )

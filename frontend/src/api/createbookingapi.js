@@ -1,28 +1,19 @@
-import axios from 'axios';
+import api from './axiosInstance';
 
 export const createBookingRequestApi = async (inputData) => {
   try {
-    const options = {
-        method: 'POST',
-        url: 'http://localhost:8000/api/booking/create_booking',
-        headers: {
-          'content-type': 'application/json',
-        },
-        withCredentials: true,
-        data:inputData
-    };
-
-
-    let response = await axios(options);
-    return response
-
-
+    const response = await api.post(
+      '/booking/create_booking',
+      inputData
+    );
+    return response;
   } catch (error) {
-  if (error.response) {
-    console.error(error.response.data);
-  } else {
-    console.error("Network or server error:", error.message);
+    if (error.response) {
+      console.error(error.response.data);
+      throw error.response;
+    } else {
+      console.error('Network or server error:', error.message);
+      throw error;
+    }
   }
-}
-
 };

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import "./DepartmentHistory.css";
-import axios from 'axios';
+import api from '../../../api/axiosInstance';
 import Grid from '@mui/material/Grid';
 import Card from '@mui/material/Card';
 import Typography from '@mui/material/Typography';
@@ -10,7 +10,7 @@ export default function DepartmentHistory() {
   const [list, setList] = useState([]);
 
   useEffect(() => {
-    axios.get('http://localhost:8000/api/booking/department_history', {
+    api.get('/booking/department_history', {
       withCredentials: true
     }).then(res => {
       setList(res.data.history);

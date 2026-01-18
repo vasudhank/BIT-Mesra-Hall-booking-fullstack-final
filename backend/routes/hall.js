@@ -10,6 +10,8 @@ router.get('/', (req, res) => {
 // Create Hall (Admin only)
 router.post('/create_hall', async (req, res) => {
   try {
+    console.log('🔍 isAuthenticated:', req.isAuthenticated?.());
+    console.log('🔍 session user:', req.user);
     if (
       !(
         req.isAuthenticated &&

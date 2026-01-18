@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import "./AdminLogin.css"
+import React, { useState, useEffect } from 'react';
+import "./AdminLogin.css";
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Button from '@mui/material/Button';
@@ -47,9 +47,13 @@ export default function AdminLogin() {
   };
 
   const auth = useSelector((state)=> state.user);
-  if(auth.status === "Authenticated" && auth.user === 'Admin'){
+  useEffect(() => {
+  if (auth.status === "Authenticated" && auth.user === "Admin") {
     navigate("/admin/hall");
   }
+}, [auth.status, auth.user, navigate]);
+
+  
 
   return (
     <>

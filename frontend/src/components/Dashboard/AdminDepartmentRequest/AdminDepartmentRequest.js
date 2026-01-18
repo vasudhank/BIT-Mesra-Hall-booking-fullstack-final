@@ -3,7 +3,7 @@ import "./AdminDepartmentRequest.css"
 import Appbar from '../AppBar/AppBar'
 import Grid from '@mui/material/Grid';
 import { Container } from '@mui/material';
-import axios from 'axios';
+import api from '../../../api/axiosInstance';
 import AdminDepartmentRequestCard from './AdminDepartmentRequestCard';
 import Backdrop from '@mui/material/Backdrop';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -32,7 +32,7 @@ export default function AdminDepartmentRequest() {
     const get_department_requests = async()=> {
         setOpen(true);
         try{
-            const response = await axios.get("http://localhost:8000/api/department/show_department_requests", {
+            const response = await api.get("/department/show_department_requests", {
                 withCredentials:true
             });
             const temp = response.data.requests.map((data)=>{

@@ -7,7 +7,7 @@ import DepartmentAppBar from '../DepartmentAppBar/DepartmentAppBar';
 import DepartmentBookingCard from './DepartmentBookingCard';
 import Backdrop from '@mui/material/Backdrop';
 import CircularProgress from '@mui/material/CircularProgress';
-import axios from 'axios';
+import api from '../../../api/axiosInstance';
 
 export default function DepartmentBooking() {
 
@@ -21,8 +21,8 @@ export default function DepartmentBooking() {
   const get_halls = async () => {
     setOpen(true);
     try {
-      const response = await axios.get(
-        `http://localhost:8000/api/hall/view_halls`,
+      const response = await api.get(
+        `/hall/view_halls`,
         { withCredentials: true }
       );
 

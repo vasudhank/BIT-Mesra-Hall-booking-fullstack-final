@@ -1,88 +1,107 @@
 const express = require('express');
-const port =  8000;
 const app = express();
-const db = require('./config/mongoose');
-var session = require('express-session');
-const MongoStore = require('connect-mongo');
-const adminPassport = require('./config/passport');
-const departmentPassport = require('./config/department_passport');
-const details = require('./routes/constants');
-const cors = require('cors')
 const path = require('path');
+const cors = require('cors');
+const session = require('express-session');
+const MongoStore = require('connect-mongo');
+
+const db = require('./config/mongoose');
+const passport = require('./config/passport');
+
 require('dotenv').config();
 
-console.log('ENV EMAIL:', process.env.EMAIL);
-console.log('ENV SMS KEY:', process.env.SMS_API_KEY ? 'SET' : 'NOT SET');
+/* =====================================================
+   BASIC CONFIG
+===================================================== */
+const PORT = process.env.PORT || 8000;
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
+/* =====================================================
+   DEBUG ENV (SAFE)
+===================================================== */
+console.log('ENV:', NODE_ENV);
+console.log('EMAIL:', process.env.EMAIL ? 'SET' : 'NOT SET');
+console.log('MONGO_URI:', process.env.MONGO_URI ? 'SET' : 'NOT SET');
 
+/* =====================================================
+   BODY PARSERS
+===================================================== */
 app.use(express.json());
-app.use(express.urlencoded());
+app.use(express.urlencoded({ extended: true }));
 
-const allowedOrigins = ['http://localhost:3000'];
+/* =====================================================
+   CORS CONFIG (LOCAL + PROD SAFE)
+===================================================== */
+const allowedOrigins = [
+  'http://localhost:3000',
+  process.env.FRONTEND_URL
+].filter(Boolean);
 
+app.use(cors({
+  origin: function (origin, callback) {
+    // allow server-to-server / Postman / same-origin
+    if (!origin) return callback(null, true);
 
-// const corsOptions ={
-//     origin:allowedOrigins,
-//     credentials:true,            //access-control-allow-credentials:true
-//     optionSuccessStatus:200
-// }
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
 
-
-const whitelist = ['http://localhost:3000']
-const corsOptions = {
-  origin:whitelist,
-  credentials:true
-}
-app.use(cors(corsOptions));
-
-app.set('trust proxy', 1)
-app.use(session({
-  secret: 'rkm seminar',
-  resave: true,
-  saveUninitialized: true,
-  cookie: {
-    maxAge: 1000 * 60 * 60 * 24,
-    sameSite: 'lax',   // 'none' → 'lax'
-    secure: false      // ❌ turn off HTTPS requirement for localhost
+    return callback(new Error('CORS not allowed: ' + origin));
   },
-  store: MongoStore.create({
-    mongoUrl: `mongodb://localhost:27017/seminar_hall`,
-    collectionName: "sessions"
-  }),
+  credentials: true
 }));
 
+/* =====================================================
+   SESSION CONFIG (LOCAL + PROD)
+===================================================== */
+app.set('trust proxy', 1);
+
+app.use(session({
+  name: 'seminar.sid',
+  secret: process.env.SESSION_SECRET || 'rkm seminar',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    maxAge: 1000 * 60 * 60 * 24, // 1 day
+
+    // 🔑 LOCAL vs PROD difference
+    sameSite: NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: NODE_ENV === 'production'
+  },
+  store: MongoStore.create({
+    mongoUrl: process.env.MONGO_URI,
+    collectionName: 'sessions'
+  })
+}));
+
+/* =====================================================
+   PASSPORT
+===================================================== */
+app.use(passport.initialize());
+app.use(passport.session());
 
 
-app.use(adminPassport.initialize())
-app.use(adminPassport.session())
-app.use(departmentPassport.initialize())
-app.use(departmentPassport.session())
+/* =====================================================
+   API ROUTES
+===================================================== */
+app.use('/api', require('./index1'));
 
+/* =====================================================
+   SERVE FRONTEND (ONLY IN PRODUCTION)
+===================================================== */
+if (NODE_ENV === 'production') {
+  const rootPath = path.join(__dirname, '..', 'frontend', 'build');
 
+  app.use(express.static(rootPath));
 
-app.use('/api',require('./index1'));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(rootPath, 'index.html'));
+  });
+}
 
-
-const rootPath = __dirname.substring(0, __dirname.length - 8);
-// app.use(express.static(""));
-app.use(express.static(rootPath + '/frontend/build'));
-// Any other routes should be handled by the React app
-app.get('*', (req, res) => {
-  res.sendFile(rootPath + '/frontend/build/index.html');
+/* =====================================================
+   START SERVER
+===================================================== */
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });
-
-
-
-
-
-
-
-
-app.listen(port , (err)=>{
-    if(err){
-        console.log("Error while starting the server ",err);
-        return;
-    }
-    console.log("Server is up and running on port : ",port);
-
-})

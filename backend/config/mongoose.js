@@ -1,11 +1,26 @@
-const details = require('../routes/constants');
 const mongoose = require('mongoose');
-mongoose.connect(`mongodb://localhost:27017/seminar_hall`,{
+require('dotenv').config();
+
+const MONGO_URI = process.env.MONGO_URI;
+
+if (!MONGO_URI) {
+  console.error('❌ MONGO_URI not set in environment variables');
+  process.exit(1);
+}
+
+mongoose.connect(MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
 });
 
 const db = mongoose.connection;
-db.on('error', console.error.bind(console,'Error Connecting to Db'));
 
-db.once('open',function(){
-    console.log('Successfully Connected To database');
+db.on('error', err => {
+  console.error('❌ MongoDB connection error:', err);
 });
+
+db.once('open', () => {
+  console.log('✅ Successfully connected to MongoDB');
+});
+
+module.exports = db;

@@ -1,6 +1,5 @@
-// frontend/src/App.js
 import './App.css';
-import React, { useEffect } from "react";  
+import React, { useEffect } from "react";
 import {
   BrowserRouter as Router,
   Route,
@@ -9,78 +8,65 @@ import {
 
 import Home from './routes/Home';
 import AdminLoginRoute from './routes/AdminLoginRoute';
-import DepartmentAccount from './components/Dashboard/DepartmentAccount/DepartmentAccount';
 import DepartmentLoginRoute from './routes/DepartmentLoginRoute';
 import DepartmentRegisterRoute from './routes/DepartmentRegisterRoute';
+
 import AdminHallRoute from './routes/AdminHallRoute';
 import AdminBookingRoute from './routes/AdminBookingRoute';
 import AdminDepartmentRoute from './routes/AdminDepartmentRoute';
 import AdminDepartmentRequestRoute from './routes/AdminDepartmentRequestRoute';
+
 import DepartmentBookingRoute from './routes/DepartmentBookingRoute';
 import DepartmentHistoryRoute from './routes/DepartmentHistoryRoute';
-import Schedule from './components/Schedule/Schedule.js';
-import DepartmentForgot from './components/DepartmentForgot/DepartmentForgot';
 
-// ✅ NEW: Forgot password page
+import DepartmentAccount from './components/Dashboard/DepartmentAccount/DepartmentAccount';
+import Schedule from './components/Schedule/Schedule';
+import DepartmentForgot from './components/DepartmentForgot/DepartmentForgot';
 import AdminForgot from './components/AdminForgot/AdminForgot';
 
+// NEW IMPORT
+import AdminApproveDepartment from './components/AdminApproveDepartment/AdminApproveDepartment';
+
 import { checkauth } from './store/slices/userSlice';
-import { useSelector, useDispatch } from 'react-redux';
+import { useDispatch } from 'react-redux';
 
 function App() {
   const dispatch = useDispatch();
-  const user = useSelector((state)=> state.user);
-  
+
+  // ✅ Run ONCE on app load
   useEffect(() => {
     dispatch(checkauth());
-  }, [user.status, dispatch]);
+  }, [dispatch]);
 
   return (
-    <>
-      <Router>
-        <Routes>
-          {/* Public routes */}
-          <Route exact path="/" element={<Home/>} />
-          <Route path="/schedule" element={<Schedule />} />
-          <Route exact path="/admin/forgot" element={<AdminForgot />} /> {/* ✅ NEW */}
-          <Route exact path="/department/account" element={<DepartmentAccount/>} />
-          <Route exact path="/department/forgot" element={<DepartmentForgot />} />
+    <Router>
+      <Routes>
 
-          {(user.status === "Authenticated") && (
-            <>
-              {/* Admin routes */}
-              {user.user === 'Admin' && (
-                <>
-                  <Route exact path="/admin/hall" element={<AdminHallRoute/>} />
-                  <Route exact path="/admin/booking" element={<AdminBookingRoute/>} />
-                  <Route exact path="/admin/department" element={<AdminDepartmentRoute/>} />
-                  <Route exact path="/admin/department/request" element={<AdminDepartmentRequestRoute/>} />
-                  <Route exact path="/department_login" element={<DepartmentLoginRoute/>} />
-                  <Route exact path="/department_register" element={<DepartmentRegisterRoute/>} />
-                </>
-              )}
+        {/* ===== PUBLIC ROUTES ===== */}
+        <Route path="/" element={<Home />} />
+        <Route path="/schedule" element={<Schedule />} />
+        <Route path="/admin_login" element={<AdminLoginRoute />} />
+        <Route path="/department_login" element={<DepartmentLoginRoute />} />
+        <Route path="/department_register" element={<DepartmentRegisterRoute />} />
+        <Route path="/admin/forgot" element={<AdminForgot />} />
+        <Route path="/department/forgot" element={<DepartmentForgot />} />
+        <Route path="/department/account" element={<DepartmentAccount />} />
 
-              {/* Department routes */}
-              {user.user === 'Department' && (
-                <>
-                  <Route exact path="/admin_login" element={<AdminLoginRoute/>} />
-                  <Route exact path="/department/booking" element={<DepartmentBookingRoute/>} />
-                  <Route exact path="/department/booking/history" element={<DepartmentHistoryRoute/>} />
-                </>
-              )}
-            </>
-          )}
+        {/* ===== NEW ADMIN EMAIL ACTION ROUTE (Publicly accessible with token) ===== */}
+        <Route path="/admin/department/approve/:token" element={<AdminApproveDepartment />} />
 
-          {(user.status === "Not Authenticated") && (
-            <>
-              <Route exact path="/admin_login" element={<AdminLoginRoute/>} />
-              <Route exact path="/department_login" element={<DepartmentLoginRoute/>} />
-              <Route exact path="/department_register" element={<DepartmentRegisterRoute/>} />
-            </>
-          )}
-        </Routes>
-      </Router>
-    </>
+        {/* ===== ADMIN PROTECTED ROUTES ===== */}
+        <Route path="/admin/hall" element={<AdminHallRoute />} />
+        <Route path="/admin/booking" element={<AdminBookingRoute />} />
+        <Route path="/admin/department" element={<AdminDepartmentRoute />} />
+        <Route path="/admin/department/request" element={<AdminDepartmentRequestRoute />} />
+
+        {/* ===== DEPARTMENT PROTECTED ROUTES ===== */}
+        <Route path="/department/booking" element={<DepartmentBookingRoute />} />
+        <Route path="/department/booking/history" element={<DepartmentHistoryRoute />} />
+
+      </Routes>
+    </Router>
   );
 }
 

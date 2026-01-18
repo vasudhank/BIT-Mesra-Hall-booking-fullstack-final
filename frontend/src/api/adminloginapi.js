@@ -1,34 +1,53 @@
-import axios from 'axios';
+import api from './axiosInstance';
 
+/**
+ * Admin login
+ */
 export const adminloginApi = async (inputData) => {
   try {
-    const options = {
-        method: 'POST',
-        url: 'http://localhost:8000/api/admin_login',
-        headers: {
-          'content-type': 'application/json',
-        },
-        withCredentials: true,
-        data:inputData
-    };
-    let response = await axios(options);
-    return response
-
-
+    const response = await api.post('/admin_login', inputData);
+    return response;
   } catch (error) {
-  if (error.response) {
-    console.error(error.response.data);
-  } else {
-    console.error("Network or server error:", error.message);
+    if (error.response) {
+      console.error(error.response.data);
+      throw error.response;
+    } else {
+      console.error('Network or server error:', error.message);
+      throw error;
+    }
   }
-}
-
 };
 
+/**
+ * Send OTP to admin email
+ */
 export const adminSendOtpApi = async (data) => {
-  return axios.post('http://localhost:8000/api/admin/send_otp', data, { withCredentials:true });
+  try {
+    return await api.post('/admin/send_otp', data);
+  } catch (error) {
+    if (error.response) {
+      console.error(error.response.data);
+      throw error.response;
+    } else {
+      console.error('Network or server error:', error.message);
+      throw error;
+    }
+  }
 };
 
+/**
+ * Reset admin password
+ */
 export const adminResetPasswordApi = async (data) => {
-  return axios.post('http://localhost:8000/api/admin/reset_password', data, { withCredentials:true });
+  try {
+    return await api.post('/admin/reset_password', data);
+  } catch (error) {
+    if (error.response) {
+      console.error(error.response.data);
+      throw error.response;
+    } else {
+      console.error('Network or server error:', error.message);
+      throw error;
+    }
+  }
 };

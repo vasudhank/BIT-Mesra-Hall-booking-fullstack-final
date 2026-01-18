@@ -16,7 +16,7 @@ import TextField from '@mui/material/TextField';
 import InputAdornment from '@mui/material/InputAdornment';
 import SearchIcon from '@mui/icons-material/Search';
 import { Link,useNavigate, useLocation } from "react-router-dom";
-import axios from "axios";
+import api from '../../../api/axiosInstance';
 import { useDispatch } from "react-redux";
 import { removeStatus } from "../../../store/slices/userSlice";
 
@@ -36,7 +36,7 @@ export default function Appbar({
 
   const logout = async ()=> {
     try{
-      await axios.get('http://localhost:8000/api/logout',{ withCredentials:true });
+      await api.get('/logout',{ withCredentials:true });
       dispatch(removeStatus());
       navigate('/admin_login');
     } catch {}

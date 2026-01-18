@@ -1,6 +1,6 @@
 // frontend/src/components/Schedule/Schedule.js
 import React, { useEffect, useState, useRef, useMemo, useLayoutEffect } from 'react';
-import axios from 'axios';
+import api from '../../api/axiosInstance';
 import "./Schedule.css";
 import HomeIcon from '@mui/icons-material/Home';
 import {
@@ -9,16 +9,9 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
-dayjs.extend(isoWeek);
+import { useLocation } from 'react-router-dom'; // Import useLocation
 
-/**
- * Schedule component with toggle between List and Timetable (grid).
- *
- * Timetable:
- *  - Columns: days of current week (Mon -> Sun)
- *  - Rows: halls (rooms)
- *  - Cells: colored blocks for bookings that overlap the weekday
- */
+dayjs.extend(isoWeek);
 
 function formatTime(dt) {
   if (!dt) return '';
@@ -53,10 +46,13 @@ function colorFromString(str) {
 }
 
 export default function Schedule() {
+  const location = useLocation(); // Hook to access state passed via navigate
   const [halls, setHalls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
-  const [viewMode, setViewMode] = useState('list'); // 'list' or 'grid'
+  
+  // Set initial viewMode based on navigation state, default to 'list'
+  const [viewMode, setViewMode] = useState(location.state?.mode || 'list'); 
 
   // NEW: search state (for the new rounded search box)
   const [searchTerm, setSearchTerm] = useState('');    // controlled input
@@ -86,7 +82,7 @@ export default function Schedule() {
       if (el) {
         const r = el.getBoundingClientRect();
         setTopStripHeight(Math.ceil(r.height));
-      } else {
+            } else {
         setTopStripHeight(0);
       }
     };
@@ -109,7 +105,7 @@ export default function Schedule() {
   const fetchHalls = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('http://localhost:8000/api/hall/view_halls', { withCredentials: true });
+      const res = await api.get('/hall/view_halls', { withCredentials: true });
       setHalls(res.data.halls || []);
     } catch (err) {
       console.error('fetch halls error', err);
@@ -181,9 +177,6 @@ export default function Schedule() {
   const onSearchSubmit = () => {
     setSearchQuery(searchTerm.trim());
   };
-
-  // clear search
-  
 
   // allow Enter to submit search
   const onSearchKeyDown = (e) => {
@@ -290,7 +283,7 @@ export default function Schedule() {
 
     // ⭐ CUSTOM PLACEHOLDER FONT SIZE HERE ⭐
     '& input::placeholder': {
-      fontSize: '12px',      // <-- set any px value you want
+      fontSize: '12px',       // <-- set any px value you want
       opacity: 1,            // ensures it's not faded
     }
   }}

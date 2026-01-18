@@ -2,6 +2,8 @@ const Booking_Requests = require('../models/booking_requests');
 const Hall = require('../models/hall');
 const Department = require('../models/department');
 const { sendDecisionToDepartment } = require('../services/emailService');
+const { sendDecisionSMSDepartment } = require('../services/smsService');
+const { safeExecute } = require('../utils/safeNotify');
 
 exports.handleApproval = async (req, res, decision) => {
   const { token } = req.params;
@@ -18,23 +20,40 @@ exports.handleApproval = async (req, res, decision) => {
 
   const departmentEmail = request.department.email;
 
-  if (decision === 'REJECT') {
+  /* =========================
+     ❌ REJECTED
+     ========================= */
+  if (decision === 'REJECTED') {
     request.status = 'REJECTED';
     request.approvalToken = null;
     request.tokenExpiry = null;
     await request.save();
 
-    // 🔽 NEW: email department
-    await sendDecisionToDepartment({
-      email: departmentEmail,
-      booking: request,
-      decision: 'REJECTED'
-    });
+    // 📧 Email (non-blocking)
+    safeExecute(
+      () => sendDecisionToDepartment({
+        email: departmentEmail,
+        booking: request,
+        decision: 'REJECTED'
+      }),
+      'DEPARTMENT EMAIL'
+    );
+
+    // 📱 SMS (non-blocking)
+    safeExecute(
+      () => sendDecisionSMSDepartment({
+        booking: request,
+        decision: 'REJECTED'
+      }),
+      'DEPARTMENT SMS'
+    );
 
     return res.send('Booking request rejected');
   }
 
-  // APPROVE
+  /* =========================
+     ✅ APPROVED
+     ========================= */
   await Hall.findOneAndUpdate(
     { name: request.hall },
     {
@@ -55,12 +74,24 @@ exports.handleApproval = async (req, res, decision) => {
   request.tokenExpiry = null;
   await request.save();
 
-  // 🔽 NEW: email department
-  await sendDecisionToDepartment({
-    email: departmentEmail,
-    booking: request,
-    decision: 'APPROVED'
-  });
+  // 📧 Email (non-blocking)
+  safeExecute(
+    () => sendDecisionToDepartment({
+      email: departmentEmail,
+      booking: request,
+      decision: 'APPROVED'
+    }),
+    'DEPARTMENT EMAIL'
+  );
 
-  res.send('Booking approved successfully');
+  // 📱 SMS (non-blocking)
+  safeExecute(
+    () => sendDecisionSMSDepartment({
+      booking: request,
+      decision: 'APPROVED'
+    }),
+    'DEPARTMENT SMS'
+  );
+
+  return res.send('Booking approved successfully');
 };

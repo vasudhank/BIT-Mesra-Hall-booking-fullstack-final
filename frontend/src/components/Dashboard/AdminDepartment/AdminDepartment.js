@@ -12,7 +12,7 @@ import Person2Icon from '@mui/icons-material/Person2';
 import EmailIcon from '@mui/icons-material/Email';
 import Backdrop from '@mui/material/Backdrop';
 import CircularProgress from '@mui/material/CircularProgress';
-import axios from 'axios';
+import api from '../../../api/axiosInstance';
 import Modal from '@mui/material/Modal';
 import Box from '@mui/material/Box';
 import FormControl from '@mui/material/FormControl';
@@ -51,7 +51,7 @@ export default function AdminDepartment() {
     const get_departments = async ()=> {
         setOpen(true)
         try{
-            const response = await axios.get("http://localhost:8000/api/department/show_departments")
+            const response = await api.get("/department/show_departments")
            const temp = response.data.departments.map((data)=> {
             return(
                 <Grid item xs={11} sm={6} md={6} lg={6} xl={6}>

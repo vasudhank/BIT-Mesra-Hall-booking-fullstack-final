@@ -7,12 +7,13 @@
 }
 :root {
   --appbar-height: 64px;      /* change if AppBar height changes */
-  --content-gap: 12px;        /* 🔥 MAIN CONTROL: gap below AppBar */
+  --content-gap: 4px;  
+  --section-top-gap: 8px;      /* 🔥 MAIN CONTROL: gap below AppBar */
 }
 
 .admin-hall-body{
     background: linear-gradient(243.81deg, #25354F 0.9%, #1B2033 100%);
-min-height: 100vh;
+    min-height: 100vh;
     box-sizing: border-box;
     padding-top: calc(var(--appbar-height) + var(--content-gap));
   

@@ -1,52 +1,62 @@
 import { createSlice } from '@reduxjs/toolkit';
-import axios from "axios";
-
-
+import api from '../../api/axiosInstance';
 
 const initialState = {
-    status:'Not Authenticated',
-    user: null,
-}
-
+  status: 'Checking',   // IMPORTANT
+  user: null,
+};
 
 const userSlice = createSlice({
-    name: 'user',
-    initialState:initialState,
-    reducers:{
-        addStatus(state,action){
-            state.status = "Authenticated";
-            state.user = action.payload;
-        },
-        removeStatus(state,action){
-            state.status = "Not Authenticated";
-            state.user = null;
-        }
-    }
-})
+  name: 'user',
+  initialState,
+  reducers: {
+    // NEW names (used internally)
+    setAuthenticated(state, action) {
+      state.status = 'Authenticated';
+      state.user = action.payload; // 'Admin' | 'Department'
+    },
+    setUnauthenticated(state) {
+      state.status = 'Not Authenticated';
+      state.user = null;
+    },
 
+    // ✅ OLD NAMES (aliases for backward compatibility)
+    addStatus(state, action) {
+      state.status = 'Authenticated';
+      state.user = action.payload;
+    },
+    removeStatus(state) {
+      state.status = 'Not Authenticated';
+      state.user = null;
+    },
+  },
+});
 
-export const {addStatus , removeStatus} = userSlice.actions;
+export const {
+  setAuthenticated,
+  setUnauthenticated,
+  addStatus,
+  removeStatus,
+} = userSlice.actions;
+
 export default userSlice.reducer;
 
-
+/* ======================
+   AUTH CHECK
+====================== */
 export function checkauth() {
-    return async function checkAuthThunk(dispatch,getState) {
+  return async function (dispatch) {
+    try {
+      const response = await api.get('/details');
 
-        try{
-                const response = await axios.get('http://localhost:8000/api/details', {
-                    withCredentials: true
-                    });
-                if(response.data.status === 'Authenticated'){
-                    dispatch(addStatus(response.data.details.type));
-                }
-                else{
-                    dispatch(removeStatus());
-                }      
-        }
-        catch(err){
-            console.log(err);
-        }
+      if (response.data.status === 'Authenticated') {
+        dispatch(setAuthenticated(response.data.details.type));
+      } else {
+        dispatch(setUnauthenticated());
+      }
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      dispatch(setUnauthenticated());
     }
+  };
 }
-
-

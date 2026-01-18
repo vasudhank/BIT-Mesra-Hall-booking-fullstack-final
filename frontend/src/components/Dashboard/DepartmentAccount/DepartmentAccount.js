@@ -1,4 +1,3 @@
-// frontend/src/components/Dashboard/DepartmentAccount/DepartmentAccount.js
 import React, { useEffect, useState } from "react";
 import {
   Container, Grid, Card, CardContent, Typography, FormControl, Input, Button,
@@ -13,8 +12,8 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import axios from "axios";
-import { Link, useNavigate } from "react-router-dom";
+import api from '../../../api/axiosInstance';
+import { Link, useNavigate, useLocation } from "react-router-dom";
 
 // password checks
 function checkPasswordStrength(pwd) {
@@ -39,6 +38,10 @@ export default function DepartmentAccount() {
   const [confirmPwd, setConfirmPwd] = useState("");
   const [isAuth, setIsAuth] = useState(false);
 
+  // === SETUP MODE STATE (New Feature) ===
+  const [setupToken, setSetupToken] = useState(null);
+  const [isSetupMode, setIsSetupMode] = useState(false);
+
   // readOnly flag to reduce browser autofill for current password
   const [curReadOnly, setCurReadOnly] = useState(true);
 
@@ -51,82 +54,99 @@ export default function DepartmentAccount() {
   const [anchorElUser, setAnchorElUser] = useState(null);
 
   const [successOpen, setSuccessOpen] = useState(false);
+  const [successMsg, setSuccessMsg] = useState("Password changed successfully");
   const [errMsg, setErrMsg] = useState("");
   const [errorOpen, setErrorOpen] = useState(false);
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   // password strength state (computed)
   const pwdState = checkPasswordStrength(newPwd);
 
-  // helper to read ?token=... or ?email=... from URL
-  function getQueryParam(name) {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const v = params.get(name);
-      return v ? decodeURIComponent(v) : null;
-    } catch (err) {
-      return null;
-    }
+  // Helper to extract query params
+  function useQuery() {
+    return new URLSearchParams(location.search);
   }
+  const query = useQuery();
 
   useEffect(() => {
-    (async () => {
-      const token = getQueryParam('token');
-      // try authenticated "me" first
-      try {
-        const res = await axios.get("http://localhost:8000/api/department/me", { withCredentials: true });
-        if (res.data && res.data.success && res.data.department) {
-          const d = res.data.department;
-          setEmail(d.email || "");
-          setDeptName(d.department || "");
-          setHodName(d.head || "");
-          setIsAuth(true);
-          return;
-        }
-      } catch (err) {
-        // not authenticated — we'll try token next
-      }
+    const tokenFromUrl = query.get("token");
 
-      if (token) {
-        // attempt one-click auto-login via token
+    if (tokenFromUrl) {
+      // 1. First, try to verify if this is a "Setup Token" (New Account)
+      api.post("/department/verify_setup_token", { token: tokenFromUrl })
+        .then((res) => {
+          if (res.data && res.data.success) {
+            // === It is a valid Setup Token ===
+            setSetupToken(tokenFromUrl);
+            setIsSetupMode(true);
+            
+            const d = res.data.department;
+            setEmail(d.email);
+            setDeptName(d.department);
+            setHodName(d.head);
+            // Allow them to see the form
+            setIsAuth(true); 
+          }
+        })
+        .catch(() => {
+          // 2. If Setup verification fails, Fallback to your existing "Auto Login" logic
+          api.post("/department/auto_login", { token: tokenFromUrl }, { withCredentials: true })
+            .then((r) => {
+              if (r.data && r.data.success && r.data.department) {
+                // === It is a valid Auto-Login Token ===
+                const d = r.data.department;
+                setEmail(d.email || "");
+                setDeptName(d.department || "");
+                setHodName(d.head || "");
+                setIsAuth(true);
+                
+                // Clean URL
+                const newUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, newUrl);
+              } else {
+                setErrMsg(r.data?.message || "Token login failed");
+                setErrorOpen(true);
+                setIsAuth(false);
+              }
+            })
+            .catch((err) => {
+              const message = err.response?.data?.message || "Invalid or Expired Link";
+              setErrMsg(message);
+              setErrorOpen(true);
+              setIsAuth(false);
+            });
+        });
+
+    } else {
+      // 3. No token? Check for standard session auth (/me)
+      (async () => {
         try {
-          const r = await axios.post("http://localhost:8000/api/department/auto_login", { token }, { withCredentials: true });
-          if (r.data && r.data.success && r.data.department) {
-            const d = r.data.department;
+          const res = await api.get("/department/me", { withCredentials: true });
+          if (res.data && res.data.success && res.data.department) {
+            const d = res.data.department;
             setEmail(d.email || "");
             setDeptName(d.department || "");
             setHodName(d.head || "");
             setIsAuth(true);
-            // remove token from URL (clean)
-            const newUrl = window.location.pathname;
-            window.history.replaceState({}, document.title, newUrl);
-            return;
-          } else {
-            setErrMsg(r.data?.message || "Token login failed");
-            setErrorOpen(true);
-            setIsAuth(false);
           }
         } catch (err) {
-          const message = err.response?.data?.message || err.message || "Auto-login failed";
-          setErrMsg(message);
-          setErrorOpen(true);
+          // Not logged in
+          setEmail('');
+          setDeptName('');
+          setHodName('');
           setIsAuth(false);
         }
-      } else {
-        // no token & not authenticated - keep empty
-        setEmail('');
-        setDeptName('');
-        setHodName('');
-        setIsAuth(false);
-      }
-    })();
-  }, []);
+      })();
+    }
+  }, [location.search]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!currentPwd || !newPwd || !confirmPwd) {
+    // Validation: Current Password is required ONLY if NOT in Setup Mode
+    if ((!isSetupMode && !currentPwd) || !newPwd || !confirmPwd) {
       setErrMsg("Please fill all fields");
       setErrorOpen(true);
       return;
@@ -143,34 +163,54 @@ export default function DepartmentAccount() {
     }
 
     try {
-      const payload = { currentPassword: currentPwd, newPassword: newPwd };
-      const res = await axios.post("http://localhost:8000/api/department/change_password", payload, { withCredentials: true });
-      if (res.data && res.data.success) {
-        setSuccessOpen(true);
-        setCurrentPwd("");
-        setNewPwd("");
-        setConfirmPwd("");
-        // re-enable readOnly so browser is less likely to autofill next time
-        setCurReadOnly(true);
-        // hide all passwords after success
-        setShowCurrent(false);
-        setShowNew(false);
-        setShowConfirm(false);
+      if (isSetupMode) {
+        // === CASE 1: NEW ACCOUNT SETUP ===
+        const res = await api.post("/department/complete_setup", {
+            token: setupToken,
+            newPassword: newPwd
+        });
+        
+        if (res.data.success) {
+            setSuccessMsg("Account secured! Redirecting to login...");
+            setSuccessOpen(true);
+            // Redirect after delay
+            setTimeout(() => {
+                navigate("/department_login");
+            }, 2000);
+        }
       } else {
-        setErrMsg(res.data.message || "Failed to change password");
-        setErrorOpen(true);
+        // === CASE 2: STANDARD PASSWORD CHANGE ===
+        const payload = { currentPassword: currentPwd, newPassword: newPwd };
+        const res = await api.post("/department/change_password", payload, { withCredentials: true });
+        
+        if (res.data && res.data.success) {
+          setSuccessMsg("Password changed successfully");
+          setSuccessOpen(true);
+          setCurrentPwd("");
+          setNewPwd("");
+          setConfirmPwd("");
+          setCurReadOnly(true);
+          // hide all passwords after success
+          setShowCurrent(false);
+          setShowNew(false);
+          setShowConfirm(false);
+        } else {
+          setErrMsg(res.data.message || "Failed to change password");
+          setErrorOpen(true);
+        }
       }
     } catch (err) {
       console.error("Change password error:", err);
       const status = err.response?.status;
-      if (status === 401) {
-        // not authenticated — redirect user to login
+      
+      // Handle auth error (only relevant for standard change, not setup)
+      if (status === 401 && !isSetupMode) {
         setErrMsg("Please login before changing password");
         setErrorOpen(true);
         navigate("/department_login");
         return;
       }
-      setErrMsg(err.response?.data?.message || err.message || "Error changing password");
+      setErrMsg(err.response?.data?.message || err.message || "Operation failed");
       setErrorOpen(true);
     }
   };
@@ -190,7 +230,7 @@ export default function DepartmentAccount() {
 
   const logout = async () => {
     try {
-      await axios.get("http://localhost:8000/api/logout", { withCredentials: true });
+      await api.get("/logout", { withCredentials: true });
     } catch (err) {
       console.warn("Logout request failed:", err);
     } finally {
@@ -201,57 +241,61 @@ export default function DepartmentAccount() {
 
   return (
     <>
-      {/* Top-right avatar/menu */}
-      <Box sx={{ position: 'fixed', top: 8, right: 12, zIndex: 1400 }}>
-        <Tooltip title="Open settings">
-          <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-            <Avatar alt="" src="" sx={{ color: 'black' }} />
-          </IconButton>
-        </Tooltip>
+      {/* Top-right avatar/menu (Hidden during Setup Mode to prevent navigation) */}
+      {!isSetupMode && (
+        <Box sx={{ position: 'fixed', top: 8, right: 12, zIndex: 1400 }}>
+          <Tooltip title="Open settings">
+            <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
+              <Avatar alt="" src="" sx={{ color: 'black' }} />
+            </IconButton>
+          </Tooltip>
 
-        <Menu
-          sx={{ mt: '45px', color: 'white' }}
-          id="menu-appbar"
-          anchorEl={anchorElUser}
-          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-          keepMounted
-          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-          open={Boolean(anchorElUser)}
-          onClose={handleCloseUserMenu}
-        >
-          <MenuItem onClick={handleCloseUserMenu} sx={{ color: 'black' }}>
-            <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <Menu
+            sx={{ mt: '45px', color: 'white' }}
+            id="menu-appbar"
+            anchorEl={anchorElUser}
+            anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            keepMounted
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            open={Boolean(anchorElUser)}
+            onClose={handleCloseUserMenu}
+          >
+            <MenuItem onClick={handleCloseUserMenu} sx={{ color: 'black' }}>
+              <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+                <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>
+                  HOME
+                </Typography>
+              </Link>
+            </MenuItem>
+
+            <MenuItem onClick={handleCloseUserMenu} sx={{ color: 'black' }}>
+              <Link to="/department/booking" style={{ textDecoration: 'none', color: 'inherit' }}>
+                <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>
+                  DEPARTMENT
+                </Typography>
+              </Link>
+            </MenuItem>
+
+            <MenuItem onClick={() => { handleCloseUserMenu(); logout(); }} sx={{ color: 'black' }}>
               <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>
-                HOME
+                LOGOUT
               </Typography>
-            </Link>
-          </MenuItem>
-
-          <MenuItem onClick={handleCloseUserMenu} sx={{ color: 'black' }}>
-            <Link to="/department/booking" style={{ textDecoration: 'none', color: 'inherit' }}>
-              <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>
-                DEPARTMENT
-              </Typography>
-            </Link>
-          </MenuItem>
-
-          <MenuItem onClick={() => { handleCloseUserMenu(); logout(); }} sx={{ color: 'black' }}>
-            <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>
-              LOGOUT
-            </Typography>
-          </MenuItem>
-        </Menu>
-      </Box>
+            </MenuItem>
+          </Menu>
+        </Box>
+      )}
 
       <Container sx={{ mt: 8 }}> {/* pushed down so menu/avatar doesn't overlap content */}
         <Grid container justifyContent="center">
           <Grid item xs={11} sm={8} md={6} lg={5}>
             <Card>
               <CardContent>
-                <Typography variant="h5" sx={{ mb: 2 }}>Account</Typography>
+                <Typography variant="h5" sx={{ mb: 2 }}>
+                  {isSetupMode ? "Secure Your Account" : "Account"}
+                </Typography>
 
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <AccountCircleIcon sx={{ fontSize: 40, mr: 1 }} />
+                  <AccountCircleIcon sx={{ fontSize: 40, mr: 1, color: isSetupMode ? '#1976d2' : 'inherit' }} />
                   <Box>
                     <Typography variant="subtitle1">{email || "—"}</Typography>
                     <Typography variant="caption" color="text.secondary">Logged-in email</Typography>
@@ -280,55 +324,60 @@ export default function DepartmentAccount() {
 
                 <Divider sx={{ my: 2 }} />
 
-                <Typography variant="h6" sx={{ mb: 1 }}>Change password</Typography>
+                <Typography variant="h6" sx={{ mb: 1 }}>
+                  {isSetupMode ? "Set New Password" : "Change password"}
+                </Typography>
 
-                {!isAuth && (
+                {!isAuth && !isSetupMode && (
                   <Box sx={{ mb: 2 }}>
                     <Alert severity="info">You must log in to change this account's password. <Link to="/department_login">Login</Link></Alert>
                   </Box>
                 )}
 
-                {isAuth && (
+                {(isAuth || isSetupMode) && (
                   <form onSubmit={handleSubmit} autoComplete="off" noValidate>
                     <input type="hidden" name="fakeusernameremembered" />
 
-                    <FormControl fullWidth sx={{ mb: 2 }}>
-                      <Input
-                        name="cur_pass_field"
-                        disableUnderline
-                        placeholder="Current password"
-                        type={showCurrent ? "text" : "password"}
-                        value={currentPwd}
-                        onChange={(e) => setCurrentPwd(e.target.value)}
-                        startAdornment={<InputAdornment position="start"><HttpsIcon /></InputAdornment>}
-                        endAdornment={
-                          <InputAdornment position="end">
-                            <IconButton
-                              aria-label="toggle current password visibility"
-                              onClick={() => setShowCurrent(s => !s)}
-                              edge="end"
-                              size="small"
-                            >
-                              {showCurrent ? <VisibilityOff /> : <Visibility />}
-                            </IconButton>
-                          </InputAdornment>
-                        }
-                        inputProps={{ autoComplete: "off" }}
-                        sx={{ padding: "1rem" }}
-                        required
-                        readOnly={curReadOnly}
-                        onFocus={() => {
-                          setCurReadOnly(false);
-                          setCurrentPwd('');
-                        }}
-                      />
-                    </FormControl>
+                    {/* Show Current Password Field ONLY if NOT in Setup Mode */}
+                    {!isSetupMode && (
+                        <FormControl fullWidth sx={{ mb: 2 }}>
+                        <Input
+                            name="cur_pass_field"
+                            disableUnderline
+                            placeholder="Current password"
+                            type={showCurrent ? "text" : "password"}
+                            value={currentPwd}
+                            onChange={(e) => setCurrentPwd(e.target.value)}
+                            startAdornment={<InputAdornment position="start"><HttpsIcon /></InputAdornment>}
+                            endAdornment={
+                            <InputAdornment position="end">
+                                <IconButton
+                                aria-label="toggle current password visibility"
+                                onClick={() => setShowCurrent(s => !s)}
+                                edge="end"
+                                size="small"
+                                >
+                                {showCurrent ? <VisibilityOff /> : <Visibility />}
+                                </IconButton>
+                            </InputAdornment>
+                            }
+                            inputProps={{ autoComplete: "off" }}
+                            sx={{ padding: "1rem" }}
+                            required
+                            readOnly={curReadOnly}
+                            onFocus={() => {
+                            setCurReadOnly(false);
+                            setCurrentPwd('');
+                            }}
+                        />
+                        </FormControl>
+                    )}
 
                     <FormControl fullWidth sx={{ mb: 1 }}>
                       <Input
                         name="new_pass_field"
                         disableUnderline
-                        placeholder="New password"
+                        placeholder={isSetupMode ? "Create new password" : "New password"}
                         type={showNew ? "text" : "password"}
                         value={newPwd}
                         onChange={(e) => setNewPwd(e.target.value)}
@@ -397,7 +446,9 @@ export default function DepartmentAccount() {
                       />
                     </FormControl>
 
-                    <Button fullWidth type="submit" variant="contained" sx={{ py: 1 }}>Change password</Button>
+                    <Button fullWidth type="submit" variant="contained" sx={{ py: 1 }}>
+                        {isSetupMode ? "SECURE ACCOUNT & LOGIN" : "Change password"}
+                    </Button>
                   </form>
                 )}
               </CardContent>
@@ -407,7 +458,7 @@ export default function DepartmentAccount() {
       </Container>
 
       <Snackbar open={successOpen} autoHideDuration={3000} onClose={() => setSuccessOpen(false)}>
-        <Alert severity="success" onClose={() => setSuccessOpen(false)}>Password changed successfully</Alert>
+        <Alert severity="success" onClose={() => setSuccessOpen(false)}>{successMsg}</Alert>
       </Snackbar>
       <Snackbar open={errorOpen} autoHideDuration={4000} onClose={() => setErrorOpen(false)}>
         <Alert severity="error" onClose={() => setErrorOpen(false)}>{errMsg}</Alert>

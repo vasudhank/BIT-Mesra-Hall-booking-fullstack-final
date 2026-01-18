@@ -4,6 +4,8 @@ backend/node_modules/
 
 # Ignore environment variables (backend only)
 backend/.env
+frontend/.env
+.env
 
 # Ignore build outputs (future-proof)
 frontend/dist/

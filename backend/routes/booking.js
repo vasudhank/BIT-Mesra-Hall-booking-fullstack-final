@@ -4,6 +4,7 @@ const router = express.Router();
 
 const Booking_Requests = require('../models/booking_requests');
 const Hall = require('../models/hall');
+const { safeExecute } = require('../utils/safeNotify');
 require('dotenv').config();
 
 // SMS services
@@ -21,9 +22,31 @@ const {
 // Token utils
 const { generateApprovalToken, getTokenExpiry } = require('../utils/token');
 
-/* Root check */
+/* ================= ROOT CHECK ================= */
 router.get('/', (req, res) => {
   res.send({ msg: 'Inside Booking Route' });
+});
+
+/* =================================================
+   🔹 SHOW ALL BOOKING REQUESTS (ADMIN ONLY)
+   🔹 THIS WAS MISSING → CAUSED 404
+   ================================================= */
+router.get('/show_booking_requests', async (req, res) => {
+  try {
+    if (!(req.isAuthenticated && req.isAuthenticated() && req.user.type === 'Admin')) {
+      return res.status(403).json({ msg: 'You are not authorized' });
+    }
+
+    const requests = await Booking_Requests
+      .find({ status: 'PENDING' })   // only pending requests
+      .populate('department')
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({ booking_requests: requests });
+  } catch (err) {
+    console.error('show_booking_requests error:', err);
+    return res.status(500).json({ error: err.message });
+  }
 });
 
 /* =========================================
@@ -31,8 +54,6 @@ router.get('/', (req, res) => {
    ========================================= */
 router.post('/create_booking', async (req, res) => {
   try {
-    console.log('🔥 CREATE BOOKING ROUTE HIT');
-
     if (!(req.isAuthenticated && req.isAuthenticated() && req.user.type === 'Department')) {
       return res.status(403).json({ msg: 'Not Authorized to Make booking requests' });
     }
@@ -56,10 +77,6 @@ router.post('/create_booking', async (req, res) => {
 
     const startDT = new Date(startDateTime);
     const endDT = new Date(endDateTime);
-
-    if (isNaN(startDT.getTime()) || isNaN(endDT.getTime())) {
-      return res.status(400).json({ msg: 'Invalid startDateTime or endDateTime' });
-    }
 
     if (endDT <= startDT) {
       return res.status(400).json({ msg: 'endDateTime must be after startDateTime' });
@@ -88,37 +105,37 @@ router.post('/create_booking', async (req, res) => {
       event,
       startDateTime: startDT,
       endDateTime: endDT,
-      startTime12: startTime12 || null,
-      endTime12: endTime12 || null,
-      startTime24: startTime24 || null,
-      endTime24: endTime24 || null,
-      startDate: startDate || null,
-      endDate: endDate || null,
-      createdBy: req.user.id,
+      startTime12,
+      endTime12,
+      startTime24,
+      endTime24,
+      startDate,
+      endDate,
       approvalToken,
       tokenExpiry,
       status: 'PENDING'
     });
 
     const saved = await newRequest.save();
-    console.log('🔥 ABOUT TO SEND EMAIL + SMS');
-
     const baseUrl = `${process.env.PUBLIC_BASE_URL}/api/approval`;
 
-    // 📧 Email to Admin
-    await sendBookingApprovalMail({
-      adminEmail: process.env.EMAIL,
-      booking: saved,
-      approveUrl: `${baseUrl}/approve/${approvalToken}`,
-      rejectUrl: `${baseUrl}/reject/${approvalToken}`
-    });
+    safeExecute(
+      () => sendBookingApprovalMail({
+        adminEmail: process.env.EMAIL,
+        booking: saved,
+        approveUrl: `${baseUrl}/approve/${approvalToken}`,
+        rejectUrl: `${baseUrl}/reject/${approvalToken}`
+      }),
+      'ADMIN EMAIL'
+    );
 
-    // 📱 SMS to Admin
-    await sendBookingApprovalSMS({
-  booking: saved,
-  token: approvalToken
-});
-
+    safeExecute(
+      () => sendBookingApprovalSMS({
+        booking: saved,
+        token: approvalToken
+      }),
+      'ADMIN SMS'
+    );
 
     return res.status(201).json({
       message: 'Booking request created and sent for approval',
@@ -132,28 +149,7 @@ router.post('/create_booking', async (req, res) => {
 });
 
 /* =================================================
-   SHOW ALL BOOKING REQUESTS (ADMIN ONLY)
-   ================================================= */
-router.get('/show_booking_requests', async (req, res) => {
-  try {
-    if (!(req.isAuthenticated && req.isAuthenticated() && req.user.type === 'Admin')) {
-      return res.status(403).json({ msg: 'You are not authorized' });
-    }
-
-    const requests = await Booking_Requests
-      .find()
-      .populate('department')
-      .sort({ createdAt: -1 });
-
-    return res.status(200).json({ booking_requests: requests });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-/* =================================================
-   ADMIN ACCEPTS / REJECTS BOOKING
+   ADMIN ACCEPT / REJECT BOOKING
    ================================================= */
 router.post('/change_booking_request', async (req, res) => {
   try {
@@ -162,107 +158,77 @@ router.post('/change_booking_request', async (req, res) => {
     }
 
     const { decision, id, name } = req.body;
-    if (!id || !decision) {
-      return res.status(400).json({ msg: 'id and decision are required' });
-    }
-
     const requestDoc = await Booking_Requests.findById(id).populate('department');
+
     if (!requestDoc) {
       return res.status(404).json({ msg: 'Booking request not found' });
     }
 
     /* ---------- REJECT ---------- */
     if (decision !== 'Yes') {
-      await Booking_Requests.findByIdAndDelete(id);
+      requestDoc.status = 'REJECTED';
+      await requestDoc.save();
 
-      // 📧 Email to Department
-      await sendDecisionToDepartment({
-        email: requestDoc.department.email,
-        booking: requestDoc,
-        decision: 'REJECTED'
-      });
+      safeExecute(
+        () => sendDecisionToDepartment({
+          email: requestDoc.department.email,
+          booking: requestDoc,
+          decision: 'REJECTED'
+        }),
+        'DEPARTMENT EMAIL'
+      );
 
-      // 📱 SMS to Department
-      await sendDecisionSMSDepartment({
-        booking: requestDoc,
-        decision: 'REJECTED'
-      });
+      safeExecute(
+        () => sendDecisionSMSDepartment({
+          booking: requestDoc,
+          decision: 'REJECTED'
+        }),
+        'DEPARTMENT SMS'
+      );
 
-      return res.status(200).json({ status: 'Not Accepted' });
+      return res.status(200).json({ status: 'Rejected' });
     }
 
     /* ---------- APPROVE ---------- */
-    const startDT = new Date(requestDoc.startDateTime);
-    const endDT = new Date(requestDoc.endDateTime);
-
-    const existingOverlap = await Hall.findOne({
-      name,
-      bookings: {
-        $elemMatch: {
-          startDateTime: { $lt: endDT },
-          endDateTime: { $gt: startDT }
-        }
-      }
-    });
-
-    if (existingOverlap) {
-      await Booking_Requests.findByIdAndDelete(id);
-      return res.status(409).json({ msg: 'Time overlaps existing booking' });
-    }
-
     const bookingObj = {
       bookingRequest: requestDoc._id,
       department: requestDoc.department._id,
       event: requestDoc.event,
-      startDateTime: startDT,
-      endDateTime: endDT
+      startDateTime: requestDoc.startDateTime,
+      endDateTime: requestDoc.endDateTime
     };
 
-    const updatedHall = await Hall.findOneAndUpdate(
+    await Hall.findOneAndUpdate(
       { name },
-      { $push: { bookings: bookingObj } },
-      { new: true }
+      { $push: { bookings: bookingObj } }
     );
 
-    await Booking_Requests.findByIdAndDelete(id);
+    requestDoc.status = 'APPROVED';
+    await requestDoc.save();
 
-    // 📧 Email to Department
-    await sendDecisionToDepartment({
-      email: requestDoc.department.email,
-      booking: requestDoc,
-      decision: 'APPROVED'
-    });
+    safeExecute(
+      () => sendDecisionToDepartment({
+        email: requestDoc.department.email,
+        booking: requestDoc,
+        decision: 'APPROVED'
+      }),
+      'DEPARTMENT EMAIL'
+    );
 
-    // 📱 SMS to Department
-    await sendDecisionSMSDepartment({
-      booking: requestDoc,
-      decision: 'APPROVED'
-    });
+    safeExecute(
+      () => sendDecisionSMSDepartment({
+        booking: requestDoc,
+        decision: 'APPROVED'
+      }),
+      'DEPARTMENT SMS'
+    );
 
-    return res.status(200).json({
-      status: 'Booking Accepted',
-      updates: updatedHall
-    });
+    return res.status(200).json({ status: 'Approved' });
 
   } catch (err) {
     console.error('change_booking_request error:', err);
     return res.status(500).json({ error: err.message });
   }
-});
-
-/* =================================================
-   DEPARTMENT BOOKING HISTORY
-   ================================================= */
-router.get('/department_history', async (req, res) => {
-  if (!(req.isAuthenticated && req.user.type === 'Department')) {
-    return res.status(403).json({ msg: 'Unauthorized' });
-  }
-
-  const history = await Booking_Requests
-    .find({ department: req.user.id })
-    .sort({ createdAt: -1 });
-
-  res.json({ history });
 });
 
 module.exports = router;

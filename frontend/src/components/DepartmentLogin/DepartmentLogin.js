@@ -36,7 +36,7 @@ export default function DepartmentLogin() {
     e.preventDefault()
     const response = await departmentLoginApi({ email, password });
     if (!response.data.error) {
-      dispatch(addStatus("Admin"))
+      dispatch(addStatus("Department"))
       navigate("/department/booking")
     } else {
       setOpen(true)
