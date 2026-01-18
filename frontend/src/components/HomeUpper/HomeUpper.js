@@ -479,7 +479,7 @@ export default function HomeUpper() {
 
       {/* 3. Navbar */}
       <Box className="navbar-wrapper">
-        <Grid container justifyContent="center" wrap="nowrap">
+        <Grid container justifyContent="center">
           <Grid item display="flex" justifyContent="center">
             <div className={`navbar-shell ${scrolled ? "navbar-shell--scrolled" : ""}`}>
               <div className="navbar">
