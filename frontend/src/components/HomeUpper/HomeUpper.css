@@ -57,6 +57,7 @@
   width: 100%;
   z-index: 7;
   overflow: hidden;
+  min-height: 70px;
 }
 .navbar-wrapper .MuiGrid-container {
   margin-left: 0 !important;
@@ -66,6 +67,9 @@
   width: 72vw;
   max-width: 800px;
   min-width: 500px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   transform-origin: center top;
   transition: transform 0.35s cubic-bezier(.2,.8,.2,1), width 0.35s ease;
 }
@@ -81,6 +85,7 @@
   justify-content: center;
   align-items: center;
   width:100%;
+  white-space: nowrap;
   padding: 13px 44px;
   border-radius: 16px;
   transition: padding 0.35s ease, background 0.35s ease, backdrop-filter 0.35s ease, box-shadow 0.35s ease;
@@ -129,6 +134,7 @@
   justify-content: space-evenly;
   align-items: center;
   width: 100%;
+  flex-wrap: nowrap;
   font-family: "RecklessNeue";
   font-weight: 500;
   font-size: 1.1rem;
