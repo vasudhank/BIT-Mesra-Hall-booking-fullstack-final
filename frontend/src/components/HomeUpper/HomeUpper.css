@@ -57,7 +57,6 @@
   width: 100%;
   z-index: 7;
   overflow: hidden;
-  
 }
 .navbar-wrapper .MuiGrid-container {
   margin-left: 0 !important;
@@ -642,3 +641,171 @@
 .btn-check:hover { background: #dbeafe; }
 .btn-book-now { background: #0f172a; color: white; }
 .btn-book-now:hover { background: #1e293b; }
+
+/* =============================================================
+   RESPONSIVE MEDIA QUERIES (NEW ADDITION)
+   ============================================================= */
+
+/* 1. MacBook Pro (1440px) & Similar Screens */
+/* This specifically handles the 16:10 aspect ratio and 1440px width */
+@media (max-width: 1500px) {
+  .hero-content h1 {
+    font-size: 3.8rem;
+  }
+  .navbar-shell {
+    width: 80vw;
+  }
+  .calendar-3d-wrapper {
+    /* Push right (-5%) to align with the cropped background image on 1440px screens */
+    right: -0.4%; 
+    top: 42.8%; /* Keep vertical alignment same or tweak slightly if needed */
+    transform: perspective(600px) rotateY(3deg) rotateX(2deg) rotateZ(0deg) skewY(2.5deg) scale(0.85);
+  }
+  .steam-layer {
+  position: absolute;
+  left: 15%;
+  bottom: 37.4%;
+  width: 0;
+  height: 0;
+  z-index: 7;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+}
+}
+
+/* 2. Standard Tablets / Small Laptops (1024px and below) */
+@media (max-width: 1024px) {
+  .hero-content h1 {
+    font-size: 3.2rem;
+  }
+  .navbar-shell {
+    width: 90vw;
+    min-width: unset;
+  }
+  .navbar {
+    padding: 13px 20px;
+  }
+  .calendar-3d-wrapper {
+    /* Reset right for smaller screens where layout changes completely */
+    right: 1%;
+    top: 50%;
+    transform: perspective(600px) rotateY(3deg) rotateX(2deg) rotateZ(0deg) skewY(2.5deg) scale(0.75);
+  }
+}
+
+/* 3. Portrait Tablets & Mobile Devices (Below 768px) */
+@media (max-width: 768px) {
+  /* Navbar Adjustments */
+  .navbar-wrapper {
+    top: 1rem;
+  }
+  .navbar-shell,
+  .navbar-shell--scrolled {
+    width: 95vw !important; /* Force full width on mobile */
+    min-width: unset;
+  }
+  .navbar {
+    padding: 10px 15px;
+  }
+  .nav-links-container {
+    font-size: 0.9rem;
+  }
+
+  /* Logos */
+  .logo-img, .logo-img2 {
+    width: 50px;
+  }
+  .logo-container { left: 10px; }
+  .logo-container2 { right: 10px; }
+
+  /* Text Content */
+  .hero-content {
+    padding: 1rem;
+    justify-content: flex-start; /* Move text to top half */
+    padding-top: 25vh; /* Push down below navbar */
+  }
+  .hero-content-lowered {
+    transform: translateY(0); /* Remove desktop offset */
+  }
+  .hero-content h1 {
+    font-size: 2.5rem;
+  }
+  .hero-content p {
+    font-size: 11px;
+    max-width: 90%;
+  }
+
+  /* 3D Calendar - CENTER BOTTOM on Mobile */
+  .calendar-3d-wrapper {
+    top: auto;
+    bottom: 18%; /* Position in lower half */
+    right: 50%;
+    left: 50%;
+    /* Reset rotation slightly for simpler mobile view, center it */
+    transform: translate(-50%, 0) perspective(600px) rotateY(0deg) rotateX(5deg) scale(0.7);
+    z-index: 5;
+  }
+
+  /* Steam - Hide on mobile if it interferes, or center it */
+  .steam-layer {
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 15%;
+  }
+
+  /* Controls */
+  .controls-container {
+    bottom: 80px; /* Move above scroll arrow */
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+  }
+
+  /* Scroll Arrow */
+  .scroll-down-hero {
+    bottom: 1rem;
+    left: 50%;
+  }
+
+  /* CONTACT MODAL - Make it stacked for mobile */
+  .contact-header-row {
+    display: none; /* Hide header row on mobile */
+  }
+  .contact-item-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 15px;
+  }
+  .c-name {
+    font-size: 1.1rem;
+    margin-bottom: 2px;
+  }
+  .c-num, .c-email {
+    font-size: 0.9rem;
+    color: #64748b;
+  }
+  
+  /* Make all modals full width */
+  .popup-card, .popup-card-wide {
+    width: 95%;
+    max-width: 95%;
+    padding: 20px 15px;
+  }
+}
+
+/* 4. Very Small Phones (Below 400px) */
+@media (max-width: 400px) {
+  .hero-content h1 {
+    font-size: 2rem;
+  }
+  .nav-links-container {
+    font-size: 0.8rem;
+  }
+  .calendar-3d-wrapper {
+    transform: translate(-50%, 0) perspective(600px) rotateX(5deg) scale(0.6);
+    bottom: 15%;
+  }
+}

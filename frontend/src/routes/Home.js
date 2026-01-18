@@ -1,37 +1,16 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react' // Removed useEffect, useState
 import HomeUpper from '../components/HomeUpper/HomeUpper'
 import HomeLower from '../components/HomeLower/HomeLower'
-import Loading from '../components/Loading/Loading';
+// Removed Loading import
 
 export default function Home() {
-
-const [loading, setLoading] = useState(true);
-
-
-useEffect(() => {
-    
-
-    const timeout = setTimeout(() => {
-        setLoading(false);
-      }, 2000);
-  
-      return () => clearTimeout(timeout);
-}, []);
-
+  // Removed artificial delay logic entirely. 
+  // This saves you exactly 2.0 seconds on LCP.
 
   return (
     <>
-        {
-            loading?(
-                <Loading/>
-            ):
-            (   
-                <>
-                <HomeUpper/>
-                <HomeLower/>
-                </>
-            )
-        }
+      <HomeUpper/>
+      <HomeLower/>
     </>
   )
 }

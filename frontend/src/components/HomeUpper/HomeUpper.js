@@ -362,7 +362,7 @@ export default function HomeUpper() {
               </div>
             </div>
 
-            {/* CONTACT LIST HEADER */}
+            {/* CONTACT LIST HEADER (Hidden on mobile via CSS) */}
             <div className="contact-header-row">
               <span>NAME</span>
               <span>PHONE NUMBER</span>
