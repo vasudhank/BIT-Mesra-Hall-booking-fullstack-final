@@ -89,15 +89,7 @@ app.use('/api', require('./index1'));
 /* =====================================================
    SERVE FRONTEND (ONLY IN PRODUCTION)
 ===================================================== */
-if (NODE_ENV === 'production') {
-  const rootPath = path.join(__dirname, '..', 'frontend', 'build');
 
-  app.use(express.static(rootPath));
-
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(rootPath, 'index.html'));
-  });
-}
 
 /* =====================================================
    START SERVER
