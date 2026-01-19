@@ -20,6 +20,10 @@
   height: 100vh;
   width: 100%;
   overflow: hidden;
+  /* Default desktop background fallback */
+  background-color: #0f172a; 
+  /* Base z-index */
+  z-index: 1; 
 }
 
 .hero-video {
@@ -48,7 +52,7 @@
 .logo-img { width: 70px; }
 .logo-img2 { width: 80px; }
 
-/* ===== NAVBAR ===== */
+/* ===== NAVBAR (Desktop) ===== */
 .navbar-wrapper {
   position: fixed;
   top: 2rem;
@@ -98,7 +102,7 @@
   width: 100%;
   display: flex;
   justify-content: center;
-  z-index: 7;
+  z-index: 100; /* High z-index to stay above HomeLower */
   pointer-events: none;
 }
 .datetime-bar {
@@ -485,7 +489,7 @@
 @keyframes gradientShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
 
 /* =============================================================
-   POPUP CARDS & MODALS (EXTENDED FOR NEW FEATURES)
+   POPUP CARDS & MODALS
    ============================================================= */
 .popup-overlay-backdrop {
   position: absolute;
@@ -508,14 +512,11 @@
   position: relative;
   text-align: center;
 }
-
-/* --- WIDER CARD FOR WISH LIST --- */
 .popup-card-wide {
-  max-width: 900px; /* Wider to fit columns properly */
+  max-width: 900px; 
   width: 90%;
   text-align: left;
 }
-
 .popup-close {
   position: absolute;
   top: 10px;
@@ -526,7 +527,7 @@
 }
 .popup-close:hover { color: #333; }
 
-/* --- CONTACT MODAL SPECIFIC STYLES --- */
+/* Contact Modal Styles */
 .modal-title {
   font-family: 'RecklessNeue';
   margin-top: 0;
@@ -535,8 +536,6 @@
   text-align: center;
   color: #0f172a;
 }
-
-/* Search Box Styles */
 .contact-search-wrapper {
   display: flex;
   margin-bottom: 20px;
@@ -563,10 +562,9 @@
 }
 .search-btn-box:hover { background: #334155; }
 
-/* Contact List Header (3 Columns) */
 .contact-header-row {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1.5fr; /* Name, Number, Email */
+  grid-template-columns: 1.2fr 1fr 1.5fr;
   gap: 15px;
   padding: 10px 16px;
   background: #f1f5f9;
@@ -577,21 +575,16 @@
   margin-bottom: 8px;
   font-family: 'Inter', sans-serif;
 }
-
-/* Scrollable Contact List */
 .contact-list-scrollable {
-  max-height: 50vh; /* Limits height, enables scroll */
+  max-height: 50vh; 
   overflow-y: auto;
-  padding-right: 5px; /* Spacing for scrollbar */
+  padding-right: 5px; 
 }
-
-/* Custom Scrollbar */
 .contact-list-scrollable::-webkit-scrollbar { width: 6px; }
 .contact-list-scrollable::-webkit-scrollbar-track { background: #f1f1f1; }
 .contact-list-scrollable::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 .contact-list-scrollable::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-/* Contact Items (3 Columns matching header) */
 .contact-item-row {
   display: grid;
   grid-template-columns: 1.2fr 1fr 1.5fr;
@@ -609,14 +602,12 @@
 .c-num { font-size: 0.95rem; color: #475569; }
 .c-email { font-size: 0.95rem; color: #475569; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Clickable Utility */
 .clickable { cursor: pointer; transition: color 0.2s; }
 .clickable:hover { color: #2563eb; text-decoration: underline; }
 
 .no-contacts-msg { text-align: center; color: #94a3b8; margin: 40px 0; font-style: italic; }
 .modal-footer-hint { text-align: center; font-size: 0.8rem; color: #94a3b8; margin-top: 15px; }
 
-/* --- OTHER MODAL SPECIFICS --- */
 .ai-typing-box {
   margin-top: 20px;
   padding: 10px;
@@ -624,6 +615,10 @@
   border-radius: 8px;
   font-size: 0.8rem;
   color: #64748b;
+}
+.ai-modal-icon {
+  font-size: 3rem;
+  margin-bottom: 10px;
 }
 .date-modal-subtitle { font-family: 'Inter'; color: #334155; margin-bottom: 5px; }
 .date-modal-title { font-family: 'RecklessNeue'; color: #d32f2f; margin: 0 0 20px 0; }
@@ -643,135 +638,249 @@
 .btn-book-now:hover { background: #1e293b; }
 
 /* =============================================================
-   RESPONSIVE MEDIA QUERIES (NEW ADDITION)
+   MOBILE MENU STYLES (NEW)
+   ============================================================= */
+/* Hamburger Button (Fixed, Circular, Blurry) */
+.mobile-menu-toggle {
+  position: fixed; /* Fixed as requested */
+  top: 90px;
+  right: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100; /* High z-index to stay above HomeLower */
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  display: none; /* Hidden on desktop */
+}
+
+/* "Wish Your Day" Button (Mobile, Absolute, Left) */
+.mobile-wish-btn {
+  position: absolute; /* Scrollable as requested */
+  top: 90px;
+  left: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+  border: none;
+  border-radius: 30px;
+  padding: 10px 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+  z-index: 9;
+  cursor: pointer;
+  display: none; /* Hidden on desktop */
+}
+
+/* AI Floating Action Button (Fixed, Bottom Right, Gradient) */
+.mobile-ai-fab {
+  position: fixed;
+  bottom: 25px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  z-index: 100; /* High z-index to stay above HomeLower */
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  /* Modern Blending Gradient Animation */
+  background: linear-gradient(45deg, #4285f4, #9b72cb, #d96570, #fbbc05);
+  background-size: 300% 300%;
+  animation: aiGradient 4s ease infinite;
+  display: none; /* Hidden on desktop */
+}
+
+@keyframes aiGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.drag-hint-card {
+  position: absolute;
+  right: 65px; /* Appears to the left of the button */
+  top: 50%;
+  transform: translateY(-50%) translateX(10px);
+  background: rgba(0, 0, 0, 0.85);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.drag-hint-card.visible {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+.mobile-menu-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.mobile-menu-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.mobile-menu-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.mobile-menu-close {
+  position: absolute;
+  top: 30px;
+  right: 20px;
+  cursor: pointer;
+}
+
+.mobile-nav-links {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  text-align: center;
+}
+
+.mobile-nav-item {
+  font-family: 'RecklessNeue';
+  font-size: 2rem;
+  color: white;
+  text-decoration: none;
+  font-weight: 500;
+  transition: transform 0.2s;
+}
+
+.mobile-nav-item:hover {
+  transform: scale(1.1);
+  color: #cbd5e1;
+}
+
+/* =============================================================
+   RESPONSIVE MEDIA QUERIES
    ============================================================= */
 
-/* 1. MacBook Pro (1440px) & Similar Screens */
-/* This specifically handles the 16:10 aspect ratio and 1440px width */
+/* 1. MacBook Pro (1440px) */
 @media (max-width: 1500px) {
-  .hero-content h1 {
-    font-size: 3.8rem;
-  }
-  .navbar-shell {
-    width: 80vw;
-  }
+  .hero-content h1 { font-size: 3.8rem; }
+  .navbar-shell { width: 80vw; }
   .calendar-3d-wrapper {
-    /* Push right (-5%) to align with the cropped background image on 1440px screens */
     right: -0.4%; 
-    top: 42.8%; /* Keep vertical alignment same or tweak slightly if needed */
+    top: 42.8%;
     transform: perspective(600px) rotateY(3deg) rotateX(2deg) rotateZ(0deg) skewY(2.5deg) scale(0.85);
   }
   .steam-layer {
-  position: absolute;
-  left: 15%;
-  bottom: 37.4%;
-  width: 0;
-  height: 0;
-  z-index: 7;
-  pointer-events: none;
-  display: flex;
-  justify-content: center;
-}
+    left: 15%;
+    bottom: 37.4%;
+  }
 }
 
-/* 2. Standard Tablets / Small Laptops (1024px and below) */
+/* 2. Standard Tablets / Small Laptops (1024px) */
 @media (max-width: 1024px) {
-  .hero-content h1 {
-    font-size: 3.2rem;
-  }
-  .navbar-shell {
-    width: 90vw;
-    min-width: unset;
-  }
-  .navbar {
-    padding: 13px 20px;
-  }
+  .hero-content h1 { font-size: 3.2rem; }
+  .navbar-shell { width: 90vw; min-width: unset; }
+  .navbar { padding: 13px 20px; }
   .calendar-3d-wrapper {
-    /* Reset right for smaller screens where layout changes completely */
     right: 1%;
     top: 50%;
     transform: perspective(600px) rotateY(3deg) rotateX(2deg) rotateZ(0deg) skewY(2.5deg) scale(0.75);
   }
 }
 
-/* 3. Portrait Tablets & Mobile Devices (Below 768px) */
+/* 3. MOBILE DEVICES (Strictly below 768px) */
 @media (max-width: 768px) {
-  /* Navbar Adjustments */
-  .navbar-wrapper {
-    top: 1rem;
-  }
-  .navbar-shell,
-  .navbar-shell--scrolled {
-    width: 95vw !important; /* Force full width on mobile */
-    min-width: unset;
-  }
-  .navbar {
-    padding: 10px 15px;
-  }
-  .nav-links-container {
-    font-size: 0.9rem;
+  /* sticky logic for HomeUpper */
+  .hero-video-wrapper {
+    position: sticky;
+    top: 0;
+    z-index: 1; /* Low z-index so HomeLower slides OVER it */
   }
 
-  /* Logos */
-  .logo-img, .logo-img2 {
-    width: 50px;
-  }
+  /* Activate Mobile Specific Buttons */
+  .mobile-menu-toggle { display: flex; animation: fadeIn 0.5s ease; }
+  .mobile-wish-btn { display: flex; animation: fadeIn 0.5s ease; }
+  .mobile-ai-fab { display: flex; animation: popup 0.5s ease; }
+
+  /* Logos - Slightly smaller */
+  .logo-img, .logo-img2 { width: 50px; }
   .logo-container { left: 10px; }
   .logo-container2 { right: 10px; }
 
-  /* Text Content */
-  .hero-content {
+  /* Hero Content - POSTER STYLE TYPOGRAPHY */
+  .hero-content-mobile {
     padding: 1rem;
-    justify-content: flex-start; /* Move text to top half */
-    padding-top: 25vh; /* Push down below navbar */
+    justify-content: flex-start;
+     /* Push text down */
+    
+    background: transparent; 
   }
-  .hero-content-lowered {
-    transform: translateY(0); /* Remove desktop offset */
-  }
+  
   .hero-content h1 {
-    font-size: 2.5rem;
+    padding-top: 20vh;
+    text-align:left;
+    font-size: 4.8rem; /* Significantly Larger */
+    margin-bottom: 10px;
+    text-shadow: 0 4px 10px rgba(0,0,0,0.6);
   }
+
+  .hero-content h1 span {
+    font-size:3.8rem;
+    text-shadow: 0 4px 10px rgba(0,0,0,0.6);
+    padding-top: 30vh;
+    text-align:center;
+
+  }
+  
   .hero-content p {
-    font-size: 11px;
+    font-size: 13px;
     max-width: 90%;
-  }
-
-  /* 3D Calendar - CENTER BOTTOM on Mobile */
-  .calendar-3d-wrapper {
-    top: auto;
-    bottom: 18%; /* Position in lower half */
-    right: 50%;
-    left: 50%;
-    /* Reset rotation slightly for simpler mobile view, center it */
-    transform: translate(-50%, 0) perspective(600px) rotateY(0deg) rotateX(5deg) scale(0.7);
-    z-index: 5;
-  }
-
-  /* Steam - Hide on mobile if it interferes, or center it */
-  .steam-layer {
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: 15%;
-  }
-
-  /* Controls */
-  .controls-container {
-    bottom: 80px; /* Move above scroll arrow */
-    left: 50%;
-    transform: translateX(-50%);
-    width: max-content;
+    text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+    font-weight: 500;
+    color: #e2e8f0;
   }
 
   /* Scroll Arrow */
   .scroll-down-hero {
-    bottom: 1rem;
+    bottom: 4rem;
     left: 50%;
   }
 
-  /* CONTACT MODAL - Make it stacked for mobile */
-  .contact-header-row {
-    display: none; /* Hide header row on mobile */
-  }
+  /* CONTACT MODAL STACKED */
+  .contact-header-row { display: none; }
   .contact-item-row {
     display: flex;
     flex-direction: column;
@@ -779,16 +888,10 @@
     gap: 4px;
     padding: 15px;
   }
-  .c-name {
-    font-size: 1.1rem;
-    margin-bottom: 2px;
-  }
-  .c-num, .c-email {
-    font-size: 0.9rem;
-    color: #64748b;
-  }
+  .c-name { font-size: 1.1rem; margin-bottom: 2px; }
+  .c-num, .c-email { font-size: 0.9rem; color: #64748b; }
   
-  /* Make all modals full width */
+  /* Modal Resizing for Mobile */
   .popup-card, .popup-card-wide {
     width: 95%;
     max-width: 95%;
@@ -796,16 +899,14 @@
   }
 }
 
-/* 4. Very Small Phones (Below 400px) */
+/* 4. Small Phones */
 @media (max-width: 400px) {
-  .hero-content h1 {
-    font-size: 2rem;
-  }
-  .nav-links-container {
-    font-size: 0.8rem;
-  }
-  .calendar-3d-wrapper {
-    transform: translate(-50%, 0) perspective(600px) rotateX(5deg) scale(0.6);
-    bottom: 15%;
-  }
+  .hero-content h1 { font-size: 2.8rem; }
+  .mobile-wish-btn { top: 80px; font-size: 0.8rem; padding: 8px 14px; }
+  .mobile-menu-toggle { top: 80px; width: 40px; height: 40px; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }

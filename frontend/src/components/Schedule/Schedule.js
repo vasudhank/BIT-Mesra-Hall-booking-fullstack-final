@@ -4,7 +4,7 @@ import api from '../../api/axiosInstance';
 import "./Schedule.css";
 import HomeIcon from '@mui/icons-material/Home';
 import {
-  Container, Grid, Paper, Typography, TextField, Box, Chip, Button, Stack, IconButton, InputAdornment
+  Container, Grid, Paper, Typography, TextField, Box, Chip, Button, Stack, IconButton, InputAdornment, useTheme, useMediaQuery
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import dayjs from 'dayjs';
@@ -47,6 +47,10 @@ function colorFromString(str) {
 
 export default function Schedule() {
   const location = useLocation(); // Hook to access state passed via navigate
+  const theme = useTheme();
+  // Check for mobile breakpoint (sm = 600px)
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   const [halls, setHalls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
@@ -219,6 +223,9 @@ export default function Schedule() {
   return () => clearInterval(interval);
 }, []);
 
+  // Dynamic Grid Dimensions for Mobile responsiveness
+  const rowHeaderWidth = isMobile ? '120px' : '220px';
+  const dayColWidth = isMobile ? 'minmax(140px, 1fr)' : 'minmax(180px, 1fr)';
 
   return (
     // ensure container uses normal flow (do not position fixed here)
@@ -244,61 +251,66 @@ export default function Schedule() {
           backgroundColor: '#fff',         // opaque so nothing shows through
           borderBottom: '1px solid rgba(0,0,0,0.06)',
           boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
-          px: 3,
+          px: { xs: 2, md: 3 }, // Responsive padding
           py: 1
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-          <Typography variant="h4" sx={{ fontWeight: 600, fontFamily: 'RecklessNeue' }}>Hall Schedule</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+          <Typography variant="h4" sx={{ fontWeight: 600, fontFamily: 'RecklessNeue', fontSize: { xs: '1.5rem', md: '2.125rem' } }}>
+            Hall Schedule
+          </Typography>
 
           {/* RIGHT SIDE OF STRIP: search box (NEW) | select date | chip | view buttons */}
-          <Box display="flex" gap={2} alignItems="center">
+          <Box display="flex" gap={isMobile ? 1 : 2} alignItems="center" flexWrap="wrap" sx={{ justifyContent: { xs: 'space-between', md: 'flex-end' }, width: { xs: '100%', md: 'auto' } }}>
           <Typography
-    sx={{
-      fontSize: "0.85rem",
-      fontWeight: 600,
-      whiteSpace: "nowrap",
-      color: "rgba(0,0,0,0.75)"
-    }}
-  >
-    {dateTime}
-  </Typography>
+            sx={{
+              fontSize: "0.85rem",
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+              color: "rgba(0,0,0,0.75)",
+              display: { xs: 'none', md: 'block' }, // Hide full date on very small mobile screens to save space
+              mr: 1
+            }}
+          >
+            {dateTime}
+          </Typography>
             {/* SEARCH BOX - rounded corners, placeholder as requested, with search icon */}
             <TextField
-  placeholder="Type your room name here"
-  value={searchTerm}
-  onChange={onSearchChange}
-  onKeyDown={onSearchKeyDown}
-  size="small"
-  variant="outlined"
-  sx={{
-    '& .MuiOutlinedInput-root': {
-      borderRadius: '24px',
-      paddingRight: 0,
-    },
-    minWidth: { xs: 160, sm: 260 },
-    '& .MuiOutlinedInput-notchedOutline': {
-      borderColor: 'rgba(0,0,0,0.12)',
-    },
+              placeholder="Type your room name here"
+              value={searchTerm}
+              onChange={onSearchChange}
+              onKeyDown={onSearchKeyDown}
+              size="small"
+              variant="outlined"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '24px',
+                  paddingRight: 0,
+                },
+                minWidth: { xs: '100%', sm: 260 }, // Full width on mobile
+                flexGrow: { xs: 1, sm: 0 },
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(0,0,0,0.12)',
+                },
 
-    // ⭐ CUSTOM PLACEHOLDER FONT SIZE HERE ⭐
-    '& input::placeholder': {
-      fontSize: '12px',       // <-- set any px value you want
-      opacity: 1,            // ensures it's not faded
-    }
-  }}
-  InputProps={{
-    endAdornment: (
-      <InputAdornment position="end" sx={{ mr: 0 }}>
-        
-        <IconButton size="small" onClick={onSearchSubmit} aria-label="submit search">
-          <SearchIcon />
-        </IconButton>
-      </InputAdornment>
-    ),
-    sx: { paddingRight: '6px' }
-  }}
-/>
+                // ⭐ CUSTOM PLACEHOLDER FONT SIZE HERE ⭐
+                '& input::placeholder': {
+                  fontSize: '12px',        // <-- set any px value you want
+                  opacity: 1,             // ensures it's not faded
+                }
+              }}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end" sx={{ mr: 0 }}>
+                    
+                    <IconButton size="small" onClick={onSearchSubmit} aria-label="submit search">
+                      <SearchIcon />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+                sx: { paddingRight: '6px' }
+              }}
+            />
 
 
             {/* existing select date */}
@@ -309,15 +321,20 @@ export default function Schedule() {
               onChange={(e) => setSelectedDate(e.target.value)}
               InputLabelProps={{ shrink: true }}
               size="small"
+              sx={{ flexGrow: { xs: 1, sm: 0 } }}
             />
 
-            <Chip label={loading ? "Loading..." : `${(gridData.rows || []).length} halls`} />
+            <Chip 
+              label={loading ? "Loading..." : `${(gridData.rows || []).length} halls`} 
+              sx={{ display: { xs: 'none', sm: 'flex' } }} // Hide chip on very small screens if crowded
+            />
 
             <Stack direction="row" spacing={1}>
               <Button
                 variant={viewMode === 'list' ? 'contained' : 'outlined'}
                 onClick={() => setViewMode('list')}
                 size="small"
+                sx={{ minWidth: 'auto' }}
               >
                 List
               </Button>
@@ -325,17 +342,18 @@ export default function Schedule() {
                 variant={viewMode === 'grid' ? 'contained' : 'outlined'}
                 onClick={() => setViewMode('grid')}
                 size="small"
+                sx={{ minWidth: 'auto' }}
               >
                 Grid
               </Button>
             </Stack>
             <IconButton
-  size="small"
-  onClick={() => window.location.href = "/"}   // ← sends user to Homepage instantly
-  aria-label="go home"
->
-  <HomeIcon />
-</IconButton>
+              size="small"
+              onClick={() => window.location.href = "/"}   // ← sends user to Homepage instantly
+              aria-label="go home"
+            >
+              <HomeIcon />
+            </IconButton>
 
           </Box>
         </Box>
@@ -346,7 +364,7 @@ export default function Schedule() {
 
       {/* List view unchanged but with a little top padding so cards don't butt to the strip */}
       {viewMode === 'list' && (
-        <Container sx={{ px: 3, pt: 2 }}>
+        <Container sx={{ px: { xs: 2, md: 3 }, pt: 2 }}>
           <Grid container spacing={3}>
             {loading ? (
               <Grid item xs={12}><Typography>Loading...</Typography></Grid>
@@ -405,10 +423,18 @@ export default function Schedule() {
           >
             <Box sx={{
               display: 'grid',
-              gridTemplateColumns: `220px repeat(${gridData.cols.length}, minmax(180px, 1fr))`,
+              gridTemplateColumns: `${rowHeaderWidth} repeat(${gridData.cols.length}, ${dayColWidth})`,
               width: 'max-content'
             }}>
-              <Box sx={{ borderRight: '1px solid #ddd', borderBottom: '1px solid #ddd', p: 1, bgcolor: '#fafafa' }}>
+              <Box sx={{ 
+                borderRight: '1px solid #ddd', 
+                borderBottom: '1px solid #ddd', 
+                p: 1, 
+                bgcolor: '#fafafa',
+                position: 'sticky', // FIX: Sticky Left
+                left: 0,
+                zIndex: 10
+              }}>
                 <Typography variant="subtitle2">Room / Day</Typography>
               </Box>
               {gridData.cols.map(col => (
@@ -433,11 +459,20 @@ export default function Schedule() {
               {gridData.rows.map(row => (
                 <Box key={row.id} sx={{
                   display: 'grid',
-                  gridTemplateColumns: `220px repeat(${gridData.cols.length}, minmax(180px, 1fr))`,
+                  gridTemplateColumns: `${rowHeaderWidth} repeat(${gridData.cols.length}, ${dayColWidth})`,
                   width: 'max-content'
                 }}>
                   {/* left room cell */}
-                  <Box sx={{ borderRight: '1px solid #ddd', borderBottom: '1px solid #eee', p: 1, bgcolor: '#fff', minWidth: 220 }}>
+                  <Box sx={{ 
+                    borderRight: '1px solid #ddd', 
+                    borderBottom: '1px solid #eee', 
+                    p: 1, 
+                    bgcolor: '#fff', 
+                    minWidth: isMobile ? 120 : 220,
+                    position: 'sticky', // FIX: Sticky Left
+                    left: 0,
+                    zIndex: 10
+                  }}>
                     <Typography variant="subtitle2">{row.name}</Typography>
                     <Typography variant="caption" color="text.secondary">{row.capacity} seats&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</Typography>
                     <Chip label={row.status} size="small" sx={{ mt: 0.5 }} color={row.status === 'Filled' ? 'error' : 'success'} />
@@ -452,7 +487,7 @@ export default function Schedule() {
                         borderBottom: '1px solid #eee',
                         p: 1,
                         minHeight: 70,
-                        minWidth: 180,
+                        minWidth: isMobile ? 140 : 180,
                         bgcolor: bookings.length ? '#fafafa' : '#fff'
                       }}>
                         {bookings.length === 0 ? (

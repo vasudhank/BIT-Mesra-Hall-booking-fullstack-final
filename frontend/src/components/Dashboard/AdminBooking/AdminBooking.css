@@ -6,103 +6,113 @@
   font-display: swap;
 }
 
-
-.admin-booking-body{
-    background: linear-gradient(243.81deg, #25354F 0.9%, #1B2033 100%);
-    height: 100vh;
-    box-sizing: border-box;
-    overflow: auto;
-    padding:70px;
+.admin-booking-body {
+  background: linear-gradient(243.81deg, #25354F 0.9%, #1B2033 100%);
+  min-height: 100vh;
+  box-sizing: border-box;
+  overflow-y: auto;
+  /* Default Desktop Padding */
+  padding: 0; 
+  padding-bottom: 50px;
 }
 
-
-.admin-booking-title{
-    color: white !important;
-    font-family: 'RecklessNeue' !important;
-    font-size: 2rem;
-    text-align: center !important;
-    margin-top: 1rem;
-    
+.admin-booking-title {
+  color: white !important;
+  font-family: 'RecklessNeue' !important;
+  font-size: 2rem;
+  text-align: center !important;
+  margin-top: 1rem;
 }
 
-.admin-booking-title-div{
-    border-bottom: 1px solid #FFFFFF;
-    margin-bottom: 4rem;
+.admin-booking-title-div {
+  border-bottom: 1px solid #FFFFFF;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  width: 90%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-
-.request-div-admin{
-    
-    width: 100%;
-    height: auto;
-    background: #36476f;
-    font-family: 'RecklessNeue' !important;
+.request-div-admin {
+  width: 100%;
+  height: auto;
+  background: #303C5C; /* Matches other cards */
+  font-family: 'RecklessNeue' !important;
+  border-radius: 1.5rem;
+  box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.3);
+  padding-top: 10px;
 }
 
-
-.admin-booking-request-title{
-    color:#ff7b00;
-    font-size: 1.3rem;
-    padding-top: 5px;
-    text-align: center;
+.admin-booking-request-title {
+  color: #ff7b00;
+  font-size: 1.5rem;
+  padding-top: 10px;
+  text-align: center;
+  margin-bottom: 5px;
 }
 
-.admin-booking-request-desc-div{
-    display:flex ;
-    justify-content: space-evenly;
-    align-items: center;
-    margin-top: 1rem;
-    margin-bottom: 1rem;
-    font-family: 'RecklessNeue' !important;
-    text-align: center;
-    font-size: 1rem;
-    color: white;
+.admin-booking-request-desc-div {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  margin-top: 0.5rem;
+  margin-bottom: 1.5rem;
+  font-family: 'RecklessNeue' !important;
+  text-align: center;
+  gap: 5px;
 }
 
-
-.btn-admin-booking-request-accept{
-    background: #28B006 !important;
-    border-radius: 1rem !important;
-    font-family:'Times New Roman', Times, serif !important;
-    color: white !important;
-    font-size: large;
-    margin-bottom: 1rem !important;
-    width: 50%;
+.admin-booking-request-desc {
+  font-size: 1.1rem;
+  color: #e0e0e0;
 }
 
-.btn-admin-booking-request-reject{
-    background: #D72828 !important;
-    border-radius: 1rem !important;
-    font-family:'Times New Roman', Times, serif !important;
-    color: white !important;
-    font-size: large;
-    margin-bottom: 1rem !important;
-    width: 50%;
-}
-
-.btn-admin-booking-request-accept *,
-.btn-admin-booking-request-reject * {
+/* BUTTON STYLES */
+.btn-admin-booking-request-accept {
+  background: #28B006 !important;
+  border-radius: 1rem !important;
   font-family: 'Times New Roman', Times, serif !important;
+  color: white !important;
+  font-size: 1rem !important;
+  font-weight: bold !important;
+  /* Removed fixed width, let Grid handle it */
 }
 
-
-
-@media only screen and (max-width: 390px) {
-    .admin-booking-title{
-        font-size: 1.5rem;
-    }
-    .admin-booking-request-desc-div{
-        font-size: 0.8rem;
-    }
-  }
-
+.btn-admin-booking-request-reject {
+  background: #D72828 !important;
+  border-radius: 1rem !important;
+  font-family: 'Times New Roman', Times, serif !important;
+  color: white !important;
+  font-size: 1rem !important;
+  font-weight: bold !important;
+}
 
 /* Force override of all MUI button text, regardless of theme */
 .MuiButton-root.btn-admin-booking-request-accept,
-.MuiButton-root.btn-admin-booking-request-reject,
-.MuiButton-root.btn-admin-booking-request-accept * ,
-.MuiButton-root.btn-admin-booking-request-reject * {
+.MuiButton-root.btn-admin-booking-request-reject {
   font-family: "Times New Roman", Times, serif !important;
-  font-style: normal !important;
-  font-weight: normal !important;
+  text-transform: none !important;
+}
+
+/* ================= MOBILE RESPONSIVENESS ================= */
+@media only screen and (max-width: 768px) {
+  .admin-booking-body {
+    /* Push content down on mobile because of stacked AppBar */
+    padding-top: 0; 
+  }
+
+  .admin-booking-title {
+    font-size: 1.5rem;
+  }
+
+  .admin-booking-title-div {
+    margin-bottom: 2rem;
+  }
+
+  /* Buttons stay horizontal but text gets smaller if needed */
+  .btn-admin-booking-request-accept,
+  .btn-admin-booking-request-reject {
+    font-size: 0.9rem !important;
+  }
 }

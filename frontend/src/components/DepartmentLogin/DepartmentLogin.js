@@ -70,28 +70,28 @@ export default function DepartmentLogin() {
                   <div className="input-group">
                     <FormControl fullWidth>
                       <Input
-  value={email}
-  onChange={(e) => setEmail(e.target.value)}
-  disableUnderline
-  type="email"
-  placeholder="Email address"
-  required
-  className="login-input"
-  startAdornment={
-    <InputAdornment position="start">
-      <EmailIcon />
-    </InputAdornment>
-  }
-  inputProps={{
-    style: {
-      padding: "0",
-      height: "100%",
-      display: "flex",
-      alignItems: "center",
-      marginTop: "11px"
-    },
-  }}
-/>
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        disableUnderline
+                        type="email"
+                        placeholder="Email address"
+                        required
+                        className="login-input"
+                        startAdornment={
+                          <InputAdornment position="start">
+                            <EmailIcon />
+                          </InputAdornment>
+                        }
+                        inputProps={{
+                          style: {
+                            padding: "0",
+                            height: "100%",
+                            display: "flex",
+                            alignItems: "center",
+                            marginTop: "11px"
+                          },
+                        }}
+                      />
 
                     </FormControl>
                   </div>
@@ -99,28 +99,28 @@ export default function DepartmentLogin() {
                   <div className="input-group">
                     <FormControl fullWidth>
                       <Input
-  value={password}
-  onChange={(e) => setPassword(e.target.value)}
-  disableUnderline
-  type="password"
-  placeholder="Password"
-  required
-  className="login-input"
-  startAdornment={
-    <InputAdornment position="start">
-      <HttpsIcon />
-    </InputAdornment>
-  }
-  inputProps={{
-    style: {
-      padding: "0",
-      height: "100%",
-      display: "flex",
-      alignItems: "center",
-      marginTop: "11px"
-    },
-  }}
-/>
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disableUnderline
+                        type="password"
+                        placeholder="Password"
+                        required
+                        className="login-input"
+                        startAdornment={
+                          <InputAdornment position="start">
+                            <HttpsIcon />
+                          </InputAdornment>
+                        }
+                        inputProps={{
+                          style: {
+                            padding: "0",
+                            height: "100%",
+                            display: "flex",
+                            alignItems: "center",
+                            marginTop: "11px"
+                          },
+                        }}
+                      />
 
                     </FormControl>
                   </div>
@@ -137,7 +137,7 @@ export default function DepartmentLogin() {
 
                   <Button fullWidth className="home-btn" disableRipple>
                     <Link to="/" className="home-link">
-                      <HomeIcon sx={{ mr: 1 }}/>
+                      <HomeIcon sx={{ mr: 1 }} />
                       HOME
                     </Link>
                   </Button>

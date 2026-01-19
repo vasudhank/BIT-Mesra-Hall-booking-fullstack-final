@@ -45,9 +45,6 @@
   --text: #f3f3f3;
 }
 
-
-
-
 /* ================= BASE GRID ================= */
 
 .grid-card-home {
@@ -72,12 +69,7 @@
   transition: transform 240ms ease, box-shadow 240ms ease;
 }
 
-/* Slight lift when visible */
-.scroll-row.in-view .home-card {
-  transform: translateY(-6px);
-}
-
-/* ================= POSITIONING ================= */
+/* ================= POSITIONING (DESKTOP) ================= */
 
 .pos-left {
   left: 159px;
@@ -147,24 +139,29 @@
   transform: translateY(10px);
 }
 
-/* ================= SCROLL ANIMATIONS ================= */
+/* ================= SCROLL ANIMATIONS (DESKTOP DEFAULTS) ================= */
 
-.scroll-row {
+/* On desktop, we apply logic to the grid item or wrapper */
+.scroll-block {
   opacity: 0;
   transition: transform 1s cubic-bezier(.2, .9, .2, 1), opacity 1s ease;
 }
 
-.scroll-row.from-left {
-  transform: translateX(-120px);
-}
+/* Desktop Logic: Admin card/anim come from left */
+.from-left-logic { transform: translateX(-120px); }
+.from-right-logic { transform: translateX(-120px); } /* On desktop they are grouped */
+.from-left-logic-dept { transform: translateX(120px); }
+.desktop-dept-anim { transform: translateX(120px); }
 
-.scroll-row.from-right {
-  transform: translateX(120px);
-}
-
-.scroll-row.in-view {
+/* In View State (Desktop) */
+.scroll-block.in-view {
   transform: translateX(0);
   opacity: 1;
+}
+
+/* Slight lift for card when visible */
+.scroll-block.in-view .home-card {
+  transform: translateY(-6px);
 }
 
 /* ================= LOGIN BUTTON (NEUMORPHIC INSET) ================= */
@@ -212,37 +209,104 @@
     inset -6px -6px 12px var(--inset-light);
 }
 
-/* ================= RESPONSIVE ================= */
+/* ================= RESPONSIVE (MOBILE) ================= */
 
 @media (max-width: 768px) {
-  .pos-left,
-  .pos-right {
-    left: 0;
-    right: 0;
-    margin-top: 40px;
+  /* 1. Reset Desktop Positioning */
+  .pos-left, .pos-right {
+    left: auto; right: auto;
+    margin-top: 0; margin-bottom: 0;
+    height: auto; padding-left: 0;
   }
 
+  /* 2. Disconnect and Space Out Items (Vertical Centering) */
+  .mobile-center-trigger {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 60vh; /* Takes up screen height to allow distinct scrolling */
+    margin-bottom: 50px;
+  }
+
+  /* 3. Card Styling */
   .home-card {
-    width: 92%;
-    margin-left: auto;
-    margin-right: auto;
+    width: 90vw;
+    margin: 0 auto;
+    
   }
 
-  .btn-home-card-btn {
-    width: 50%;
+  /* 4. Text & Button Alignment */
+  .text-card-home {
+    text-align: center;
+    padding: 0 !important;
+    font-size: 2rem !important;
+  }
+  .right-text .text-card-home { padding: 0 !important; text-align: center; }
+  
+  .feature-list {
+    align-items: flex-start !important; 
+    width: fit-content !important;      
+    margin: 0 auto !important;          
+  }
+  
+  .feature-item {
+    flex-direction: row !important;         
+    justify-content: flex-start !important; 
+    width: 100%;
+    text-align: left;                       
   }
 
-  .lottie-admin-wrapper,
-  .lottie-dept-wrapper {
-    width: 200px;
-    height: 200px;
-    margin-left: 0;
-    margin-right: 0;
+  .btn-home-card-btn { width: 60%; }
+
+  /* 5. SPECIFIC ANIMATION FLOWS FOR MOBILE */
+
+  /* Admin Card: Slides Left -> Center */
+  .from-left-logic {
+    transform: translateX(-100px); /* Start Left */
+    opacity: 0;
+  }
+  .from-left-logic.in-view {
+    transform: translateX(0); /* Center */
+    opacity: 1;
+  }
+
+  /* Admin Animation: Slides Right -> Center */
+  .from-right-logic {
+    transform: translateX(100px); /* Start Right */
+    opacity: 0;
+  }
+  .from-right-logic.in-view {
+    transform: translateX(0); /* Center */
+    opacity: 1;
+  }
+
+  /* Dept Card: Slides Left -> Center */
+  .from-left-logic-dept {
+    transform: translateX(-100px); /* Start Left */
+    opacity: 0;
+    /* --- NEW ADDITION: Spacing for Vertically Centered Last Card --- */
+    margin-bottom: 35vh !important;
+  }
+  .from-left-logic-dept.in-view {
+    transform: translateX(0); /* Center */
+    opacity: 1;
+  }
+
+  /* 6. Admin Animation Enlargement */
+  .lottie-admin-wrapper {
+    margin: 0 auto;
+    width: 100%; /* Enlarged */
+    height: 100%;
+    margin-top: 150px;
+  }
+
+  /* 7. Hide Desktop Dept Animation */
+  .mobile-hidden {
+    display: none;
   }
 }
 
 @media only screen and (max-width: 350px) {
-  .btn-home-card-btn {
-    width: 70%;
-  }
+  .btn-home-card-btn { width: 80%; }
 }

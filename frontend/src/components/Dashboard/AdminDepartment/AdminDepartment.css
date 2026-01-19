@@ -13,7 +13,8 @@
     height: 100vh;
     box-sizing: border-box;
     overflow: auto;
-    padding:70px;
+    padding: 70px;
+    padding-top: 100px; /* Default top padding for desktop */
 }
 
 
@@ -21,14 +22,16 @@
     color: white !important;
     font-family: 'RecklessNeue' !important;
     font-size: 2rem;
-    text-align: center !important;
-    margin-top: 1rem;
-    
+    text-align: center !important; 
+    margin-top: 0.5rem;
 }
 
 .admin-department-title-div{
     border-bottom: 1px solid #FFFFFF;
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
+    width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 
@@ -39,19 +42,22 @@
     /* width: 80%; */
     color: white !important;
     font-size: large;
-    margin-bottom: 1rem !important;
-    margin-top: 1.7rem !important;
+    /* margin-bottom: 1rem !important; removed to let container handle spacing */
     justify-content: center;
-    /* margin-left: 1rem !important; */
-    /* margin-right: 1rem !important; */
+    padding: 6px 24px !important; /* Reduced vertical padding */
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
 }
 
 .admin-department-card{
     background: #334266 !important;
     border-radius: 1rem !important;
-    box-shadow: 0px 0px 34px rgba(0, 0, 0, 0.25) !important;
+    box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.3) !important;
+    transition: transform 0.2s ease-in-out;
 }
 
+.admin-department-card:hover {
+    transform: translateY(-5px);
+}
 
 .admin-department-text{
     font-family:'Times New Roman', Times, serif !important;
@@ -59,17 +65,44 @@
 }
 
 
+/* =========================================================
+   MOBILE RESPONSIVENESS
+   ========================================================= */
+@media only screen and (max-width: 768px) {
+    .admin-department-body {
+        padding: 15px;
+        /* Increased padding-top for double-stacked AppBar */
+        padding-top: 82px; 
+        padding-bottom: 80px;
+    }
 
+    .admin-department-title {
+        font-size: 1.8rem;
+    }
+
+    .admin-department-title-div {
+        width: 100%; /* Full width underline on mobile */
+        margin-bottom: 1.5rem;
+    }
+
+    .btn-admin-department {
+        width: 100%; /* Full width button on mobile */
+    }
+
+    /* Modal adjustments */
+    .modal {
+        width: 90%;
+    }
+}
 
 @media only screen and (max-width: 390px) {
-    .admin-department-title{
+    .admin-department-title {
         font-size: 1.5rem;
     }
-  }
+}
 
-
-  @media only screen and (max-width: 200px) {
-    .admin-department-title{
+@media only screen and (max-width: 200px) {
+    .admin-department-title {
         font-size: 1rem;
     }
-  }
+}

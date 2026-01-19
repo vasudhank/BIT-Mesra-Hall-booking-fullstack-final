@@ -16,6 +16,11 @@ import Alert from "@mui/material/Alert";
 import Snackbar from "@mui/material/Snackbar";
 
 export default function DepartmentBookingCard(props) {
+  // --- MANUALLY CHANGE THESE PARAMETERS HERE ---
+  const gapBetweenCards = "15px"; // Reduced gap slightly
+  const cardImageHeight = 100;    // Controls height of the image
+  // ---------------------------------------------
+
   const [successOpen, setSuccessOpen] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -175,10 +180,25 @@ export default function DepartmentBookingCard(props) {
         aria-labelledby="modal-modal-title"
         aria-describedby="modal-modal-description"
       >
-        <Box className="modal">
+        <Box 
+          className="modal"
+          sx={{
+            // Responsive width logic for Modal
+            width: { xs: '90%', sm: '70%', md: '50%' },
+            maxWidth: '600px',
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            bgcolor: 'background.paper', // Or use your custom class background
+            boxShadow: 24,
+            p: 4,
+            borderRadius: 2
+          }}
+        >
           <Typography
             className="modal-text"
-            sx={{ marginBottom: "1rem" }}
+            sx={{ marginBottom: "1rem", textAlign: "center" }}
             variant="h6"
             component="h2"
           >
@@ -200,6 +220,7 @@ export default function DepartmentBookingCard(props) {
             </FormControl>
 
             <Grid container spacing={2} sx={{ marginBottom: "0.5rem" }}>
+              {/* Stack vertically on mobile (xs=12) */}
               <Grid item xs={12} sm={6}>
                 <FormControl fullWidth>
                   <Input
@@ -273,35 +294,61 @@ export default function DepartmentBookingCard(props) {
         </Box>
       </Modal>
 
-      <Card sx={{}} className="hall-admin-card">
+      {/* Main Card */}
+      <Card 
+        sx={{ 
+          width: '90%', 
+          borderRadius: '1.5rem', 
+          boxShadow: '0px 4px 20px rgba(0,0,0,0.3)',
+          marginBottom: gapBetweenCards
+        }} 
+        className="hall-admin-card"
+      >
         <CardMedia
-          sx={{ height: 140 }}
+          sx={{ height: cardImageHeight }} 
           image="https://images.unsplash.com/photo-1594122230689-45899d9e6f69?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8Y29uZmVyZW5jZSUyMGhhbGx8ZW58MHx8MHx8fDA%3D&w=1000&q=80"
           title="seminar hall"
         />
-        <CardContent>
+        
+        {/* Content area: Reduced padding (py: 0.5) to shrink height */}
+        <CardContent sx={{ padding: '8px', '&:last-child': { paddingBottom: '4px' } }}>
           <Typography
             gutterBottom
-            variant="h5"
+            variant="h6" // Changed from h5 to h6 for smaller text
             component="div"
             className="hall-card-text"
             fontFamily={"RecklessNeue"}
+            sx={{ textAlign: 'center', my: 0, fontSize: '1.1rem' }} // Explicitly setting slightly smaller font
           >
             {props.data.name}
           </Typography>
-          <Typography variant="body2" color="text.secondary" className="hall-card-text">
-            <EventSeatIcon fontSize="large" />
-            <span className="number-seat">{props.data.capacity}</span>
+          <Typography variant="body2" color="text.secondary" className="hall-card-text" sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 0.5 }}>
+            <EventSeatIcon fontSize="medium" /> {/* Changed from large to medium */}
+            <span className="number-seat" style={{ fontSize: '0.9rem' }}>{props.data.capacity}</span>
           </Typography>
         </CardContent>
-        <Grid container spacing={2} justifyContent={"center"}>
-          <Grid item xs={8} sm={5} md={4} lg={4} xl={4}>
+
+        {/* Button Area: Reduced Grid padding (pb: 1) and Button padding/size */}
+        <Grid container spacing={2} justifyContent={"center"} sx={{ pb: 1.5, pt: 0.5 }}>
+          <Grid item xs={10} sm={6} md={5} lg={5} xl={5}>
             {props.data.status === "Not Filled" ? (
-              <Button size="medium" onClick={bookHall} fullWidth className="btn-admin-hall">
+              <Button 
+                size="small" // Changed to small
+                onClick={bookHall} 
+                fullWidth 
+                className="btn-admin-hall"
+                sx={{ paddingY: '4px', fontSize: '0.8rem' }} // Reduced button padding manually
+              >
                 BOOK
               </Button>
             ) : (
-              <Button size="medium" fullWidth className="btn-admin-hall" disabled>
+              <Button 
+                size="small" // Changed to small
+                fullWidth 
+                className="btn-admin-hall" 
+                disabled 
+                sx={{ opacity: 0.6, cursor: 'not-allowed', paddingY: '4px', fontSize: '0.8rem' }}
+              >
                 Filled
               </Button>
             )}

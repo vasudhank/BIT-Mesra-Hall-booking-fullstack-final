@@ -88,7 +88,7 @@ export default function HallCard(props) {
 
   return (
     <>
-      <Card sx={{ }} className='hall-admin-card' >
+      <Card sx={{ width: '100%' }} className='hall-admin-card' >
         <CardMedia
           sx={{ height: 140 }}
           image="https://images.unsplash.com/photo-1594122230689-45899d9e6f69?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8Y29uZmVyZW5jZSUyMGhhbGx8ZW58MHx8MHx8fDA%3D&w=1000&q=80"
@@ -112,7 +112,8 @@ export default function HallCard(props) {
         </CardContent>
         <Grid container spacing={2} justifyContent={'center'}>
           <Grid item xs={8} sm={5} md={4} lg={4} xl={4}>
-            <Button size="medium" fullWidth className='btn-admin-hall' onClick={changeStatus}>{props.data.status}</Button>
+            {/* Added style override to ensure button fits in card on mobile */}
+            <Button size="medium" fullWidth className='btn-admin-hall' sx={{ width: '100% !important', marginTop: '1rem !important' }} onClick={changeStatus}>{props.data.status}</Button>
           </Grid>
         </Grid>
       </Card>

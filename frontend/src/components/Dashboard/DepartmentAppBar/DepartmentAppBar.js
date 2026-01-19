@@ -31,12 +31,12 @@ export default function DepartmentAppBar({
   const [anchorElUser, setAnchorElUser] = React.useState(null);
   const [dateTime, setDateTime] = React.useState("");
 
-  const logout = async ()=> {
-    try{
-      await api.get('/logout',{ withCredentials:true });
+  const logout = async () => {
+    try {
+      await api.get('/logout', { withCredentials: true });
       dispatch(removeStatus());
       navigate('/department_login');
-    } catch {}
+    } catch { }
   };
 
   React.useEffect(() => {
@@ -45,11 +45,11 @@ export default function DepartmentAppBar({
         new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
       );
 
-      const days = ["SUNDAY","MONDAY","TUESDAY","WEDNESDAY","THURSDAY","FRIDAY","SATURDAY"];
-      const months = ["JANUARY","FEBRUARY","MARCH","APRIL","MAY","JUNE","JULY","AUGUST","SEPTEMBER","OCTOBER","NOVEMBER","DECEMBER"];
+      const days = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+      const months = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
 
       setDateTime(
-        `${days[now.getDay()]}, ${months[now.getMonth()]} ${String(now.getDate()).padStart(2,"0")}, ${now.getFullYear()} - ${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}:${String(now.getSeconds()).padStart(2,"0")} IST`
+        `${days[now.getDay()]}, ${months[now.getMonth()]} ${String(now.getDate()).padStart(2, "0")}, ${now.getFullYear()} - ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")} IST`
       );
     };
 
@@ -61,79 +61,154 @@ export default function DepartmentAppBar({
   return (
     <AppBar position="fixed" className="appbar">
       <Container maxWidth="xl">
-        <Toolbar disableGutters>
+        <Toolbar 
+          disableGutters 
+          sx={{ 
+            minHeight: { xs: 'auto', md: '64px' }, 
+            py: { xs: 1, md: 0 },
+            display: 'flex',
+            justifyContent: 'space-between'
+          }}
+        >
 
-          <Typography
-            variant="h4"
-            className="text-appbar"
-            sx={{ mr: 2, display: { xs: 'none', md: 'flex' }, letterSpacing: '0.25rem', fontFamily: 'RecklessNeue'}}
-          >
-            DEPARTMENT
-          </Typography>
+          {/* ================= DESKTOP VIEW ================= */}
+          <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', width: '100%' }}>
+            <Typography
+              variant="h4"
+              className="text-appbar"
+              sx={{ mr: 2, letterSpacing: '0.25rem', fontFamily: 'RecklessNeue' }}
+            >
+              DEPARTMENT
+            </Typography>
 
-          <Box sx={{ flexGrow: 1 }} />
+            <Box sx={{ flexGrow: 1 }} />
 
-          <Box sx={{ display:'flex', alignItems:'center', gap:2.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
 
-            {/* 🔍 SEARCH BOX */}
-            {showSearch && (
-              <TextField
-                value={searchValue}
-                onChange={onSearchChange}
-                onKeyDown={(e)=> e.key === 'Enter' && onSearchSubmit()}
-                placeholder="Search hall"
-                size="small"
-                sx={{
-                  minWidth: 220,
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: '24px',
-                    background: 'rgba(255,255,255,0.9)'
-                  }
-                }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton size="small" onClick={onSearchSubmit}>
-                        <SearchIcon />
-                      </IconButton>
-                    </InputAdornment>
-                  )
-                }}
-              />
-            )}
+              {/* 🔍 SEARCH BOX */}
+              {showSearch && (
+                <TextField
+                  value={searchValue}
+                  onChange={onSearchChange}
+                  onKeyDown={(e) => e.key === 'Enter' && onSearchSubmit()}
+                  placeholder="Search hall"
+                  size="small"
+                  sx={{
+                    minWidth: 220,
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '24px',
+                      background: 'rgba(255,255,255,0.9)'
+                    }
+                  }}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={onSearchSubmit}>
+                          <SearchIcon />
+                        </IconButton>
+                      </InputAdornment>
+                    )
+                  }}
+                />
+              )}
 
-            <Typography sx={{ fontSize:'0.85rem', whiteSpace:'nowrap', color:'white', fontFamily:'Inter' }}>
+              <Typography sx={{ fontSize: '0.85rem', whiteSpace: 'nowrap', color: 'white', fontFamily: 'Inter' }}>
+                {dateTime}
+              </Typography>
+
+              <Tooltip title="Open settings">
+                <IconButton onClick={(e) => setAnchorElUser(e.currentTarget)} sx={{ p: 0 }}>
+                  <Avatar />
+                </IconButton>
+              </Tooltip>
+
+            </Box>
+          </Box>
+
+
+          {/* ================= MOBILE VIEW (Stacked) ================= */}
+          <Box sx={{ display: { xs: 'flex', md: 'none' }, flexDirection: 'column', width: '100%', gap: 1 }}>
+            
+            {/* ROW 1: DATE/TIME */}
+            <Typography sx={{ 
+              fontSize: '0.75rem', 
+              whiteSpace: 'nowrap', 
+              color: 'rgba(255,255,255,0.9)', 
+              fontFamily: 'Inter',
+              textAlign: 'center',
+              width: '100%'
+            }}>
               {dateTime}
             </Typography>
 
-            <Tooltip title="Open settings">
-              <IconButton onClick={(e)=>setAnchorElUser(e.currentTarget)} sx={{ p:0 }}>
-                <Avatar />
-              </IconButton>
-            </Tooltip>
+            {/* ROW 2: SEARCH + USER ICON */}
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, width: '100%' }}>
+              
+              {/* Search Box (Takes mostly all width) */}
+              {showSearch ? (
+                <TextField
+                  value={searchValue}
+                  onChange={onSearchChange}
+                  onKeyDown={(e) => e.key === 'Enter' && onSearchSubmit()}
+                  placeholder="Search hall"
+                  size="small"
+                  fullWidth
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '24px',
+                      background: 'rgba(255,255,255,0.95)',
+                      fontSize: '0.9rem',
+                      height: '40px'
+                    }
+                  }}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={onSearchSubmit}>
+                          <SearchIcon fontSize="small"/>
+                        </IconButton>
+                      </InputAdornment>
+                    )
+                  }}
+                />
+              ) : <Box sx={{flexGrow: 1}} />}
 
-            <Menu
-              sx={{ mt: '45px' }}
-              anchorEl={anchorElUser}
-              anchorOrigin={{ vertical:'top', horizontal:'right' }}
-              transformOrigin={{ vertical:'top', horizontal:'right' }}
-              open={Boolean(anchorElUser)}
-              onClose={()=>setAnchorElUser(null)}
-            >
-              <MenuItem onClick={()=>setAnchorElUser(null)}>
-                <Link to="/">
-                  <Typography className="dropdown-text">HOME</Typography>
-                </Link>
-              </MenuItem>
-              <MenuItem onClick={() => { setAnchorElUser(null); }} sx={{ color: 'black' }}> <Link to="/department/account" style={{ textDecoration: 'none', color: 'inherit' }}> <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}> ACCOUNTS </Typography> </Link> </MenuItem>
-              <MenuItem onClick={()=>setAnchorElUser(null)}>
-                <Typography className="dropdown-text" onClick={logout}>
-                  LOGOUT
-                </Typography>
-              </MenuItem>
-            </Menu>
+              {/* User Icon on Right */}
+              <Tooltip title="Open settings">
+                <IconButton onClick={(e) => setAnchorElUser(e.currentTarget)} sx={{ p: 0, ml: 1 }}>
+                  <Avatar sx={{ width: 35, height: 35 }} />
+                </IconButton>
+              </Tooltip>
 
+            </Box>
           </Box>
+
+          {/* SHARED MENU */}
+          <Menu
+            sx={{ mt: '45px' }}
+            anchorEl={anchorElUser}
+            anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            open={Boolean(anchorElUser)}
+            onClose={() => setAnchorElUser(null)}
+          >
+            <MenuItem onClick={() => setAnchorElUser(null)}>
+              <Link to="/">
+                <Typography className="dropdown-text">HOME</Typography>
+              </Link>
+            </MenuItem>
+            <MenuItem onClick={() => { setAnchorElUser(null); }} sx={{ color: 'black' }}>
+               <Link to="/department/account" style={{ textDecoration: 'none', color: 'inherit' }}> 
+                 <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}> ACCOUNTS </Typography> 
+               </Link> 
+            </MenuItem>
+            <MenuItem onClick={() => setAnchorElUser(null)}>
+              <Typography className="dropdown-text" onClick={logout}>
+                LOGOUT
+              </Typography>
+            </MenuItem>
+          </Menu>
+
         </Toolbar>
       </Container>
     </AppBar>

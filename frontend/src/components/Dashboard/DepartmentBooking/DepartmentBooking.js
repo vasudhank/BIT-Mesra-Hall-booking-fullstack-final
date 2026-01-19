@@ -1,4 +1,4 @@
-import React,{useState , useEffect} from 'react'
+import React, { useState, useEffect } from 'react'
 import "./DepartmentBooking.css"
 import "../AdminHall/AdminHall.css"
 import Grid from '@mui/material/Grid';
@@ -40,8 +40,8 @@ export default function DepartmentBooking() {
   }, []);
 
   /* ===============================
-     🔍 SAME LOGIC AS ADMIN (CLIENT SIDE)
-     =============================== */
+      🔍 SAME LOGIC AS ADMIN (CLIENT SIDE)
+      =============================== */
 
   const handleSearchChange = (e) => {
     const val = e.target.value;
@@ -78,21 +78,25 @@ export default function DepartmentBooking() {
           onSearchSubmit={handleSearchSubmit}
         />
 
+        {/* Title now sits below appbar */}
         <div className='department-booking-title'>
           HALLS
         </div>
 
-        <Container sx={{ marginTop:'1rem', marginBottom:'1rem' }}>
-          <Grid container spacing={10} justifyContent={'center'}>
+        {/* Card Container */}
+        <Container sx={{ marginTop: '1rem', marginBottom: '1rem', padding: { xs: 0, sm: 2 } }}>
+          <Grid container spacing={{ xs: 4, sm: 8, md: 10 }} justifyContent={'center'}>
             {filteredHalls.map(data => (
               <Grid
                 item
-                xs={11}
+                xs={12} // Full width on mobile (90-95vw handled by card width inside or padding)
                 sm={7}
                 md={5}
                 lg={4}
                 xl={4}
                 key={data._id}
+                display="flex" 
+                justifyContent="center"
               >
                 <DepartmentBookingCard
                   data={data}

@@ -25,16 +25,18 @@ import deptAnim3 from "../../assets/animations/Calendar Booking.json";
 export default function HomeCard() {
   const auth = useSelector((state) => state.user);
 
-  const adminRowRef = useRef(null);
-  const deptRowRef = useRef(null);
+  // === REFS: Separated for mobile control ===
+  const adminCardRef = useRef(null);
+  const adminAnimRef = useRef(null);
+  const deptCardRef = useRef(null);
 
   /* ================= INTERSECTION OBSERVER ================= */
 
   useEffect(() => {
     const options = {
       root: null,
-      rootMargin: "-10% 0px",
-      threshold: 0.5,
+      rootMargin: "-15% 0px", // Trigger slightly before center
+      threshold: 0.2, // Trigger when 20% visible
     };
 
     const obsCallback = (entries) => {
@@ -50,12 +52,14 @@ export default function HomeCard() {
 
     const observer = new IntersectionObserver(obsCallback, options);
 
-    if (adminRowRef.current) observer.observe(adminRowRef.current);
-    if (deptRowRef.current) observer.observe(deptRowRef.current);
+    if (adminCardRef.current) observer.observe(adminCardRef.current);
+    if (adminAnimRef.current) observer.observe(adminAnimRef.current);
+    if (deptCardRef.current) observer.observe(deptCardRef.current);
 
     return () => {
-      if (adminRowRef.current) observer.unobserve(adminRowRef.current);
-      if (deptRowRef.current) observer.unobserve(deptRowRef.current);
+      if (adminCardRef.current) observer.unobserve(adminCardRef.current);
+      if (adminAnimRef.current) observer.unobserve(adminAnimRef.current);
+      if (deptCardRef.current) observer.unobserve(deptCardRef.current);
       observer.disconnect();
     };
   }, []);
@@ -117,28 +121,25 @@ export default function HomeCard() {
       <Grid
         container
         spacing={2}
-        direction="column"
+        direction="row"
         justifyContent="center"
         alignItems="stretch"
       >
-        {/* ================= ADMIN ROW ================= */}
-        <div ref={adminRowRef} className="scroll-row from-left">
-          <Grid
-            item
-            xs={12}
-            container
-            alignItems="center"
-            justifyContent="flex-start"
-          >
-            {/* Admin Card */}
-            <Grid item xs={12} md={7}>
-              <div className="home-card-scope">
-              <div className="home-card pos-left">
-              <Card elevation={0}
-  sx={{
-    background: "none",
-    boxShadow: "none",
-  }}>
+        {/* ================= ADMIN SECTION ================= 
+           Note: Classes separate Mobile (vertical scroll logic) from Desktop (row scroll logic)
+        */}
+        
+        {/* 1. Admin Card */}
+        <Grid 
+          item 
+          xs={12} 
+          md={7} 
+          ref={adminCardRef} 
+          className="scroll-block mobile-center-trigger from-left-logic"
+        >
+          <div className="home-card-scope">
+            <div className="home-card pos-left">
+              <Card elevation={0} sx={{ background: "none", boxShadow: "none" }}>
                 <CardContent>
                   <Typography
                     gutterBottom
@@ -177,64 +178,70 @@ export default function HomeCard() {
                   </Button>
                 </CardActions>
               </Card>
-              </div>
-              </div>
-            </Grid>
+            </div>
+          </div>
+        </Grid>
 
-            {/* Admin Animation */}
-            <Grid item xs={12} md={4}>
-              <div className="lottie-admin-wrapper">
-                {adminAnimations.map((anim, index) => (
-                  <div
-                    key={index}
-                    className={`lottie-admin-slide ${
-                      index === currentAdminAnim
-                        ? "active"
-                        : index === nextAdminAnim
-                        ? "next"
-                        : ""
-                    }`}
-                  >
-                    <Lottie animationData={anim} loop />
-                  </div>
-                ))}
+        {/* 2. Admin Animation (Separated for Mobile Scroll) */}
+        <Grid 
+          item 
+          xs={12} 
+          md={4} 
+          ref={adminAnimRef}
+          className="scroll-block mobile-center-trigger from-right-logic"
+        >
+          <div className="lottie-admin-wrapper">
+            {adminAnimations.map((anim, index) => (
+              <div
+                key={index}
+                className={`lottie-admin-slide ${
+                  index === currentAdminAnim
+                    ? "active"
+                    : index === nextAdminAnim
+                    ? "next"
+                    : ""
+                }`}
+              >
+                <Lottie animationData={anim} loop />
               </div>
-            </Grid>
-          </Grid>
-        </div>
+            ))}
+          </div>
+        </Grid>
 
-        {/* ================= DEPARTMENT ROW ================= */}
-        <div ref={deptRowRef} className="scroll-row from-right">
-          <Grid container spacing={2} alignItems="center">
-            {/* Department Animation */}
-            <Grid item xs={12} md={4}>
-              <div className="lottie-dept-wrapper">
-                {departmentAnimations.map((anim, index) => (
-                  <div
-                    key={index}
-                    className={`lottie-dept-slide ${
-                      index === currentDeptAnim
-                        ? "active"
-                        : index === nextDeptAnim
-                        ? "next"
-                        : ""
-                    }`}
-                  >
-                    <Lottie animationData={anim} loop />
-                  </div>
-                ))}
+        {/* ================= DEPARTMENT SECTION ================= 
+        */}
+
+        {/* 3. Department Animation (Hidden on Mobile) */}
+        <Grid item xs={12} md={4} className="mobile-hidden scroll-block desktop-dept-anim">
+          <div className="lottie-dept-wrapper">
+            {departmentAnimations.map((anim, index) => (
+              <div
+                key={index}
+                className={`lottie-dept-slide ${
+                  index === currentDeptAnim
+                    ? "active"
+                    : index === nextDeptAnim
+                    ? "next"
+                    : ""
+                }`}
+              >
+                <Lottie animationData={anim} loop />
               </div>
-            </Grid>
+            ))}
+          </div>
+        </Grid>
 
-            {/* Department Card */}
-            
-            <Grid item xs={12} md={7}>
-              <div className="home-card-scope">
-              <div className="home-card pos-right">
-              <Card  sx={{
-    background: "none",
-    boxShadow: "none",
-  }}>
+        {/* 4. Department Card */}
+        <Grid 
+          item 
+          xs={12} 
+          md={7} 
+          ref={deptCardRef}
+          className="scroll-block mobile-center-trigger from-left-logic-dept"
+        >
+          <div className="home-card-scope">
+            <div className="home-card pos-right">
+              <Card sx={{ background: "none", boxShadow: "none" }}>
                 <CardContent className="right-text">
                   <Typography
                     gutterBottom
@@ -280,11 +287,10 @@ export default function HomeCard() {
                   </Button>
                 </CardActions>
               </Card>
-              </div>
-              </div>
-            </Grid>
-          </Grid>
-        </div>
+            </div>
+          </div>
+        </Grid>
+
       </Grid>
     </>
   );

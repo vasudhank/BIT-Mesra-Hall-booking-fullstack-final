@@ -88,3 +88,34 @@
         width: 80%;
     }
   }
+
+/* =========================================================
+   MOBILE RESPONSIVENESS (New Additions)
+   ========================================================= */
+@media only screen and (max-width: 768px) {
+  /* 1. Increase padding top to account for taller stacked AppBar */
+  .admin-hall-body {
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-bottom: 80px; 
+    padding-top: 120px !important; /* Approx height of stacked appbar */
+  }
+
+  /* 2. Modern, Thin, Full Width Create Hall Button */
+  .btn-admin-hall {
+    width: 100% !important; /* Full width */
+    margin-top: 0.5rem !important; /* Reduced gap from Appbar */
+    margin-bottom: 1.5rem !important;
+    padding: 8px 0 !important; /* Vertically thin */
+    font-size: 1rem !important; /* Clean font size */
+    border-radius: 50px !important; /* Modern Pill Shape */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
+    text-transform: none !important; /* Cleaner look */
+    font-weight: 600 !important;
+  }
+
+  /* 3. Modal Width adjustment for mobile */
+  .modal {
+    width: 90%;
+  }
+}

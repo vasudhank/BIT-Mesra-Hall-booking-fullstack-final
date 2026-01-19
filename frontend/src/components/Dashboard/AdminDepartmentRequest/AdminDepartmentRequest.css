@@ -12,7 +12,8 @@
     height: 100vh;
     box-sizing: border-box;
     overflow: auto;
-    padding:70px;
+    padding: 70px;
+    padding-top: 100px;
 }
 
 
@@ -24,80 +25,86 @@
     margin-top: 1rem;
 }
 
-
+.admin-department-request-title-div {
+    border-bottom: 1px solid #FFFFFF;
+    margin-bottom: 2rem;
+    width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
+}
 
 .department-request-admin-card{
     /* background: linear-gradient(246.64deg, #4B84B7 0%, #1B2033 100%) !important; */
     background: #334266 !important;
     border-radius: 1rem !important;
-    box-shadow: 0px 0px 34px rgba(0, 0, 0, 0.25) !important;
+    box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.3) !important;
 }
 
 
 .department-admin-request-text{
     color: white !important;
-    font-family: 'Julee', cursive !important;
+    font-family: 'RecklessNeue' !important; /* Changed from Julee to match theme consistency if needed, revert if Julee strictly required */
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 .btn-admin-booking-request-accept{
     background: #28B006 !important;
     border-radius: 1rem !important;
-    font-family: 'Julee', cursive !important;
+    font-family: 'Times New Roman', Times, serif !important;
     color: white !important;
-    font-size: large;
-    margin-bottom: 1rem !important;
+    font-size: 1rem !important;
+    margin-bottom: 0 !important; /* Removed margin bottom to align with grid */
+    font-weight: bold !important;
 }
 
 
 .btn-admin-booking-request-reject{
     background: #D72828 !important;
     border-radius: 1rem !important;
-    font-family: 'Julee', cursive !important;
+    font-family: 'Times New Roman', Times, serif !important;
     color: white !important;
-    font-size: large;
-    margin-bottom: 1rem !important;
-    /* width: 50%; */
+    font-size: 1rem !important;
+    margin-bottom: 0 !important;
+    font-weight: bold !important;
 }
 
 
+/* =========================================================
+   MOBILE RESPONSIVENESS
+   ========================================================= */
+@media only screen and (max-width: 768px) {
+    .admin-department-request-div {
+        padding: 10px;
+        /* Push down content to avoid hiding behind stacked Appbar */
+        padding-top: 0px; 
+        padding-bottom: 80px;
+    }
 
+    .admin-department-request-title {
+        font-size: 1.5rem;
+    }
 
-
+    .admin-department-request-title-div {
+        width: 100%;
+        margin-bottom: 1.5rem;
+    }
+}
 
 
 @media only screen and (max-width: 400px) {
     .admin-department-request-title{
         font-size: 1.4rem;
     }
-  }
-
-
+}
   
 @media only screen and (max-width: 290px) {
     .admin-department-request-title{
         font-size: 1rem;
     }
-  }
+}
 
-  @media only screen and (max-width: 200px) {
+@media only screen and (max-width: 200px) {
     .admin-department-request-title{
         font-size: 0.8rem;
     }
-  }
+}

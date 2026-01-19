@@ -11,6 +11,7 @@
     height: 100vh;
     box-sizing: border-box;
     overflow: auto;
+    padding-top: 80px; /* Default desktop padding */
 }
 
 
@@ -19,8 +20,19 @@
     font-size: 2rem;
     color: white;
     text-align: center;
-    margin-top: 5rem;
+    margin-top: 2rem;
     margin-bottom: 2rem;
 }
 
+/* ================= MOBILE RESPONSIVENESS ================= */
+@media only screen and (max-width: 768px) {
+    .department-booking-body {
+        /* Increased padding for taller mobile AppBar (stacked date + search) */
+        padding-top: 70px; 
+    }
 
+    .department-booking-title {
+        margin-top: 1rem;
+        font-size: 1.8rem;
+    }
+}

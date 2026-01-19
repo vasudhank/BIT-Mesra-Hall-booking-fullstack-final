@@ -19,7 +19,11 @@
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
-  position: relative;
+  
+  /* === SCROLL PARALLAX LOGIC === */
+  position: relative; 
+  z-index: 10; /* Higher than HomeUpper (1) so it slides OVER it */
+  
   font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
 }
 
@@ -49,7 +53,7 @@
 }
 
 /* =============================
-   NEUMORPHIC BUTTON (FORCE MUI)
+   NEUMORPHIC BUTTON (DESKTOP DEFAULT)
    ============================= */
 .hero-btn,
 .hero-btn.MuiButton-root {
@@ -57,21 +61,18 @@
   color: var(--text) !important;
   border-radius: 24px !important;
   padding: 16px 56px !important;
-  font-size: 1.2rem !important; /* Made slightly larger to see the 3D effect */
-  font-weight: 800;             /* Thicker text holds the extrusion effect better */
+  font-size: 1.2rem !important; 
+  font-weight: 800;             
   border: none !important;
   text-transform: none !important;
   transition: all 200ms ease;
 
   /* 1. THE BUTTON (Indented / Pressed In) */
-  /* Top-Left is dark (shadow), Bottom-Right is bright (light reflection) */
   box-shadow:
     inset 6px 6px 10px var(--inset-dark),
     inset -6px -6px 10px var(--inset-light);
 
   /* 2. THE TEXT (Extruded / Popping Out) */
-  /* Top-Left is bright (light hitting the raised letter) */
-  /* Bottom-Right is dark (shadow cast by the letter) */
   text-shadow:
     -1px -1px 1px var(--inset-light),
     1px 1px 1px var(--inset-dark);
@@ -99,10 +100,6 @@
 /* =============================
    THEME TOGGLE
    ============================= */
-/* =============================
-   MODERN THEME TOGGLE (PRO)
-   ============================= */
-
 .theme-toggle {
   position: absolute;
   bottom: 20px;
@@ -113,6 +110,8 @@
   padding: 0;
   --sun-size: 14px;
   --moon-size: 14px;
+  transition: transform 0.2s;
+  z-index: 100;
 }
 
 /* Track */
@@ -160,7 +159,6 @@
   transition: opacity 200ms ease;
 }
 
-
 .toggle-svg.sun {
   width: var(--sun-size);
   height: var(--sun-size);
@@ -178,28 +176,49 @@
   transform: translateX(30px);
 }
 
-.theme-toggle.light .toggle-svg.sun {
-  opacity: 1;
-}
+.theme-toggle.light .toggle-svg.sun { opacity: 1; }
+.theme-toggle.light .toggle-svg.moon { opacity: 0; }
+.theme-toggle.dark .toggle-svg.sun { opacity: 0; }
+.theme-toggle.dark .toggle-svg.moon { opacity: 1; }
 
-.theme-toggle.light .toggle-svg.moon {
-  opacity: 0;
-}
-
-.theme-toggle.dark .toggle-svg.sun {
-  opacity: 0;
-}
-
-.theme-toggle.dark .toggle-svg.moon {
-  opacity: 1;
-}
 
 /* =============================
-   RESPONSIVE
+   RESPONSIVE (MOBILE) OVERRIDES
    ============================= */
-@media (max-width: 600px) {
-  .hero-btn {
-    width: 80%;
-    padding: 14px 36px !important;
+@media (max-width: 768px) {
+  
+  /* 1. Flat Modern Book Now Button on Mobile */
+  .hero-btn, 
+  .hero-btn.MuiButton-root {
+    width: 85%;
+    padding: 16px 0 !important;
+    background: #0f172a !important; /* Flat Dark Blue/Black */
+    color: #ffffff !important;
+    border-radius: 50px !important;
+    font-size: 1.1rem !important;
+    font-weight: 700;
+    
+    /* Remove all Neumorphic Shadows for Flat look */
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  
+  /* Dark mode variant for button */
+  .lower-div.dark .hero-btn {
+    background: #ffffff !important;
+    color: #000000 !important;
+    
+  }
+
+  .hero-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  /* 2. Smaller Theme Toggle in Bottom Left */
+  .theme-toggle {
+    transform: scale(0.75); 
+    left: 15px;
+    bottom: 15px;
   }
 }

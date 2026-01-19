@@ -1,8 +1,7 @@
-import React,{useState} from 'react'
+import React, { useState } from 'react'
 import Grid from '@mui/material/Grid';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
-import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
 import Person2Icon from '@mui/icons-material/Person2';
@@ -109,48 +108,51 @@ export default function AdminDepartmentRequestCard(props) {
                 </Box>
             </Modal>
 
-            <Grid item xs={10} sm={8} md={8} lg={8} xl={4} style={{ marginBottom: '0.5rem' }}>
-                <Card sx={{ width: '100%' }} className='department-request-admin-card'>
-                    <CardContent>
-                        <Typography gutterBottom variant="h5" component="div"
-                            className='department-admin-request-text'>
-                            {props.data.department}
-                        </Typography>
+            {/* Card Content */}
+            <Card sx={{ width: '100%', height: '100%' }} className='department-request-admin-card'>
+                <CardContent>
+                    <Typography gutterBottom variant="h5" component="div"
+                        className='department-admin-request-text' sx={{ mb: 2, textAlign: 'center' }}>
+                        {props.data.department}
+                    </Typography>
 
-                        <br />
+                    <Typography variant="body2" className='department-admin-request-text' sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                        <Person2Icon sx={{ marginRight: '1rem' }} />
+                        {props.data.head}
+                    </Typography>
 
-                        <Typography variant="body2" className='department-admin-request-text'>
-                            <Person2Icon sx={{ marginRight: '1rem' }} />
-                            {props.data.head}
-                        </Typography>
+                    <Typography variant="body2" className='department-admin-request-text' sx={{ display: 'flex', alignItems: 'center' }}>
+                        <EmailIcon sx={{ marginRight: '1rem' }} />
+                        {props.data.email}
+                    </Typography>
+                </CardContent>
 
-                        <br />
-
-                        <Typography variant="body2" className='department-admin-request-text'>
-                            <EmailIcon sx={{ marginRight: '1rem' }} />
-                            {props.data.email}
-                        </Typography>
-                    </CardContent>
-
-                    <CardActions>
-                        <Button
-                            className='btn-admin-booking-request-accept'
-                            onClick={acceptRequest}
-                            size="medium"
-                        >
-                            ACCEPT
-                        </Button>
-
-                        <Button
-                            className='btn-admin-booking-request-reject'
-                            onClick={cancelDep}
-                            size="medium"
-                        >
-                            REJECT
-                        </Button>
-                    </CardActions>
-                </Card>
-            </Grid>
+                {/* Buttons - Horizontal Layout */}
+                <Box sx={{ p: 2, pt: 0 }}>
+                    <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                            <Button
+                                className='btn-admin-booking-request-accept'
+                                onClick={acceptRequest}
+                                size="medium"
+                                fullWidth
+                            >
+                                ACCEPT
+                            </Button>
+                        </Grid>
+                        <Grid item xs={6}>
+                            <Button
+                                className='btn-admin-booking-request-reject'
+                                onClick={cancelDep}
+                                size="medium"
+                                fullWidth
+                            >
+                                REJECT
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </Box>
+            </Card>
         </>
     );
 }

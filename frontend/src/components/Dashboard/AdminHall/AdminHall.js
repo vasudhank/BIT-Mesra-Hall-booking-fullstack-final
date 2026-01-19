@@ -3,7 +3,7 @@ import "./AdminHall.css";
 
 import Grid from '@mui/material/Grid';
 import Button from '@mui/material/Button';
-import { Container, Box, Modal, Typography, FormControl, Input } from '@mui/material';
+import { Container, Box, Modal, Typography, FormControl, Input, useMediaQuery, useTheme } from '@mui/material';
 
 import Appbar from '../AppBar/AppBar';
 import HallCard from './HallCard';
@@ -22,6 +22,10 @@ export default function AdminHall() {
   const [modal, setModal] = useState(false);
   const [name, setName] = useState("");
   const [capacity, setCapacity] = useState("");
+
+  // Responsive Hooks
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   /* ================= API ================= */
   const get_halls = async () => {
@@ -62,24 +66,24 @@ export default function AdminHall() {
 
   /* ================= CREATE HALL ================= */
   const handleCreateHallSubmit = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (!name || !capacity) return;
+    if (!name || !capacity) return;
 
-  try {
-    console.log('Creating hall:', { name, capacity });
+    try {
+      console.log('Creating hall:', { name, capacity });
 
-    await createHallApi({
-      name,
-      capacity: Number(capacity),
-    });
+      await createHallApi({
+        name,
+        capacity: Number(capacity),
+      });
 
-    handleClose();
-    get_halls(); // refresh list
-  } catch (err) {
-    console.error('Create hall failed:', err);
-  }
-};
+      handleClose();
+      get_halls(); // refresh list
+    } catch (err) {
+      console.error('Create hall failed:', err);
+    }
+  };
 
 
   /* ================= UI ================= */
@@ -94,7 +98,8 @@ export default function AdminHall() {
       />
 
       {/* ================= CREATE HALL MODAL ================= */}
-      <Box sx={{ mt: 'var(--section-top-gap)' }}>
+      {/* Reduced mt for mobile to bring button closer to the taller appbar */}
+      <Box sx={{ mt: isMobile ? 1 : 'var(--section-top-gap)' }}>
 
         <Modal
           open={modal}
@@ -137,13 +142,13 @@ export default function AdminHall() {
               </FormControl>
 
               <Button
-    fullWidth
-    className='btn-admin-hall'
-    type="button"                 // 👈 IMPORTANT
-    onClick={handleCreateHallSubmit} // 👈 IMPORTANT
-  >
-    CREATE HALL
-  </Button>
+                fullWidth
+                className='btn-admin-hall'
+                type="button"                 // 👈 IMPORTANT
+                onClick={handleCreateHallSubmit} // 👈 IMPORTANT
+              >
+                CREATE HALL
+              </Button>
             </form>
           </Box>
         </Modal>
@@ -151,10 +156,11 @@ export default function AdminHall() {
         {/* ================= CREATE BUTTON ================= */}
         <Grid
           container
-          spacing={{ xs: 1, sm: 2 }}
-          justifyContent={{ xs: 'center', sm: 'flex-end' }}
-          sx={{ mt: 0 }}
+          spacing={isMobile ? 0 : 2} // Remove spacing on mobile
+          justifyContent={isMobile ? 'center' : 'flex-end'} // Center button on mobile
+          sx={{ mt: 0, px: isMobile ? 1 : 0 }}
         >
+          {/* Adjusted Grid sizes for Mobile (xs=12) vs Desktop (md=5) */}
           <Grid item xs={12} sm={6} md={5} lg={4} xl={3}>
             <Button
               fullWidth
@@ -168,10 +174,11 @@ export default function AdminHall() {
       </Box>
 
       {/* ================= HALL LIST ================= */}
-      <Container sx={{ mt: 2 }}>
-        <Grid container spacing={6} justifyContent="center">
+      <Container maxWidth={false} sx={{ mt: 2, padding: isMobile ? '0 !important' : '' }}>
+        <Grid container spacing={isMobile ? 3 : 6} justifyContent="center">
           {filteredHalls.map(h => (
-            <Grid key={h._id} item xs={11} sm={7} md={5} lg={4} xl={4}>
+            /* Modified Breakpoints: xs={12} forces full width on mobile */
+            <Grid key={h._id} item xs={12} sm={7} md={5} lg={4} xl={4}>
               <HallCard data={h} gethall={get_halls} />
             </Grid>
           ))}

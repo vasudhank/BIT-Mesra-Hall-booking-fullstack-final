@@ -246,7 +246,7 @@
   font-size:0.9rem;
   text-shadow: 0 0 0.5px currentColor;
   transition: color 0.3s ease;
-  
+   
 }
 
 .register-link{
@@ -265,4 +265,38 @@
 @keyframes fadeIn{
   from{ opacity:0; transform: translateY(26px); }
   to{ opacity:1; transform: translateY(0); }
+}
+
+/* =========================================================
+   MOBILE RESPONSIVENESS
+   ========================================================= */
+@media (max-width: 768px) {
+  /* 1. Static Blended Background (No CPU-heavy animation) */
+  .department-login-body::before,
+  .department-login-body::after {
+    animation: none; /* Disable movement */
+    background: radial-gradient(circle at 50% 50%, #FF00FF, rgb(243, 7, 7), yellow, rgb(82, 246, 82),rgb(79, 79, 240)); /* Static blend of original colors */
+    filter: blur(90px) saturate(160%); /* Reduced blur slightly for performance */
+    opacity: 0.7;
+    inset: -20%; /* Reduce area slightly */
+  }
+
+  /* 2. Wider Inputs & Adjusted Card */
+  .login-card {
+    /* Reduce padding significantly to let inputs stretch wider */
+    padding: 2.5rem 1rem !important; 
+    width: 100%;
+  }
+
+  .login-title {
+    font-size: 1.8rem !important;
+  }
+
+  .login-input {
+    height: 52px !important; /* Slightly smaller height on mobile */
+  }
+
+  .home-btn {
+    margin-top: 40px !important;
+  }
 }
