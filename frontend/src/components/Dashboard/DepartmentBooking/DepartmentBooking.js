@@ -11,7 +11,7 @@ import api from '../../../api/axiosInstance';
 
 export default function DepartmentBooking() {
 
-  const [halls, setHalls] = useState([]);              // 🔥 ALL halls
+  const [halls, setHalls] = useState([]);               // 🔥 ALL halls
   const [filteredHalls, setFilteredHalls] = useState([]); // 🔥 visible halls
   const [open, setOpen] = useState(true);
 
@@ -40,8 +40,8 @@ export default function DepartmentBooking() {
   }, []);
 
   /* ===============================
-      🔍 SAME LOGIC AS ADMIN (CLIENT SIDE)
-      =============================== */
+     🔍 SAME LOGIC AS ADMIN (CLIENT SIDE)
+     =============================== */
 
   const handleSearchChange = (e) => {
     const val = e.target.value;

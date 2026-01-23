@@ -1,19 +1,42 @@
 @font-face {
   font-family: 'RecklessNeue';
   src: url('../../../assets/fonts/RecklessCollectionVF-TRIAL.woff2') format('woff2');
-  font-weight: 100 900;  /* variable weight range */
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
 
 .admin-booking-body {
-  background: linear-gradient(243.81deg, #25354F 0.9%, #1B2033 100%);
+  /* =========================================================
+     🔥 ISOLATION: FORCE CUSTOM DARK THEME
+     Overrides global 'body.dark-mode' variables so this page
+     always retains its original dark look.
+     ========================================================= */
+  --bg-default: transparent;
+  --bg-paper: #303C5C;        /* Match card background */
+  --text-primary: #ffffff;    /* Always White Text */
+  --text-secondary: #e0e0e0;
+  --border-color: rgba(255, 255, 255, 0.2);
+
+  background: linear-gradient(243.81deg, #25354F 0.9%, #1B2033 100%) !important;
   min-height: 100vh;
   box-sizing: border-box;
   overflow-y: auto;
-  /* Default Desktop Padding */
   padding: 0; 
   padding-bottom: 50px;
+}
+
+/* Force MUI Cards/Paper inside this page to use the custom variables */
+.admin-booking-body .MuiCard-root, 
+.admin-booking-body .MuiPaper-root {
+  background-color: var(--bg-paper) !important; 
+  color: var(--text-primary) !important;
+  background-image: none !important;
+}
+
+/* Force Typography to be white */
+.admin-booking-body .MuiTypography-root {
+  color: var(--text-primary) !important;
 }
 
 .admin-booking-title {
@@ -76,7 +99,6 @@
   color: white !important;
   font-size: 1rem !important;
   font-weight: bold !important;
-  /* Removed fixed width, let Grid handle it */
 }
 
 .btn-admin-booking-request-reject {
@@ -98,7 +120,6 @@
 /* ================= MOBILE RESPONSIVENESS ================= */
 @media only screen and (max-width: 768px) {
   .admin-booking-body {
-    /* Push content down on mobile because of stacked AppBar */
     padding-top: 0; 
   }
 
@@ -110,9 +131,30 @@
     margin-bottom: 2rem;
   }
 
-  /* Buttons stay horizontal but text gets smaller if needed */
   .btn-admin-booking-request-accept,
   .btn-admin-booking-request-reject {
     font-size: 0.9rem !important;
   }
+}
+
+/* =========================================================
+   === APPBAR SEARCH BOX OVERRIDES (ALWAYS DARK & ROUNDED) ===
+   ========================================================= */
+
+/* 1. UNIVERSAL SEARCH BOX (Always Dark/Transparent + Rounded) */
+.admin-booking-body .MuiInputBase-root {
+  background-color: rgba(255, 255, 255, 0.15) !important; 
+  color: #ffffff !important;
+  border-radius: 30px !important; /* Rounded Corners */
+}
+
+/* 2. UNIVERSAL PLACEHOLDER (Always White) */
+.admin-booking-body .MuiInputBase-root input::placeholder {
+  color: rgba(255, 255, 255, 0.7) !important;
+  opacity: 1 !important;
+}
+
+/* 3. UNIVERSAL ICON (Always White) */
+.admin-booking-body .MuiSvgIcon-root {
+  color: #ffffff !important;
 }

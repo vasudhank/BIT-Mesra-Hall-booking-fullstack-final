@@ -1,5 +1,5 @@
 import './App.css';
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   BrowserRouter as Router,
   Route,
@@ -33,17 +33,37 @@ import { useDispatch } from 'react-redux';
 function App() {
   const dispatch = useDispatch();
 
+  // ✅ GLOBAL THEME STATE
+  const [lightMode, setLightMode] = useState(
+    () => localStorage.getItem("theme") !== "dark"
+  );
+
   // ✅ Run ONCE on app load
   useEffect(() => {
     dispatch(checkauth());
   }, [dispatch]);
+
+  // ✅ Apply Theme Globally to Body
+  useEffect(() => {
+    localStorage.setItem("theme", lightMode ? "light" : "dark");
+    if (lightMode) {
+      document.body.classList.remove('dark-mode');
+      document.body.classList.add('light-mode');
+    } else {
+      document.body.classList.remove('light-mode');
+      document.body.classList.add('dark-mode');
+    }
+  }, [lightMode]);
+
+  const toggleTheme = () => setLightMode(!lightMode);
 
   return (
     <Router>
       <Routes>
 
         {/* ===== PUBLIC ROUTES ===== */}
-        <Route path="/" element={<Home />} />
+        {/* Pass theme props to Home */}
+        <Route path="/" element={<Home lightMode={lightMode} toggleTheme={toggleTheme} />} />
         <Route path="/schedule" element={<Schedule />} />
         <Route path="/admin_login" element={<AdminLoginRoute />} />
         <Route path="/department_login" element={<DepartmentLoginRoute />} />

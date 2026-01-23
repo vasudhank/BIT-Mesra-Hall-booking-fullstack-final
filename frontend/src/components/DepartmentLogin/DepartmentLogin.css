@@ -118,7 +118,7 @@
 }
 
 /* =========================================================
-   TRUE NEUMORPHIC INSET INPUTS (MATCHING GFG LEVEL)
+   TRUE NEUMORPHIC INSET INPUTS
    ========================================================= */
 .login-input{
   width:100% !important;
@@ -169,7 +169,7 @@
 }
 
 /* =========================================================
-   PLACEHOLDER — MATCH INNER SURFACE (INTRUDED)
+   PLACEHOLDER
    ========================================================= */
 .login-input input::placeholder{
   color:#9aa0a6;
@@ -227,6 +227,7 @@
   text-decoration:none;
   font-size:0.95rem;
 }
+
 .forgot-link:hover{ text-decoration:underline; }
 
 .home-btn,
@@ -246,7 +247,6 @@
   font-size:0.9rem;
   text-shadow: 0 0 0.5px currentColor;
   transition: color 0.3s ease;
-   
 }
 
 .register-link{
@@ -271,19 +271,16 @@
    MOBILE RESPONSIVENESS
    ========================================================= */
 @media (max-width: 768px) {
-  /* 1. Static Blended Background (No CPU-heavy animation) */
   .department-login-body::before,
   .department-login-body::after {
-    animation: none; /* Disable movement */
-    background: radial-gradient(circle at 50% 50%, #FF00FF, rgb(243, 7, 7), yellow, rgb(82, 246, 82),rgb(79, 79, 240)); /* Static blend of original colors */
-    filter: blur(90px) saturate(160%); /* Reduced blur slightly for performance */
+    animation: none;
+    background: radial-gradient(circle at 50% 50%, #FF00FF, rgb(243, 7, 7), yellow, rgb(82, 246, 82),rgb(79, 79, 240));
+    filter: blur(90px) saturate(160%);
     opacity: 0.7;
-    inset: -20%; /* Reduce area slightly */
+    inset: -20%;
   }
 
-  /* 2. Wider Inputs & Adjusted Card */
   .login-card {
-    /* Reduce padding significantly to let inputs stretch wider */
     padding: 2.5rem 1rem !important; 
     width: 100%;
   }
@@ -293,10 +290,70 @@
   }
 
   .login-input {
-    height: 52px !important; /* Slightly smaller height on mobile */
+    height: 52px !important;
   }
 
   .home-btn {
     margin-top: 40px !important;
   }
+}
+
+/* =========================================================
+   🔥🔥 DARK MODE OVERRIDES 🔥🔥
+   ========================================================= */
+
+/* 1. General Dark Mode Reset for Card */
+body.dark-mode .department-login-body .MuiCard-root.glass {
+  background: rgba(255,255,255,0.099) !important;
+  color: unset !important;
+}
+
+/* 2. Title Color -> Black/Dark */
+body.dark-mode .department-login-body .login-title {
+  color: #000000 !important;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.3); 
+}
+
+/* 3. Input Fields -> Dark Background + Dark Neumorphism (Inset) */
+body.dark-mode .department-login-body .login-input {
+  background: #1f2226 !important; /* Dark Grey */
+  box-shadow: 
+    inset 6px 6px 10px rgba(0,0,0,0.85), 
+    inset -4px -4px 8px rgba(255,255,255,0.08) !important;
+}
+
+body.dark-mode .department-login-body .login-input.Mui-focused {
+  box-shadow: 
+    inset 8px 8px 12px rgba(0,0,0,0.95), 
+    inset -3px -3px 5px rgba(255,255,255,0.12) !important;
+}
+
+/* 4. Input Text & Placeholder -> White */
+body.dark-mode .department-login-body .login-input input {
+  color: #ffffff !important;
+  text-shadow: none !important;
+}
+body.dark-mode .department-login-body .login-input input::placeholder {
+  color: rgba(255, 255, 255, 0.7) !important;
+  text-shadow: none !important;
+}
+
+/* 5. Login Button Text -> Black/Dark */
+body.dark-mode .department-login-body .login-btn {
+  color: #000000 !important;
+}
+
+/* 6. Force Link Colors to Black/Dark */
+body.dark-mode .department-login-body .forgot-link {
+  color: #05080c !important;
+}
+body.dark-mode .department-login-body .home-link,
+body.dark-mode .department-login-body .register-link {
+  color: rgb(0, 0, 0) !important;
+}
+
+/* 7. Ensure Hover remains White (for Home/Register) */
+body.dark-mode .department-login-body .home-link:hover,
+body.dark-mode .department-login-body .register-link:hover {
+  color: #ffffff !important;
 }

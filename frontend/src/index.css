@@ -17,4 +17,63 @@ body {
 
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* === CSS VARIABLES FOR THEMING === */
+  --bg-default: #e6e9ec;
+  --bg-paper: #ffffff;
+  --text-primary: #0b0b0b;
+  --text-secondary: #5b6166;
+  --border-color: rgba(0, 0, 0, 0.12);
+}
+
+/* =========================================
+   DARK MODE VARIABLES & GLOBAL OVERRIDES
+   ========================================= */
+body.dark-mode {
+  --bg-default: #131212;
+  --bg-paper: #131212;
+  --text-primary: #ffffff;
+  --text-secondary: #b0b3b8;
+  --border-color: rgba(255, 255, 255, 0.12);
+
+  background-color: var(--bg-default);
+  color: var(--text-primary);
+}
+
+/* Apply variables to common elements */
+body {
+  background-color: var(--bg-default);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Fix Links in Dark Mode */
+body.dark-mode a {
+  color: #90caf9; /* Lighter blue for dark mode readability */
+}
+
+/* Fix Material UI Cards in Dark Mode */
+body.dark-mode .MuiCard-root,
+body.dark-mode .MuiPaper-root {
+  background-color: var(--bg-paper) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Fix Material UI Typography in Dark Mode */
+body.dark-mode .MuiTypography-root {
+  color: var(--text-primary);
+}
+body.dark-mode .MuiTypography-colorTextSecondary {
+  color: var(--text-secondary) !important;
+}
+
+/* Fix Material UI Input/TextFields in Dark Mode */
+body.dark-mode .MuiInputBase-root {
+  color: var(--text-primary) !important;
+}
+body.dark-mode .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(255, 255, 255, 0.23) !important;
+}
+body.dark-mode .MuiInputLabel-root {
+  color: var(--text-secondary) !important;
 }

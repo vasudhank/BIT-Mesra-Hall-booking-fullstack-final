@@ -13,8 +13,16 @@
   --inset-dark: rgba(140,145,150,0.45);
   --inset-light: rgba(255,255,255,0.9);
 
-  --text: #0b0b0b;
+  --text: #000000;
   --muted: #5b6166;
+  --accent: #f7390f; 
+  --tw-text-opacity: 1;
+  --highlight-yellow: rgb(253 193 21 / var(--tw-text-opacity)); /* Yellow for Marquee Highlight */
+
+  /* === MANUAL GAP CONTROLS === */
+  --gap-book-marquee: 0rem; /* Gap between Book Button and Marquee */
+  --gap-marquee-cards: 8rem; /* Gap between Marquee and Admin Card Row */
+  --marquee-word-gap: 1.5rem; /* Gap between words in marquee */
 
   min-height: 100vh;
   background: var(--bg);
@@ -22,26 +30,141 @@
   
   /* === SCROLL PARALLAX LOGIC === */
   position: relative; 
-  z-index: 10; /* Higher than HomeUpper (1) so it slides OVER it */
+  z-index: 10; 
   
   font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+  overflow: hidden; 
 }
 
 /* =============================
    DARK MODE OVERRIDES
    ============================= */
 .lower-div.dark {
-  --bg: #1f2226;
-  --surface: #232528;
+  --bg: #000000;       /* Pitch Black Background */
+  --surface: #1a1a1a;  /* Slightly lighter to allow shadows */
 
-  --raise-dark: rgba(0,0,0,0.7);
-  --raise-light: rgba(90,94,100,0.6);
+  /* NEUMORPHISM ON BLACK FIX:
+     - Dark shadow is useless on black, so we make it subtle for the card edge.
+     - Light shadow (Top-Left) creates the extrusion.
+  */
+  --raise-dark: rgba(0, 0, 0, 1);       
+  --raise-light: rgba(255, 255, 255, 0.15); /* Stronger white highlight */
 
-  --inset-dark: rgba(0,0,0,0.75);
-  --inset-light: rgba(70,74,80,0.35);
+  --inset-dark: rgba(0, 0, 0, 0.9);
+  --inset-light: rgba(255, 255, 255, 0.05);
 
-  --text: #f3f3f3;
+  --text: #ffffff;
 }
+
+/* =========================================================
+   MAGAZINE TYPOGRAPHY SECTION (DESKTOP ONLY)
+   ========================================================= */
+.magazine-hero-section {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding-top: 15vh;
+  padding-bottom: 5vh;
+  min-height: 80vh; 
+  text-align: center;
+}
+
+.mag-headline-wrapper {
+  position: relative;
+  height: 450px; /* Increased height to accommodate larger text */
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Base styles for the massive text */
+.mag-big-text {
+  font-family: 'RecklessNeue', serif; 
+  font-weight: 900;
+  /* Increased Font Size */
+  font-size: 10rem; 
+  line-height: 0.85; 
+  text-transform: uppercase;
+  color: var(--text);
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1), transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+  position: absolute; 
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) translateY(40px); 
+  width: 100%;
+  pointer-events: none; 
+  z-index: 1;
+}
+
+.mag-big-text.active {
+  opacity: 1;
+  transform: translate(-50%, -50%) translateY(0);
+}
+
+.mag-big-text.exit {
+  opacity: 0;
+  transform: translate(-50%, -50%) translateY(-40px);
+}
+
+.mag-dot {
+  color: var(--accent);
+}
+
+/* Subtext Container - CHANGED LAYOUT TO ROW */
+.mag-subtext-container {
+  position: absolute;
+  bottom: -20px; /* Moved down slightly */
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  display: flex;
+  flex-direction: row; /* Changed to Row */
+  align-items: center; /* Vertically center line with text */
+  gap: 20px; /* Gap between line and text */
+  opacity: 0;
+  transition: opacity 0.5s ease 0.2s, transform 0.5s ease 0.2s;
+}
+
+.mag-subtext-container.active {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Accent Line - Vertical Line on Left */
+.mag-accent-line {
+  width: 4px;        /* Thicker vertical line */
+  height: 60px;      /* Height matches text block approximately */
+  background-color: var(--accent);
+}
+
+.mag-subtext {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: var(--muted);
+  max-width: 600px;
+  line-height: 1.5;
+  text-align: left; /* Align text to left next to the line */
+}
+
+@media (min-width: 1400px) {
+  .mag-big-text { font-size: 12rem; }
+}
+
+@media (min-width: 1800px) {
+  .mag-big-text { font-size: 14rem; }
+}
+
+@media (max-width: 1024px) {
+  .magazine-hero-section {
+    display: none;
+  }
+}
+
 
 /* =============================
    BOOK NOW WRAPPER
@@ -49,176 +172,163 @@
 .lower-book-btn {
   display: flex;
   justify-content: center;
-  padding: 7.5rem 0 2.5rem;
+  padding-top: 2.5rem;
+  padding-bottom: var(--gap-book-marquee); 
 }
 
 /* =============================
-   NEUMORPHIC BUTTON (DESKTOP DEFAULT)
+   MODERN MAGAZINE STYLE BUTTON
    ============================= */
 .hero-btn,
 .hero-btn.MuiButton-root {
-  background: var(--surface) !important;
-  color: var(--text) !important;
-  border-radius: 24px !important;
-  padding: 16px 56px !important;
-  font-size: 1.2rem !important; 
-  font-weight: 800;             
-  border: none !important;
-  text-transform: none !important;
-  transition: all 200ms ease;
+  position: relative;
+  background: transparent !important; 
+  color: var(--text) !important;      
+  border: 2px solid var(--text) !important; 
+  border-radius: 0px !important;      
+  padding: 18px 60px !important;
+  font-size: 1.3rem !important; 
+  font-family: 'RecklessNeue', serif !important; 
+  font-weight: 700 !important;             
+  text-transform: uppercase !important;
+  letter-spacing: 2px !important;
+  transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1) !important;
+  overflow: hidden;
+  z-index: 1;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
 
-  /* 1. THE BUTTON (Indented / Pressed In) */
-  box-shadow:
-    inset 6px 6px 10px var(--inset-dark),
-    inset -6px -6px 10px var(--inset-light);
+.hero-btn::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0%;
+  height: 100%;
+  background: var(--accent); 
+  transition: width 6.3s cubic-bezier(0.23, 1, 0.32, 1);
+  z-index: -1;
+}
 
-  /* 2. THE TEXT (Extruded / Popping Out) */
-  text-shadow:
-    -1px -1px 1px var(--inset-light),
-    1px 1px 1px var(--inset-dark);
+.hero-btn:hover::before {
+  width: 100%;
 }
 
 .hero-btn:hover {
-  transform: translateY(-4px);
-  box-shadow:
-    14px 14px 28px var(--raise-dark),
-    -6px -6px 10px var(--raise-light);
+  color: #ffffff !important; 
+  border-color: var(--accent) !important; 
+  transform: translateY(-2px);
+  padding-left: 70px !important; 
+  padding-right: 50px !important;
 }
 
 .hero-btn:active {
   transform: translateY(0);
-  box-shadow:
-    inset 10px 10px 18px var(--inset-dark),
-    inset -10px -10px 18px var(--inset-light);
 }
 
 .hero-btn a {
   text-decoration: none;
   color: inherit;
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
-/* =============================
-   THEME TOGGLE
-   ============================= */
-.theme-toggle {
-  position: absolute;
-  bottom: 20px;
-  left: 20px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  --sun-size: 14px;
-  --moon-size: 14px;
-  transition: transform 0.2s;
-  z-index: 100;
-}
-
-/* Track */
-.toggle-track {
+/* =========================================================
+   INFINITE MARQUEE STRIP
+   ========================================================= */
+.marquee-wrapper {
+  margin-bottom: var(--gap-marquee-cards);
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
   position: relative;
-  width: 64px;
-  height: 34px;
-  border-radius: 999px;
-  background: var(--surface);
-
-  box-shadow:
-    inset 4px 4px 8px var(--inset-dark),
-    inset -4px -4px 8px var(--inset-light);
-
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 8px;
+  padding: 1rem 0;
 }
 
-/* Thumb */
-.toggle-thumb {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  display:flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--surface);
-
-  box-shadow:
-    4px 4px 10px var(--raise-dark),
-    -4px -4px 10px var(--raise-light);
-
-  transition: transform 280ms cubic-bezier(.4,0,.2,1);
+.marquee-content {
+  display: inline-block;
+  animation: marquee 300s linear infinite; /* Slower speed */
 }
 
-/* Icons */
-.toggle-svg {
-  position: absolute;
-  fill: currentColor;
-  transition: opacity 200ms ease;
+/* Individual Span for repeating block */
+.marquee-block {
+  display: inline-block;
+  margin-right: 4rem; /* Gap between repetitions */
 }
 
-.toggle-svg.sun {
-  width: var(--sun-size);
-  height: var(--sun-size);
-  color: #111;
+/* Individual Words */
+.marquee-word {
+  font-family: 'RecklessNeue', serif;
+  font-weight: 800;
+  font-size: 6rem; /* Huge text */
+  text-transform: uppercase;
+  color: var(--text);
+  margin-right: var(--marquee-word-gap); /* Manual Gap Control */
+  opacity: 0.9;
+  display: inline-block;
 }
 
-.toggle-svg.moon {
-  width: var(--moon-size);
-  height: var(--moon-size);
-  color: #ffffff;
+.marquee-highlight {
+  color: var(--highlight-yellow) !important; /* Yellow override */
 }
 
-/* DARK MODE STATE */
-.theme-toggle.dark .toggle-thumb {
-  transform: translateX(30px);
+.marquee-dot {
+  color: var(--accent);
 }
 
-.theme-toggle.light .toggle-svg.sun { opacity: 1; }
-.theme-toggle.light .toggle-svg.moon { opacity: 0; }
-.theme-toggle.dark .toggle-svg.sun { opacity: 0; }
-.theme-toggle.dark .toggle-svg.moon { opacity: 1; }
-
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
 
 /* =============================
    RESPONSIVE (MOBILE) OVERRIDES
    ============================= */
 @media (max-width: 768px) {
   
+  .lower-book-btn {
+    padding-top: 5rem;
+    padding-bottom: 4rem;
+  }
+
+  /* Marquee smaller on mobile */
+  .marquee-word {
+    font-size: 1.5rem;
+  }
+  .marquee-wrapper {
+    margin-bottom: 4rem;
+  }
+
   /* 1. Flat Modern Book Now Button on Mobile */
   .hero-btn, 
   .hero-btn.MuiButton-root {
     width: 85%;
     padding: 16px 0 !important;
-    background: #0f172a !important; /* Flat Dark Blue/Black */
+    background: #0f172a !important; 
     color: #ffffff !important;
-    border-radius: 50px !important;
+    border-radius: 50px !important; 
+    border: none !important;
+    font-family: 'Inter', sans-serif !important; 
     font-size: 1.1rem !important;
     font-weight: 700;
-    
-    /* Remove all Neumorphic Shadows for Flat look */
-    box-shadow: none !important;
-    text-shadow: none !important;
+    letter-spacing: 0.5px !important;
   }
   
-  /* Dark mode variant for button */
   .lower-div.dark .hero-btn {
     background: #ffffff !important;
     color: #000000 !important;
-    
   }
 
   .hero-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3) !important;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2) !important;
+    padding-left: 0 !important; 
+    padding-right: 0 !important;
   }
-
-  /* 2. Smaller Theme Toggle in Bottom Left */
-  .theme-toggle {
-    transform: scale(0.75); 
-    left: 15px;
-    bottom: 15px;
+  
+  .hero-btn::before {
+    display: none;
   }
 }

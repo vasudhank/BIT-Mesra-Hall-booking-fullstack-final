@@ -1,4 +1,3 @@
-// frontend/src/components/Schedule/Schedule.js
 import React, { useEffect, useState, useRef, useMemo, useLayoutEffect } from 'react';
 import api from '../../api/axiosInstance';
 import "./Schedule.css";
@@ -9,7 +8,7 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
-import { useLocation } from 'react-router-dom'; // Import useLocation
+import { useLocation } from 'react-router-dom';
 
 dayjs.extend(isoWeek);
 
@@ -46,40 +45,24 @@ function colorFromString(str) {
 }
 
 export default function Schedule() {
-  const location = useLocation(); // Hook to access state passed via navigate
+  const location = useLocation();
   const theme = useTheme();
-  // Check for mobile breakpoint (sm = 600px)
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const [halls, setHalls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
-  
-  // Set initial viewMode based on navigation state, default to 'list'
   const [viewMode, setViewMode] = useState(location.state?.mode || 'list'); 
-
-  // NEW: search state (for the new rounded search box)
-  const [searchTerm, setSearchTerm] = useState('');    // controlled input
-  const [searchQuery, setSearchQuery] = useState('');  // committed query on Enter / button
-
-  // refs
-  const weekHeaderRef = useRef(null); // week header (days)
+  const [searchTerm, setSearchTerm] = useState('');    
+  const [searchQuery, setSearchQuery] = useState('');  
+  const weekHeaderRef = useRef(null); 
   const bodyRef = useRef(null);
-  const topStripRef = useRef(null); // top control strip ref
-
-  // measured height of the top strip (used for spacer and to position week header)
+  const topStripRef = useRef(null); 
   const [topStripHeight, setTopStripHeight] = useState(0);
   const [dateTime, setDateTime] = useState("");
-
-
-  // small visual offset from top of viewport (gap below browser chrome/address bar)
-  // adjust this number (px) if you want a bigger/smaller gap. Increased slightly to avoid peek.
-  const topOffsetPx = 20; // tweak if needed
-
-  // If you have an extra global fixed navbar above this page, set its height here (usually 0).
+  const topOffsetPx = 20; 
   const navbarHeightPx = 0;
 
-  // measure top strip height synchronously so layout doesn't flicker
   useLayoutEffect(() => {
     const measure = () => {
       const el = topStripRef.current;
@@ -95,13 +78,12 @@ export default function Schedule() {
     return () => window.removeEventListener('resize', measure);
   }, []);
 
-  // compute monday..sunday (dayjs objects) for week containing selectedDate
   const weekDates = useMemo(() => {
     const dt = dayjs(selectedDate);
     const monday = dt.isoWeekday() === 1 ? dt.startOf('day') : dt.subtract(dt.isoWeekday() - 1, 'day');
     const days = [];
     for (let i = 0; i < 7; ++i) days.push(monday.add(i, 'day'));
-    return days; // Mon..Sun
+    return days; 
   }, [selectedDate]);
 
   useEffect(() => { fetchHalls(); }, []);
@@ -121,15 +103,12 @@ export default function Schedule() {
     return (hall.bookings || []).filter(b => bookingOverlapsDay(b, selectedDate)).sort((a,b)=> new Date(a.startDateTime)-new Date(b.startDateTime));
   };
 
-  // gridData: columns = weekDates (Mon..Sun), rows = halls
-  // apply searchQuery filter here so both list and grid view use filtered halls
   const gridData = useMemo(() => {
-    const cols = weekDates.map(d => ({ label: d.format('ddd'), date: d.format('YYYY-MM-DD'), longLabel: d.format('DD MMM') })); // Mon..Sun
+    const cols = weekDates.map(d => ({ label: d.format('ddd'), date: d.format('YYYY-MM-DD'), longLabel: d.format('DD MMM') })); 
     const filteredRows = (halls || []).filter(h => {
       if (!searchQuery) return true;
       return (h.name || '').toLowerCase().includes(searchQuery.toLowerCase());
     }).map(h => ({ id: h._id || h.name, name: h.name, capacity: h.capacity, bookings: h.bookings || [], status: h.status }));
-    // map[rowId][colDate] => bookings array
     const map = {};
     filteredRows.forEach(r => {
       map[r.id] = {};
@@ -141,7 +120,6 @@ export default function Schedule() {
     return { cols, rows: filteredRows, map };
   }, [halls, weekDates, searchQuery]);
 
-  // sync week-header horizontal scrollLeft to body horizontal scrollLeft
   useEffect(() => {
     const bodyEl = bodyRef.current;
     if (!bodyEl) return;
@@ -154,7 +132,6 @@ export default function Schedule() {
     return () => bodyEl.removeEventListener('scroll', onScroll);
   }, [bodyRef.current, weekHeaderRef.current]);
 
-  // on window resize keep week header aligned with body
   useEffect(() => {
     const onResize = () => {
       if (weekHeaderRef.current && bodyRef.current) {
@@ -165,24 +142,17 @@ export default function Schedule() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // top value for the top strip sticky
   const topStripStickyTop = navbarHeightPx + topOffsetPx;
+  const weekHeaderStickyTop = navbarHeightPx + topOffsetPx + topStripHeight - 2; 
 
-  // top value for the week header sticky (must be directly below top strip).
-  // keep small overlap to avoid hairline reveal
-  const weekHeaderStickyTop = navbarHeightPx + topOffsetPx + topStripHeight - 2; // 2px overlap
-
-  // simple handler for search input (updates controlled input)
   const onSearchChange = (e) => {
     setSearchTerm(e.target.value);
   };
 
-  // commit the current searchTerm to searchQuery (triggering filter)
   const onSearchSubmit = () => {
     setSearchQuery(searchTerm.trim());
   };
 
-  // allow Enter to submit search
   const onSearchKeyDown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -195,48 +165,27 @@ export default function Schedule() {
     const now = new Date(
       new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
     );
-
-    const days = [
-      "SUNDAY", "MONDAY", "TUESDAY",
-      "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"
-    ];
-
-    const months = [
-      "JANUARY", "FEBRUARY", "MARCH", "APRIL",
-      "MAY", "JUNE", "JULY", "AUGUST",
-      "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"
-    ];
-
-    const formatted = `${days[now.getDay()]}, ${
-      months[now.getMonth()]
-    } ${String(now.getDate()).padStart(2, "0")}, ${
-      now.getFullYear()
-    } - ${String(now.getHours()).padStart(2, "0")}:${
-      String(now.getMinutes()).padStart(2, "0")
-    }:${String(now.getSeconds()).padStart(2, "0")} IST`;
-
+    const days = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+    const months = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
+    const formatted = `${days[now.getDay()]}, ${months[now.getMonth()]} ${String(now.getDate()).padStart(2, "0")}, ${now.getFullYear()} - ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")} IST`;
     setDateTime(formatted);
   };
-
   updateTime();
   const interval = setInterval(updateTime, 1000);
   return () => clearInterval(interval);
 }, []);
 
-  // Dynamic Grid Dimensions for Mobile responsiveness
   const rowHeaderWidth = isMobile ? '120px' : '220px';
   const dayColWidth = isMobile ? 'minmax(140px, 1fr)' : 'minmax(180px, 1fr)';
 
   return (
-    // ensure container uses normal flow (do not position fixed here)
     <Container maxWidth={false} sx={{ paddingLeft: 0, paddingRight: 0, marginTop: 0 }}>
-      {/* Opaque cover bar to hide timetable behind the address bar (tiny gap) */}
       <Box
         sx={{
           position: "sticky",
           top: 0,
           height: `${topOffsetPx}px`,
-          backgroundColor: "#fff",
+          backgroundColor: "var(--bg-paper)",
           zIndex: 2000
         }}
       />
@@ -246,12 +195,13 @@ export default function Schedule() {
         ref={topStripRef}
         sx={{
           position: 'sticky',
-          top: `${topStripStickyTop}px`,   // small gap below browser chrome
+          top: `${topStripStickyTop}px`,   
           zIndex: 1600,
-          backgroundColor: '#fff',         // opaque so nothing shows through
-          borderBottom: '1px solid rgba(0,0,0,0.06)',
+          backgroundColor: 'var(--bg-paper)', 
+          color: 'var(--text-primary)',       
+          borderBottom: '1px solid var(--border-color)',
           boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
-          px: { xs: 2, md: 3 }, // Responsive padding
+          px: { xs: 2, md: 3 },
           py: 1
         }}
       >
@@ -260,21 +210,19 @@ export default function Schedule() {
             Hall Schedule
           </Typography>
 
-          {/* RIGHT SIDE OF STRIP: search box (NEW) | select date | chip | view buttons */}
           <Box display="flex" gap={isMobile ? 1 : 2} alignItems="center" flexWrap="wrap" sx={{ justifyContent: { xs: 'space-between', md: 'flex-end' }, width: { xs: '100%', md: 'auto' } }}>
           <Typography
             sx={{
               fontSize: "0.85rem",
               fontWeight: 600,
               whiteSpace: "nowrap",
-              color: "rgba(0,0,0,0.75)",
-              display: { xs: 'none', md: 'block' }, // Hide full date on very small mobile screens to save space
+              color: "var(--text-secondary)", 
+              display: { xs: 'none', md: 'block' }, 
               mr: 1
             }}
           >
             {dateTime}
           </Typography>
-            {/* SEARCH BOX - rounded corners, placeholder as requested, with search icon */}
             <TextField
               placeholder="Type your room name here"
               value={searchTerm}
@@ -287,24 +235,22 @@ export default function Schedule() {
                   borderRadius: '24px',
                   paddingRight: 0,
                 },
-                minWidth: { xs: '100%', sm: 260 }, // Full width on mobile
+                minWidth: { xs: '100%', sm: 260 }, 
                 flexGrow: { xs: 1, sm: 0 },
                 '& .MuiOutlinedInput-notchedOutline': {
-                  borderColor: 'rgba(0,0,0,0.12)',
+                  borderColor: 'var(--border-color)',
                 },
-
-                // ⭐ CUSTOM PLACEHOLDER FONT SIZE HERE ⭐
                 '& input::placeholder': {
-                  fontSize: '12px',        // <-- set any px value you want
-                  opacity: 1,             // ensures it's not faded
+                  fontSize: '12px',       
+                  opacity: 1,
+                  color: 'var(--text-secondary)'
                 }
               }}
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end" sx={{ mr: 0 }}>
-                    
                     <IconButton size="small" onClick={onSearchSubmit} aria-label="submit search">
-                      <SearchIcon />
+                      <SearchIcon sx={{ color: 'var(--text-secondary)' }} />
                     </IconButton>
                   </InputAdornment>
                 ),
@@ -312,8 +258,6 @@ export default function Schedule() {
               }}
             />
 
-
-            {/* existing select date */}
             <TextField
               label="Select date"
               type="date"
@@ -324,9 +268,16 @@ export default function Schedule() {
               sx={{ flexGrow: { xs: 1, sm: 0 } }}
             />
 
+            {/* 🔥 UPDATED CHIP: Uses CSS Variables for Dark Mode Support */}
             <Chip 
               label={loading ? "Loading..." : `${(gridData.rows || []).length} halls`} 
-              sx={{ display: { xs: 'none', sm: 'flex' } }} // Hide chip on very small screens if crowded
+              variant="outlined"
+              sx={{ 
+                display: { xs: 'none', sm: 'flex' },
+                color: 'var(--text-primary)',        // Adapts to theme
+                borderColor: 'var(--border-color)',  // Adapts to theme
+                backgroundColor: 'transparent'
+              }} 
             />
 
             <Stack direction="row" spacing={1}>
@@ -349,20 +300,18 @@ export default function Schedule() {
             </Stack>
             <IconButton
               size="small"
-              onClick={() => window.location.href = "/"}   // ← sends user to Homepage instantly
+              onClick={() => window.location.href = "/"}   
               aria-label="go home"
             >
-              <HomeIcon />
+              <HomeIcon sx={{ color: 'var(--text-primary)' }}/>
             </IconButton>
 
           </Box>
         </Box>
       </Box>
 
-      {/* Spacer equal to measured top strip height so content starts below it */}
       <Box sx={{ height: `0px` }} />
 
-      {/* List view unchanged but with a little top padding so cards don't butt to the strip */}
       {viewMode === 'list' && (
         <Container sx={{ px: { xs: 2, md: 3 }, pt: 2 }}>
           <Grid container spacing={3}>
@@ -405,17 +354,15 @@ export default function Schedule() {
         </Container>
       )}
 
-      {/* Grid view: keep week-header sticky logic as before (positioned directly below top strip) */}
       {viewMode === 'grid' && (
         <Box sx={{ width: '100%' }}>
-          {/* Week day header (kept as before). This sits below the top strip. */}
           <Box
             ref={weekHeaderRef}
             sx={{
               position: 'sticky',
-              top: `${weekHeaderStickyTop}px`, // directly under top strip (with -2px overlap)
+              top: `${weekHeaderStickyTop}px`,
               zIndex: 1500,
-              backgroundColor: '#fff',
+              backgroundColor: 'var(--bg-paper)', 
               boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
               overflowX: 'hidden',
               marginTop: '-2px'
@@ -427,26 +374,26 @@ export default function Schedule() {
               width: 'max-content'
             }}>
               <Box sx={{ 
-                borderRight: '1px solid #ddd', 
-                borderBottom: '1px solid #ddd', 
+                borderRight: '1px solid var(--border-color)', 
+                borderBottom: '1px solid var(--border-color)', 
                 p: 1, 
-                bgcolor: '#fafafa',
-                position: 'sticky', // FIX: Sticky Left
+                bgcolor: 'var(--bg-default)', 
+                color: 'var(--text-primary)', 
+                position: 'sticky', 
                 left: 0,
                 zIndex: 10
               }}>
                 <Typography variant="subtitle2">Room / Day</Typography>
               </Box>
               {gridData.cols.map(col => (
-                <Box key={col.date} sx={{ borderRight: '1px solid #ddd', borderBottom: '1px solid #ddd', p: 1, bgcolor: '#fafafa', textAlign: 'center' }}>
-                  <Typography variant="subtitle2">{col.label}</Typography>
+                <Box key={col.date} sx={{ borderRight: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)', p: 1, bgcolor: 'var(--bg-default)', textAlign: 'center' }}>
+                  <Typography variant="subtitle2" color="var(--text-primary)">{col.label}</Typography>
                   <Typography variant="caption" color="text.secondary">{col.longLabel}</Typography>
                 </Box>
               ))}
             </Box>
           </Box>
 
-          {/* Body: horizontal scrolling container that controls week-header's scrollLeft */}
           <Box
             ref={bodyRef}
             sx={{
@@ -464,12 +411,12 @@ export default function Schedule() {
                 }}>
                   {/* left room cell */}
                   <Box sx={{ 
-                    borderRight: '1px solid #ddd', 
-                    borderBottom: '1px solid #eee', 
+                    borderRight: '1px solid var(--border-color)', 
+                    borderBottom: '1px solid var(--border-color)', 
                     p: 1, 
-                    bgcolor: '#fff', 
+                    bgcolor: 'var(--bg-paper)', 
                     minWidth: isMobile ? 120 : 220,
-                    position: 'sticky', // FIX: Sticky Left
+                    position: 'sticky', 
                     left: 0,
                     zIndex: 10
                   }}>
@@ -483,12 +430,12 @@ export default function Schedule() {
                     const bookings = gridData.map[row.id][col.date] || [];
                     return (
                       <Box key={row.id + col.date} sx={{
-                        borderRight: '1px solid #eee',
-                        borderBottom: '1px solid #eee',
+                        borderRight: '1px solid var(--border-color)',
+                        borderBottom: '1px solid var(--border-color)',
                         p: 1,
                         minHeight: 70,
                         minWidth: isMobile ? 140 : 180,
-                        bgcolor: bookings.length ? '#fafafa' : '#fff'
+                        bgcolor: bookings.length ? 'var(--bg-default)' : 'var(--bg-paper)' 
                       }}>
                         {bookings.length === 0 ? (
                           <Typography variant="body2" color="text.secondary">—</Typography>

@@ -1,38 +1,82 @@
 @font-face {
   font-family: 'RecklessNeue';
   src: url('../../../assets/fonts/RecklessCollectionVF-TRIAL.woff2') format('woff2');
-  font-weight: 100 900;  /* variable weight range */
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
 
-.department-booking-body{
-    background: linear-gradient(243.81deg, #25354F 0.9%, #1B2033 100%);
-    height: 100vh;
-    box-sizing: border-box;
-    overflow: auto;
-    padding-top: 80px; /* Default desktop padding */
+.department-booking-body {
+  /* =========================================================
+     🔥 ISOLATION: REVERT TO CUSTOM DARK THEME
+     Overrides global variables to match AdminHall style
+     ========================================================= */
+  --bg-default: transparent;
+  --bg-paper: #303C5C;        /* Same blue as Admin Hall cards */
+  --text-primary: #ffffff;
+  --text-secondary: #e0e0e0;
+  --border-color: rgba(255, 255, 255, 0.2);
+
+  /* Original Gradient Background */
+  background: linear-gradient(243.81deg, #25354F 0.9%, #1B2033 100%) !important;
+  height: 100vh;
+  box-sizing: border-box;
+  overflow: auto;
+  padding-top: 80px;
 }
 
+/* Force MUI components inside this page to look like the old design */
+.department-booking-body .MuiCard-root,
+.department-booking-body .MuiPaper-root {
+    background-color: var(--bg-paper) !important;
+    color: var(--text-primary) !important;
+    background-image: none !important;
+}
 
-.department-booking-title{
-    font-family: 'RecklessNeue' !important;
-    font-size: 2rem;
-    color: white;
-    text-align: center;
-    margin-top: 2rem;
-    margin-bottom: 2rem;
+/* Force Text to be White */
+.department-booking-body .MuiTypography-root {
+    color: var(--text-primary) !important;
+}
+
+.department-booking-title {
+  font-family: 'RecklessNeue' !important;
+  font-size: 2rem;
+  color: white !important;
+  text-align: center;
+  margin-top: 2rem;
+  margin-bottom: 2rem;
 }
 
 /* ================= MOBILE RESPONSIVENESS ================= */
 @media only screen and (max-width: 768px) {
-    .department-booking-body {
-        /* Increased padding for taller mobile AppBar (stacked date + search) */
-        padding-top: 70px; 
-    }
+  .department-booking-body {
+    padding-top: 70px;
+  }
 
-    .department-booking-title {
-        margin-top: 1rem;
-        font-size: 1.8rem;
-    }
+  .department-booking-title {
+    margin-top: 1rem;
+    font-size: 1.8rem;
+  }
+}
+
+/* =========================================================
+   === APPBAR SEARCH BOX OVERRIDES (ALWAYS DARK) ===
+   ========================================================= */
+
+/* 1. UNIVERSAL SEARCH BOX (Always Dark/Transparent) */
+.department-booking-body .MuiInputBase-root {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+  border-radius: 4px;
+}
+
+/* 2. UNIVERSAL PLACEHOLDER (Always White) */
+.department-booking-body .MuiInputBase-root input::placeholder {
+  color: rgba(255, 255, 255, 0.7) !important;
+  opacity: 1 !important;
+}
+
+/* 3. UNIVERSAL ICON (Always White) */
+.department-booking-body .MuiSvgIcon-root {
+  color: #ffffff !important;
 }

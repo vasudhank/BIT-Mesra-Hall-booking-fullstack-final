@@ -12,13 +12,89 @@ import CircularProgress from '@mui/material/CircularProgress';
 import SearchIcon from '@mui/icons-material/Search';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'; // For AI Icon
-import CakeIcon from '@mui/icons-material/Cake'; // Icon for Wish button
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'; 
+import CakeIcon from '@mui/icons-material/Cake'; 
 
 // Import the API call
 import { getContactsApi } from "../../api/contactApi";
 
-export default function HomeUpper() {
+// --- SUB-COMPONENT: FLIP DIGIT ---
+const FlipDigit = ({ digit }) => {
+  const [currentDigit, setCurrentDigit] = useState(digit);
+  const [previousDigit, setPreviousDigit] = useState(digit);
+  const [isFlipping, setIsFlipping] = useState(false);
+  const digitRef = useRef(null);
+
+  useEffect(() => {
+    if (digit !== currentDigit) {
+      setPreviousDigit(currentDigit);
+      setCurrentDigit(digit);
+
+      setIsFlipping(false);
+      void digitRef.current.offsetWidth;
+      setIsFlipping(true);
+
+      const timeout = setTimeout(() => {
+        setIsFlipping(false);
+      }, 600);
+
+      return () => clearTimeout(timeout);
+    }
+  }, [digit, currentDigit]);
+
+  return (
+    <div ref={digitRef} className={`flip-digit ${isFlipping ? "flip" : ""}`}>
+      <div className="card__top">{currentDigit}</div>
+      <div className="card__bottom" data-value={currentDigit}></div>
+
+      <div className="card__back" data-value={previousDigit}>
+        <div className="card__bottom" data-value={currentDigit}></div>
+      </div>
+    </div>
+  );
+};
+
+
+// --- SUB-COMPONENT: CLOCK CARD CONTAINER ---
+const ClockCard = ({ value, label, children, extraClass = "" }) => {
+  const strVal = value.toString().padStart(2, "0");
+  const digit1 = strVal.charAt(0);
+  const digit2 = strVal.charAt(1);
+
+  return (
+    <div className={`flip-card-container ${extraClass}`}>
+      {children}
+      <div className="flip-card-inner">
+        <FlipDigit digit={digit1} />
+        <FlipDigit digit={digit2} />
+      </div>
+    </div>
+  );
+};
+
+// --- SUB-COMPONENT: THEME BUTTON (Moved Outside) ---
+const ThemeButton = ({ className, lightMode, toggleTheme }) => (
+  <button
+    className={`upper-theme-toggle ${lightMode ? "light" : "dark"} ${className || ''}`}
+    onClick={toggleTheme}
+    aria-label="Toggle theme"
+  >
+    <span className="upper-toggle-track">
+      <span className="upper-toggle-thumb">
+        <svg className="upper-toggle-svg sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+          <path d="M12 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0M8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0m0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13m8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5M3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8m10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0m-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0m9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 0 .707l1.414 1.414a.5.5 0 0 1 0 .707M4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708" />
+        </svg>
+        <svg className="upper-toggle-svg moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+          <path d="M6 .278a.77.77 0 0 1 .08.858 7.2 7.2 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277q.792-.001 1.533-.16a.79.79 0 0 1 .81.316.73.73 0 0 1-.031.893A8.35 8.35 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.75.75 0 0 1 6 .278" />
+          <path d="M10.794 3.148a.217.217 0 0 1 .412 0l.387 1.162c.173.518.579.924 1.097 1.097l1.162.387a.217.217 0 0 1 0 .412l-1.162.387a1.73 1.73 0 0 0-1.097 1.097l-.387 1.162a.217.217 0 0 1-.412 0l-.387-1.162A1.73 1.73 0 0 0 9.31 6.593l-1.162-.387a.217.217 0 0 1 0-.412l1.162-.387a1.73 1.73 0 0 0 1.097-1.097z" />
+        </svg>
+      </span>
+    </span>
+  </button>
+);
+
+
+export default function HomeUpper({ lightMode, toggleTheme }) {
   const auth = useSelector((state) => state.user);
   const location = useLocation();
   const navigate = useNavigate();
@@ -27,13 +103,22 @@ export default function HomeUpper() {
   const videoRef = useRef(null);
 
   // === RESPONSIVE STATE ===
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 1364);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Scroll & UI States
   const [showArrow, setShowArrow] = useState(true);
   const [scrolled, setScrolled] = useState(false);
-  const [dateTime, setDateTime] = useState("");
+  
+  // FLIP CLOCK STATE
+  const [timeData, setTimeData] = useState({
+    hours: "00",
+    minutes: "00",
+    seconds: "00",
+    dateStr: "", 
+    navDateStr: "",
+    mobileDateTimeStr: "" 
+  });
 
   // Video Logic States
   const [showConsent, setShowConsent] = useState(false);
@@ -47,7 +132,7 @@ export default function HomeUpper() {
   const [showAIModal, setShowAIModal] = useState(false);
   const [showDateModal, setShowDateModal] = useState(false);
   const [clickedDate, setClickedDate] = useState(null);
-   
+    
   // === CONTACTS LOGIC ===
   const [contacts, setContacts] = useState([]);
   const [filteredContacts, setFilteredContacts] = useState([]);
@@ -63,7 +148,7 @@ export default function HomeUpper() {
   const currentMonth = today.getMonth();
   const currentYear = today.getFullYear();
   const currentDay = today.getDate();
-   
+    
   const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay();
@@ -77,7 +162,7 @@ export default function HomeUpper() {
   // --- Effect: Detect Mobile Resize ---
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
+      setIsMobile(window.innerWidth <= 1364);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -98,15 +183,11 @@ export default function HomeUpper() {
     }
   };
 
-  // UPDATED SEARCH HANDLER (Real-time clear, Manual Enter)
+  // Search Logic
   const handleSearchChange = (e) => {
     const val = e.target.value;
     setSearchText(val);
-
-    // If user clears the box, reset list immediately
-    if (val === "") {
-      setFilteredContacts(contacts);
-    }
+    if (val === "") setFilteredContacts(contacts);
   };
 
   const handleSearchSubmit = () => {
@@ -158,7 +239,7 @@ export default function HomeUpper() {
   };
 
   const goToCheckBookings = () => navigate('/schedule', { state: { mode: 'grid' } });
-   
+    
   const goToBookNow = () => {
     if (auth.status === "Authenticated" && auth.user === "Department") {
       navigate('/department/booking');
@@ -182,22 +263,52 @@ export default function HomeUpper() {
     return () => observer.disconnect();
   }, []);
 
-  /* ================= DATE & TIME ================= */
+  /* ================= DATE & TIME LOGIC ================= */
   useEffect(() => {
     const updateTime = () => {
       const ist = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-      const days = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
-      const months = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
-      setDateTime(`${days[ist.getDay()]}, ${months[ist.getMonth()]} ${String(ist.getDate()).padStart(2, "0")}, ${ist.getFullYear()} - ${String(ist.getHours()).padStart(2, "0")}:${String(ist.getMinutes()).padStart(2, "0")}:${String(ist.getSeconds()).padStart(2, "0")} IST`);
+      
+      // Desktop: 24-hour format (No conversion logic)
+      const h = ist.getHours();
+      const hStr = String(h).padStart(2, '0');
+      const mStr = String(ist.getMinutes()).padStart(2, '0');
+      const sStr = String(ist.getSeconds()).padStart(2, '0');
+      
+      // Date Formats for Desktop Cards
+      const dd = String(ist.getDate()).padStart(2, '0');
+      const mm = String(ist.getMonth() + 1).padStart(2, '0');
+      const yy = String(ist.getFullYear()).slice(-2);
+      
+      const dateStr = `${dd}/${mm}/${yy}`; // For Card (Zero Scroll)
+      const navDateStr = `${dd}-${mm}-${yy}`; // For Navbar (Scrolled)
+
+      // Mobile Date Time Bar Construction
+      // Format: Friday, January 23, 2026 - 14:50:14 IST
+      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const monthsFull = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      
+      const dayName = days[ist.getDay()];
+      const monthName = monthsFull[ist.getMonth()];
+      const fullYear = ist.getFullYear();
+      
+      const mobileStr = `${dayName}, ${monthName} ${dd}, ${fullYear} - ${hStr}:${mStr}:${sStr} IST`;
+
+      setTimeData({
+        hours: hStr,
+        minutes: mStr,
+        seconds: sStr,
+        dateStr: dateStr,
+        navDateStr: navDateStr,
+        mobileDateTimeStr: mobileStr
+      });
     };
     updateTime();
     const i = setInterval(updateTime, 1000);
     return () => clearInterval(i);
   }, []);
 
-  /* ================= VIDEO HANDLERS (Desktop Only) ================= */
+  /* ================= VIDEO HANDLERS ================= */
   const handleInitialClick = () => setShowConsent(true);
-   
   const handleConsentOk = () => {
     setShowConsent(false);
     setVideoEnabled(true);
@@ -211,27 +322,18 @@ export default function HomeUpper() {
       }
     }, 100);
   };
-
   const handleConsentCancel = () => setShowConsent(false);
-
   const togglePlayPause = () => {
     if (!videoRef.current) return;
-    if (isPlaying) {
-      videoRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      videoRef.current.play();
-      setIsPlaying(true);
-    }
+    if (isPlaying) { videoRef.current.pause(); setIsPlaying(false); } 
+    else { videoRef.current.play(); setIsPlaying(true); }
   };
-
   const toggleMute = () => {
     if (!videoRef.current) return;
     const newMuteState = !isMuted;
     setIsMuted(newMuteState);
     videoRef.current.muted = newMuteState;
   };
-
   const toggleMediaSource = () => {
     if (showVideo) {
       if (videoRef.current) videoRef.current.pause();
@@ -240,19 +342,14 @@ export default function HomeUpper() {
     } else {
       setShowVideo(true);
       setIsPlaying(true);
-      setTimeout(() => {
-        if (videoRef.current) videoRef.current.play();
-      }, 50);
+      setTimeout(() => { if (videoRef.current) videoRef.current.play(); }, 50);
     }
   };
-
   const handleScrollDown = () => {
     setShowArrow(false);
     document.querySelector(".lower-div")?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // Determine Background Image
-  // Mobile: Specific image provided. Desktop: Dynamic logic.
   const bgImage = isMobile 
     ? "url('https://res.cloudinary.com/dkgbflzrc/image/upload/v1768803019/WhatsApp_Image_2026-01-19_at_11.35.40_AM_1_awmflo.jpg')"
     : (!showVideo 
@@ -263,23 +360,54 @@ export default function HomeUpper() {
   return (
     <>
       {/* =========================================================
-          FIXED UI LAYERS (MOVED OUTSIDE SECTION TO STAY ON TOP)
+          FIXED UI LAYERS 
           ========================================================= */}
 
-      {/* 1. Date & Time */}
-      <div className="datetime-wrapper">
-        <div className={`datetime-bar ${scrolled ? "datetime--scrolled" : ""}`}>
-          {dateTime}
+      {/* 1. FLIP CLOCK COMPONENT (Desktop Only) */}
+      {!isMobile && (
+        <div className={`flip-clock-wrapper ${scrolled ? 'clock-scrolled' : ''}`}>
+          
+          {/* Theme Toggle: Left in Unscrolled (order:-1), Right in Scrolled (order:5) */}
+          <div className="clock-toggle-wrapper">
+             <ThemeButton lightMode={lightMode} toggleTheme={toggleTheme} />
+          </div>
+
+          <div className="clock-group">
+            {/* Hour Card */}
+            <ClockCard value={timeData.hours} extraClass="hour-card">
+               {/* Date inside card (Unscrolled only) */}
+               <div className="card-date">{timeData.dateStr}</div>
+            </ClockCard>
+
+            {/* Separator Colon (Hidden in Unscrolled, Visible in Scrolled) */}
+            <div className="clock-separator">:</div>
+
+            {/* Minute Card */}
+            <ClockCard value={timeData.minutes} extraClass="min-card">
+               {/* Tiny Seconds inside card (Unscrolled only - Text) */}
+               <div className="card-seconds-corner">{timeData.seconds}</div>
+            </ClockCard>
+
+             {/* Separator Colon (Hidden in Unscrolled, Visible in Scrolled) */}
+             <div className="clock-separator">:</div>
+
+            {/* Second Card (Scrolled Only - Hidden by CSS initially) */}
+            <ClockCard value={timeData.seconds} extraClass="ss-card" />
+          </div>
+
         </div>
-      </div>
+      )}
 
       {/* 2. Navbar (DESKTOP) */}
       {!isMobile && (
-        <Box className="navbar-wrapper">
+        <Box className={`navbar-wrapper ${scrolled ? "navbar-wrapper--scrolled" : ""}`}>
           <Grid container justifyContent="center">
             <Grid item display="flex" justifyContent="center">
               <div className={`navbar-shell ${scrolled ? "navbar-shell--scrolled" : ""}`}>
                 <div className="navbar">
+                  {/* Date on Navbar (Scrolled Only) */}
+                  <div className="nav-date">{timeData.navDateStr}</div>
+
                   <div className="nav-links-container">
                     <div className="nav-link-item">
                       <Link to="/" className={location.pathname === "/" ? "active" : ""}>Home</Link>
@@ -301,21 +429,38 @@ export default function HomeUpper() {
         </Box>
       )}
 
-      {/* 3. Mobile Menu Button (Fixed, Circular, Right) */}
+      {/* 3. Mobile Date Time Bar (Fixed Top) */}
+      {isMobile && (
+        <div className="mobile-datetime-bar">
+          {timeData.mobileDateTimeStr}
+        </div>
+      )}
+
+      {/* 4. Mobile Menu Button */}
       {isMobile && (
         <button className="mobile-menu-toggle" onClick={toggleMobileMenu}>
-          <MenuIcon style={{ fontSize: '1.8rem', color: 'white' }} />
+          {/* Color set to inherit so CSS can control it */}
+          <MenuIcon style={{ fontSize: '1.8rem', color: 'inherit' }} />
         </button>
       )}
 
-      {/* 4. Mobile AI FAB (Fixed, Bottom Right, Modern AI Look) */}
+      {/* 5. Mobile Theme Toggle (Fixed Center) */}
+      {isMobile && (
+        <ThemeButton 
+          className="mobile-toggle-fixed" 
+          lightMode={lightMode} 
+          toggleTheme={toggleTheme} 
+        />
+      )}
+
+      {/* 6. Mobile AI FAB */}
       {isMobile && (
         <button className="mobile-ai-fab" onClick={handleAIClick}>
           <AutoAwesomeIcon sx={{ fontSize: 26, color: 'white' }} />
         </button>
       )}
 
-      {/* 5. Mobile Menu Overlay */}
+      {/* 7. Mobile Menu Overlay */}
       {isMobile && (
         <div className={`mobile-menu-overlay ${mobileMenuOpen ? 'open' : ''}`}>
            <div className="mobile-menu-content">
@@ -332,7 +477,7 @@ export default function HomeUpper() {
         </div>
       )}
 
-      {/* 6. SNACKBAR & MODALS */}
+      {/* 8. SNACKBAR & MODALS */}
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={2000}
@@ -361,7 +506,7 @@ export default function HomeUpper() {
                 onKeyDown={handleSearchKeyDown}
               />
               <div className="search-btn-box" onClick={handleSearchSubmit}>
-                <SearchIcon sx={{ color: 'white', fontSize: 20 }} />
+                <SearchIcon className="search-icon-svg" sx={{ fontSize: 20, color: lightMode ? 'white' : 'inherit' }} />
               </div>
             </div>
 
@@ -413,7 +558,7 @@ export default function HomeUpper() {
       {/* AI Modal */}
       {showAIModal && (
         <div className="popup-overlay-backdrop" onClick={closeModals}>
-          <div className="popup-card" onClick={(e) => e.stopPropagation()}>
+          <div className="popup-card ai-card" onClick={(e) => e.stopPropagation()}>
             <div className="popup-close" onClick={closeModals}>&times;</div>
             <div style={{ textAlign: 'center' }}>
               <div className="ai-modal-icon">✨</div>
@@ -451,7 +596,7 @@ export default function HomeUpper() {
       )}
 
       {/* =========================================================
-          HERO SECTION (STICKY BACKGROUND)
+          HERO SECTION
           ========================================================= */}
       <section
         ref={sectionRef}
@@ -462,7 +607,7 @@ export default function HomeUpper() {
           backgroundPosition: "center",
         }}
       >
-        {/* --- DESKTOP: VIDEO ELEMENT (Render only if !isMobile) --- */}
+        {/* --- DESKTOP: VIDEO ELEMENT --- */}
         {!isMobile && videoEnabled && showVideo && (
           <video
             ref={videoRef}
@@ -475,10 +620,9 @@ export default function HomeUpper() {
           />
         )}
 
-        {/* DARK OVERLAY */}
         <div className="hero-overlay" />
-         
-        {/* --- DESKTOP: STEAM & CALENDAR (Render only if !isMobile & Image mode) --- */}
+          
+        {/* --- DESKTOP: STEAM & CALENDAR --- */}
         {!isMobile && !showVideo && (
           <>
           <div className="steam-layer">
@@ -486,7 +630,6 @@ export default function HomeUpper() {
             <span></span><span></span><span></span><span></span>
           </div>
 
-          {/* 3D CALENDAR */}
           <div className="calendar-3d-wrapper">
             <div className="calendar-page">
               <div className="cal-body-row">
@@ -523,7 +666,7 @@ export default function HomeUpper() {
         )}
 
         {/* ================= MOBILE SPECIFIC CONTENT ================= */}
-        {/* Wish Button (Left Inside - Scrolls with content) */}
+        {/* Wish Button */}
         {isMobile && (
           <button className="mobile-wish-btn" onClick={handleWishClick}>
             <CakeIcon sx={{ fontSize: 18 }} />
@@ -532,7 +675,6 @@ export default function HomeUpper() {
         )}
 
         {/* ================= UI ELEMENTS (LOGOS & TEXT) ================= */}
-        {/* Logos */}
         <div className="logo-container">
           <img src={require("../../assets/BIT-Mesra.png")} alt="Logo" className="logo-img" />
         </div>
@@ -596,37 +738,37 @@ export default function HomeUpper() {
                       </svg>
                     )}
                   </button>
-                   
+                    
                   <div className="control-divider"></div>
                 </>
               )}
 
               <button className="icon-btn" onClick={toggleMediaSource} title={showVideo ? "Switch to Image" : "Switch to Video"}>
-                 {showVideo ? (
-                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
-                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                     <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                     <polyline points="21 15 16 10 5 21"></polyline>
-                   </svg>
-                 ) : (
-                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
-                      <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
-                      <line x1="7" y1="2" x2="7" y2="22"></line>
-                      <line x1="17" y1="2" x2="17" y2="22"></line>
-                      <line x1="2" y1="12" x2="22" y2="12"></line>
-                      <line x1="2" y1="7" x2="7" y2="7"></line>
-                      <line x1="2" y1="17" x2="7" y2="17"></line>
-                      <line x1="17" y1="17" x2="22" y2="17"></line>
-                      <line x1="17" y1="7" x2="22" y2="7"></line>
-                   </svg>
-                 )}
+                  {showVideo ? (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                      <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                      <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
+                        <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+                        <line x1="7" y1="2" x2="7" y2="22"></line>
+                        <line x1="17" y1="2" x2="17" y2="22"></line>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <line x1="2" y1="7" x2="7" y2="7"></line>
+                        <line x1="2" y1="17" x2="7" y2="17"></line>
+                        <line x1="17" y1="17" x2="22" y2="17"></line>
+                        <line x1="17" y1="7" x2="22" y2="7"></line>
+                    </svg>
+                  )}
               </button>
             </div>
           )}
         </div>
         )}
 
-        {/* ================= CONSENT MODAL (Desktop Only) ================= */}
+        {/* ================= CONSENT MODAL ================= */}
         {!isMobile && showConsent && (
           <div className="hero-consent-backdrop">
             <div className="hero-consent-card">

@@ -85,7 +85,6 @@ export default function AdminHall() {
     }
   };
 
-
   /* ================= UI ================= */
   return (
     <div className='admin-hall-body'>
@@ -98,7 +97,6 @@ export default function AdminHall() {
       />
 
       {/* ================= CREATE HALL MODAL ================= */}
-      {/* Reduced mt for mobile to bring button closer to the taller appbar */}
       <Box sx={{ mt: isMobile ? 1 : 'var(--section-top-gap)' }}>
 
         <Modal
@@ -144,8 +142,8 @@ export default function AdminHall() {
               <Button
                 fullWidth
                 className='btn-admin-hall'
-                type="button"                 // 👈 IMPORTANT
-                onClick={handleCreateHallSubmit} // 👈 IMPORTANT
+                type="button"
+                onClick={handleCreateHallSubmit}
               >
                 CREATE HALL
               </Button>
@@ -156,11 +154,10 @@ export default function AdminHall() {
         {/* ================= CREATE BUTTON ================= */}
         <Grid
           container
-          spacing={isMobile ? 0 : 2} // Remove spacing on mobile
-          justifyContent={isMobile ? 'center' : 'flex-end'} // Center button on mobile
+          spacing={isMobile ? 0 : 2}
+          justifyContent={isMobile ? 'center' : 'flex-end'}
           sx={{ mt: 0, px: isMobile ? 1 : 0 }}
         >
-          {/* Adjusted Grid sizes for Mobile (xs=12) vs Desktop (md=5) */}
           <Grid item xs={12} sm={6} md={5} lg={4} xl={3}>
             <Button
               fullWidth
@@ -177,7 +174,6 @@ export default function AdminHall() {
       <Container maxWidth={false} sx={{ mt: 2, padding: isMobile ? '0 !important' : '' }}>
         <Grid container spacing={isMobile ? 3 : 6} justifyContent="center">
           {filteredHalls.map(h => (
-            /* Modified Breakpoints: xs={12} forces full width on mobile */
             <Grid key={h._id} item xs={12} sm={7} md={5} lg={4} xl={4}>
               <HallCard data={h} gethall={get_halls} />
             </Grid>

@@ -17,296 +17,268 @@
   font-display: swap;
 }
 
-/* =============================
-   LOCAL NEUMORPHIC VARIABLES
-   ============================= */
+/* =========================================================
+   MODERN MAGAZINE STYLE CARD VARIABLES
+   ========================================================= */
 .home-card-scope {
-  --surface: #edf0f2;
-
-  --raise-dark: rgba(160,166,172,0.45);
-  --raise-light: rgba(255,255,255,0.9);
-
-  --inset-dark: rgba(140,145,150,0.45);
-  --inset-light: rgba(255,255,255,0.9);
-
-  --text: #0b0b0b;
+  --card-bg: #e6e9ec; /* Glassy White */
+  --text-primary: #000000;
+  --text-secondary: #4b5563;
+  --btn-bg: #000000;
+  --btn-text: #ffffff;
 }
 
-/* Dark mode inherited from HomeLower */
+/* Dark Mode Variables */
 .lower-div.dark .home-card-scope {
-  --surface: #232528;
-
-  --raise-dark: rgba(0,0,0,0.7);
-  --raise-light: rgba(90,94,100,0.6);
-
-  --inset-dark: rgba(0,0,0,0.75);
-  --inset-light: rgba(70,74,80,0.35);
-
-  --text: #f3f3f3;
+  --card-bg: rgba(0, 0, 0); /* Glassy Dark */
+  
+  --text-primary: #ffffff;
+  --text-secondary: #8a929e;
+  --btn-bg: #ffffff;
+  --btn-text: #000000;
 }
 
 /* ================= BASE GRID ================= */
-
 .grid-card-home {
   font-family: 'RecklessNeue', serif !important;
 }
 
-/* ================= NEUMORPHIC CARD ================= */
-
+/* ================= MODERN CARD DESIGN ================= */
 .home-card {
-  background: var(--surface) !important;
+  background: var(--card-bg) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   margin-bottom: 3rem;
-  border-radius: 22px;
-  width: 70%;
+  border-radius: 32px; /* Modern large radius */
+  width: 75%; /* Slightly wider for editorial look */
   z-index: 3;
   position: relative;
+  overflow: hidden; /* For inner glow effects */
+  
+  /* Soft, deep shadow for floating effect */
 
-  /* Raised neumorphism (card should float) */
-  box-shadow:
-    4px 4px 12px var(--raise-dark),
-    -4px -4px 12px var(--raise-light);
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s ease;
+}
 
-  transition: transform 240ms ease, box-shadow 240ms ease;
+.home-card:hover {
+  transform: translateY(-8px) scale(1.01);
+   /* Deeper shadow on hover */
+}
+
+/* Internal Glow Gradient (Subtle) */
+.home-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.lower-div.dark .home-card::before {
+  background: black;
+}
+
+/* ================= CARD CONTENT LAYOUT ================= */
+.home-card .MuiCardContent-root {
+  position: relative;
+  z-index: 1;
+  padding: 3rem 2.5rem !important; /* Spacious padding */
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ================= TYPOGRAPHY ================= */
+.text-card-title {
+  font-family: 'RecklessNeue', serif !important;
+  font-size: 3.5rem !important; /* Huge Magazine Title */
+  line-height: 0.9 !important;
+  color: var(--text-primary) !important;
+  margin: 0 !important;
+  letter-spacing: -0.02em;
+}
+
+.text-card-desc {
+  font-family: 'Inter', sans-serif !important;
+  font-size: 1.05rem !important;
+  line-height: 1.6 !important;
+  color: var(--text-secondary) !important;
+  font-weight: 500 !important;
+  max-width: 90%;
 }
 
 /* ================= POSITIONING (DESKTOP) ================= */
-
 .pos-left {
-  left: 159px;
-  margin-bottom: 15px;
-  margin-top: 200px;
-  height: 350px;
-  padding-left: 25px;
+  left: 100px;
+  margin-top: 150px;
 }
 
 .pos-right {
-  right: -259px;
-  height: 350px;
+  right: -100px;
 }
 
-.right-text {
+/* Alignment Classes */
+.align-left {
+  text-align: left;
+  align-items: flex-start;
+}
+
+.align-right {
   text-align: right;
+  align-items: flex-end; /* Align flex items to right */
 }
 
-/* ================= TEXT ================= */
-
-.text-card-home {
-  margin-top: 3rem !important;
-  color: var(--text) !important;
-  font-family: 'RecklessNeue', serif;
-}
-
-/* ================= LOTTIE ================= */
-
-.lottie-dept-wrapper {
-  margin-top: 30px;
+/* ================= MODERN BUTTON ================= */
+.card-actions-wrapper {
+  padding: 0 2.5rem 2.5rem !important;
   position: relative;
-  width: 300px;
-  height: 300px;
+  z-index: 1;
+  display: flex;
+}
+
+.align-left .card-actions-wrapper { justify-content: flex-start; }
+.align-right .card-actions-wrapper { justify-content: flex-end; }
+
+.btn-modern-card {
+  background: var(--btn-bg) !important;
+  color: var(--btn-text) !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+  padding: 14px 32px !important;
+  border-radius: 50px !important; /* Pill shape */
+  border: none !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1) !important;
+  
+}
+
+.btn-modern-card:hover {
+  transform: translateY(-3px);
+  padding-left: 40px !important; /* Animation hint */
+  padding-right: 24px !important;
+}
+
+.btn-modern-card a {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ================= LOTTIE WRAPPERS ================= */
+.lottie-dept-wrapper {
+  margin-top: -20px;
+  position: relative;
+  width: 550px; /* Slightly larger */
+  height: 550px;
   overflow: hidden;
-  margin-left: 260px;
+  margin-left: 80px;
 }
 
 .lottie-admin-wrapper {
-  margin-top: 200px;
+  margin-top: 80px;
   position: relative;
-  width: 300px;
-  height: 300px;
+  width: 550px;
+  height: 550px;
   overflow: hidden;
-  margin-right: 200px;
+  margin-right: 120px;
 }
 
-/* Fade-slide animation */
-
+/* Animation Slides */
 .lottie-admin-slide,
 .lottie-dept-slide {
   position: absolute;
   inset: 0;
   opacity: 0;
-  transform: translateY(40px);
-  transition: opacity 0.9s ease, transform 0.9s ease;
+  visibility: hidden;
+  transform: translateY(30px);
+  transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1), transform 0.8s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.8s ease;
 }
 
 .lottie-admin-slide.active,
 .lottie-dept-slide.active {
   opacity: 1;
+  visibility: visible;
   transform: translateY(0);
+  z-index: 2;
 }
 
-.lottie-admin-slide.next,
-.lottie-dept-slide.next {
-  opacity: 0.6;
-  transform: translateY(10px);
-}
-
-/* ================= SCROLL ANIMATIONS (DESKTOP DEFAULTS) ================= */
-
-/* On desktop, we apply logic to the grid item or wrapper */
+/* ================= SCROLL REVEAL ANIMATIONS ================= */
 .scroll-block {
   opacity: 0;
   transition: transform 1s cubic-bezier(.2, .9, .2, 1), opacity 1s ease;
 }
 
-/* Desktop Logic: Admin card/anim come from left */
-.from-left-logic { transform: translateX(-120px); }
-.from-right-logic { transform: translateX(-120px); } /* On desktop they are grouped */
-.from-left-logic-dept { transform: translateX(120px); }
-.desktop-dept-anim { transform: translateX(120px); }
+.from-left-logic { transform: translateX(-80px); }
+.from-right-logic { transform: translateX(80px); }
+.from-left-logic-dept { transform: translateX(80px); }
+.desktop-dept-anim { transform: translateX(80px); }
 
-/* In View State (Desktop) */
 .scroll-block.in-view {
   transform: translateX(0);
   opacity: 1;
 }
 
-/* Slight lift for card when visible */
-.scroll-block.in-view .home-card {
-  transform: translateY(-6px);
-}
-
-/* ================= LOGIN BUTTON (NEUMORPHIC INSET) ================= */
-
-.btn-card-home {
-  display: flex !important;
-  justify-content: center !important;
-  margin-top: 0.7rem;
-}
-
-.btn-home-card-btn {
-  background: var(--surface) !important;
-  border-radius: 10px !important;
-  font-family: 'Inter' !important;
-  width: 30%;
-  color: var(--text) !important;
-  font-size: 1rem;
-  font-weight: 700;
-  padding: 10px 18px;
-  margin-bottom: 0.7rem !important;
-  border: none !important;
-  cursor: pointer;
-
-  /* INSET NEUMORPHISM (pressed by default) */
-  box-shadow:
-    inset 6px 6px 12px var(--inset-dark),
-    inset -6px -6px 12px var(--inset-light);
-
-  transition: box-shadow 200ms ease, transform 160ms ease;
-}
-
-/* Hover → raised */
-.btn-home-card-btn:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    8px 8px 18px var(--raise-dark),
-    -2px -2px 10px var(--raise-light);
-}
-
-/* Active → pressed again */
-.btn-home-card-btn:active {
-  transform: translateY(0);
-  box-shadow:
-    inset 6px 6px 12px var(--inset-dark),
-    inset -6px -6px 12px var(--inset-light);
-}
-
-/* ================= RESPONSIVE (MOBILE) ================= */
-
+/* ================= MOBILE RESPONSIVENESS ================= */
 @media (max-width: 768px) {
-  /* 1. Reset Desktop Positioning */
   .pos-left, .pos-right {
     left: auto; right: auto;
     margin-top: 0; margin-bottom: 0;
-    height: auto; padding-left: 0;
+    height: auto;
   }
 
-  /* 2. Disconnect and Space Out Items (Vertical Centering) */
+  .home-card {
+    width: 90vw;
+    margin: 0 auto 3rem auto;
+    border-radius: 24px;
+  }
+
+  /* Center everything on mobile */
+  .home-card .MuiCardContent-root,
+  .card-actions-wrapper {
+    align-items: center !important;
+    text-align: center !important;
+    justify-content: center !important;
+  }
+
+  .text-card-title {
+    font-size: 2.5rem !important;
+  }
+
+  .text-card-desc {
+    max-width: 100%;
+    font-size: 0.95rem !important;
+  }
+
+  .btn-modern-card {
+    width: 100%;
+    border-radius: 12px !important; /* Less rounded on mobile for tapping area */
+  }
+
+  .btn-modern-card:hover {
+    padding-left: 32px !important; /* Reset desktop animation */
+    padding-right: 32px !important;
+  }
+
+  .lottie-admin-wrapper {
+    margin: 50px auto 0 auto;
+    width: 280px;
+    height: 280px;
+  }
+
   .mobile-center-trigger {
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    min-height: 60vh; /* Takes up screen height to allow distinct scrolling */
+    min-height: auto;
     margin-bottom: 50px;
   }
 
-  /* 3. Card Styling */
-  .home-card {
-    width: 90vw;
-    margin: 0 auto;
-    
-  }
-
-  /* 4. Text & Button Alignment */
-  .text-card-home {
-    text-align: center;
-    padding: 0 !important;
-    font-size: 2rem !important;
-  }
-  .right-text .text-card-home { padding: 0 !important; text-align: center; }
-  
-  .feature-list {
-    align-items: flex-start !important; 
-    width: fit-content !important;      
-    margin: 0 auto !important;          
-  }
-  
-  .feature-item {
-    flex-direction: row !important;         
-    justify-content: flex-start !important; 
-    width: 100%;
-    text-align: left;                       
-  }
-
-  .btn-home-card-btn { width: 60%; }
-
-  /* 5. SPECIFIC ANIMATION FLOWS FOR MOBILE */
-
-  /* Admin Card: Slides Left -> Center */
-  .from-left-logic {
-    transform: translateX(-100px); /* Start Left */
-    opacity: 0;
-  }
-  .from-left-logic.in-view {
-    transform: translateX(0); /* Center */
-    opacity: 1;
-  }
-
-  /* Admin Animation: Slides Right -> Center */
-  .from-right-logic {
-    transform: translateX(100px); /* Start Right */
-    opacity: 0;
-  }
-  .from-right-logic.in-view {
-    transform: translateX(0); /* Center */
-    opacity: 1;
-  }
-
-  /* Dept Card: Slides Left -> Center */
-  .from-left-logic-dept {
-    transform: translateX(-100px); /* Start Left */
-    opacity: 0;
-    /* --- NEW ADDITION: Spacing for Vertically Centered Last Card --- */
-    margin-bottom: 35vh !important;
-  }
-  .from-left-logic-dept.in-view {
-    transform: translateX(0); /* Center */
-    opacity: 1;
-  }
-
-  /* 6. Admin Animation Enlargement */
-  .lottie-admin-wrapper {
-    margin: 0 auto;
-    width: 100%; /* Enlarged */
-    height: 100%;
-    margin-top: 150px;
-  }
-
-  /* 7. Hide Desktop Dept Animation */
-  .mobile-hidden {
-    display: none;
-  }
-}
-
-@media only screen and (max-width: 350px) {
-  .btn-home-card-btn { width: 80%; }
+  .mobile-hidden { display: none; }
 }

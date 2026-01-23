@@ -29,6 +29,7 @@ export default function HomeCard() {
   const adminCardRef = useRef(null);
   const adminAnimRef = useRef(null);
   const deptCardRef = useRef(null);
+  const deptAnimRef = useRef(null); 
 
   /* ================= INTERSECTION OBSERVER ================= */
 
@@ -55,11 +56,13 @@ export default function HomeCard() {
     if (adminCardRef.current) observer.observe(adminCardRef.current);
     if (adminAnimRef.current) observer.observe(adminAnimRef.current);
     if (deptCardRef.current) observer.observe(deptCardRef.current);
+    if (deptAnimRef.current) observer.observe(deptAnimRef.current);
 
     return () => {
       if (adminCardRef.current) observer.unobserve(adminCardRef.current);
       if (adminAnimRef.current) observer.unobserve(adminAnimRef.current);
       if (deptCardRef.current) observer.unobserve(deptCardRef.current);
+      if (deptAnimRef.current) observer.unobserve(deptAnimRef.current);
       observer.disconnect();
     };
   }, []);
@@ -68,23 +71,14 @@ export default function HomeCard() {
 
   const adminAnimations = [adminAnim0, adminAnim1, adminAnim2];
   const [currentAdminAnim, setCurrentAdminAnim] = useState(0);
-  const [nextAdminAnim, setNextAdminAnim] = useState(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      const nextIndex =
-        (currentAdminAnim + 1) % adminAnimations.length;
-
-      setNextAdminAnim(nextIndex);
-
-      setTimeout(() => {
-        setCurrentAdminAnim(nextIndex);
-        setNextAdminAnim(null);
-      });
-    }, 10000);
+      setCurrentAdminAnim((prev) => (prev + 1) % adminAnimations.length);
+    }, 10000); // 10 seconds per slide
 
     return () => clearInterval(interval);
-  }, [currentAdminAnim, adminAnimations.length]);
+  }, [adminAnimations.length]);
 
   /* ================= DEPARTMENT ANIMATIONS ================= */
 
@@ -96,23 +90,14 @@ export default function HomeCard() {
   ];
 
   const [currentDeptAnim, setCurrentDeptAnim] = useState(0);
-  const [nextDeptAnim, setNextDeptAnim] = useState(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      const nextIndex =
-        (currentDeptAnim + 1) % departmentAnimations.length;
-
-      setNextDeptAnim(nextIndex);
-
-      setTimeout(() => {
-        setCurrentDeptAnim(nextIndex);
-        setNextDeptAnim(null);
-      });
-    }, 10000);
+      setCurrentDeptAnim((prev) => (prev + 1) % departmentAnimations.length);
+    }, 10000); // 10 seconds per slide
 
     return () => clearInterval(interval);
-  }, [currentDeptAnim, departmentAnimations.length]);
+  }, [departmentAnimations.length]);
 
   /* ================= RENDER ================= */
 
@@ -125,9 +110,7 @@ export default function HomeCard() {
         justifyContent="center"
         alignItems="stretch"
       >
-        {/* ================= ADMIN SECTION ================= 
-           Note: Classes separate Mobile (vertical scroll logic) from Desktop (row scroll logic)
-        */}
+        {/* ================= ADMIN SECTION ================= */}
         
         {/* 1. Admin Card */}
         <Grid 
@@ -140,23 +123,19 @@ export default function HomeCard() {
           <div className="home-card-scope">
             <div className="home-card pos-left">
               <Card elevation={0} sx={{ background: "none", boxShadow: "none" }}>
-                <CardContent>
+                
+                {/* Content Alignment Class: align-left */}
+                <CardContent className="align-left">
                   <Typography
                     gutterBottom
-                    variant="h4"
+                    variant="h2"
                     component="div"
-                    className="text-card-home"
-                    style={{ fontFamily: "RecklessNeue" }}
+                    className="text-card-title"
                   >
                     ADMIN
                   </Typography>
 
-                  <Typography
-                    variant="body1"
-                    color="text.secondary"
-                    className="text-card-home"
-                    style={{ fontSize: "small", fontFamily: "Inter" }}
-                  >
+                  <div className="text-card-desc">
                     <FeatureList
                       features={[
                         { text: "Create and manage departments" },
@@ -164,11 +143,11 @@ export default function HomeCard() {
                         { text: "Manage hall availability and clearing" },
                       ]}
                     />
-                  </Typography>
+                  </div>
                 </CardContent>
 
-                <CardActions className="btn-card-home">
-                  <Button size="small" className="btn-home-card-btn">
+                <CardActions className="card-actions-wrapper align-left">
+                  <Button size="large" className="btn-modern-card">
                     {auth.status === "Authenticated" &&
                     auth.user === "Admin" ? (
                       <Link to="/admin/hall">LOGIN HERE</Link>
@@ -182,12 +161,12 @@ export default function HomeCard() {
           </div>
         </Grid>
 
-        {/* 2. Admin Animation (Separated for Mobile Scroll) */}
+        {/* 2. Admin Animation */}
         <Grid 
           item 
           xs={12} 
           md={4} 
-          ref={adminAnimRef}
+          ref={adminAnimRef} 
           className="scroll-block mobile-center-trigger from-right-logic"
         >
           <div className="lottie-admin-wrapper">
@@ -195,11 +174,7 @@ export default function HomeCard() {
               <div
                 key={index}
                 className={`lottie-admin-slide ${
-                  index === currentAdminAnim
-                    ? "active"
-                    : index === nextAdminAnim
-                    ? "next"
-                    : ""
+                  index === currentAdminAnim ? "active" : ""
                 }`}
               >
                 <Lottie animationData={anim} loop />
@@ -208,21 +183,22 @@ export default function HomeCard() {
           </div>
         </Grid>
 
-        {/* ================= DEPARTMENT SECTION ================= 
-        */}
+        {/* ================= DEPARTMENT SECTION ================= */}
 
-        {/* 3. Department Animation (Hidden on Mobile) */}
-        <Grid item xs={12} md={4} className="mobile-hidden scroll-block desktop-dept-anim">
+        {/* 3. Department Animation */}
+        <Grid 
+          item 
+          xs={12} 
+          md={4} 
+          ref={deptAnimRef} 
+          className="mobile-hidden scroll-block desktop-dept-anim"
+        >
           <div className="lottie-dept-wrapper">
             {departmentAnimations.map((anim, index) => (
               <div
                 key={index}
                 className={`lottie-dept-slide ${
-                  index === currentDeptAnim
-                    ? "active"
-                    : index === nextDeptAnim
-                    ? "next"
-                    : ""
+                  index === currentDeptAnim ? "active" : ""
                 }`}
               >
                 <Lottie animationData={anim} loop />
@@ -236,36 +212,25 @@ export default function HomeCard() {
           item 
           xs={12} 
           md={7} 
-          ref={deptCardRef}
+          ref={deptCardRef} 
           className="scroll-block mobile-center-trigger from-left-logic-dept"
         >
           <div className="home-card-scope">
             <div className="home-card pos-right">
               <Card sx={{ background: "none", boxShadow: "none" }}>
-                <CardContent className="right-text">
+                
+                {/* Content Alignment Class: align-right */}
+                <CardContent className="align-right">
                   <Typography
                     gutterBottom
-                    variant="h4"
+                    variant="h2"
                     component="div"
-                    className="text-card-home"
-                    style={{
-                      fontFamily: "RecklessNeue",
-                      paddingRight: "25px",
-                    }}
+                    className="text-card-title"
                   >
                     DEPARTMENT
                   </Typography>
 
-                  <Typography
-                    variant="body1"
-                    color="text.secondary"
-                    className="text-card-home"
-                    style={{
-                      fontSize: "small",
-                      fontFamily: "Inter",
-                      paddingLeft: "280px",
-                    }}
-                  >
+                  <div className="text-card-desc" style={{ textAlign: 'right' }}>
                     <FeatureList
                       features={[
                         { text: "Request login access for HODs" },
@@ -273,11 +238,11 @@ export default function HomeCard() {
                         { text: "Track and manage past bookings" },
                       ]}
                     />
-                  </Typography>
+                  </div>
                 </CardContent>
 
-                <CardActions className="btn-card-home">
-                  <Button size="small" className="btn-home-card-btn">
+                <CardActions className="card-actions-wrapper align-right">
+                  <Button size="large" className="btn-modern-card">
                     {auth.status === "Authenticated" &&
                     auth.user === "Department" ? (
                       <Link to="/department/booking">LOGIN HERE</Link>
@@ -290,7 +255,6 @@ export default function HomeCard() {
             </div>
           </div>
         </Grid>
-
       </Grid>
     </>
   );

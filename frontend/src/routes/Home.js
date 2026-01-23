@@ -1,16 +1,13 @@
-import React from 'react' // Removed useEffect, useState
+import React from 'react' 
 import HomeUpper from '../components/HomeUpper/HomeUpper'
 import HomeLower from '../components/HomeLower/HomeLower'
-// Removed Loading import
 
-export default function Home() {
-  // Removed artificial delay logic entirely. 
-  // This saves you exactly 2.0 seconds on LCP.
+export default function Home({ lightMode, toggleTheme }) {
 
   return (
     <>
-      <HomeUpper/>
-      <HomeLower/>
+      <HomeUpper lightMode={lightMode} toggleTheme={toggleTheme} />
+      <HomeLower lightMode={lightMode} />
     </>
   )
 }
