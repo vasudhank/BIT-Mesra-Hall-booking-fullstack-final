@@ -676,10 +676,24 @@ export default function HomeUpper({ lightMode, toggleTheme }) {
 
         {/* ================= UI ELEMENTS (LOGOS & TEXT) ================= */}
         <div className="logo-container">
-          <img src={require("../../assets/BIT-Mesra.png")} alt="Logo" className="logo-img" />
+         <img
+    src="https://res.cloudinary.com/dkgbflzrc/image/upload/f_auto,q_auto,w_300/v1769371273/BIT-Mesra_dmz9iz.png"
+    alt="Logo"
+    className="logo-img"
+    fetchpriority="high"
+    width="70"
+    height="70"
+  />
         </div>
         <div className="logo-container2">
-          <img src={require("../../assets/images.png")} alt="Logo" className="logo-img2" />
+         <img
+    src="https://res.cloudinary.com/dkgbflzrc/image/upload/f_auto,q_auto,w_200/v1769371285/images_uotatw.png"
+    alt="Logo"
+    className="logo-img2"
+    fetchpriority="high"
+    width="80"
+    height="80"
+  />
         </div>
 
         {/* Hero Text Content */}
