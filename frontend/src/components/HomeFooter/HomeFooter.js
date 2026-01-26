@@ -1,28 +1,32 @@
 import React from "react";
 import "./HomeFooter.css";
+import { Link } from "react-router-dom";
 
 export default function HomeFooter() {
   return (
-    <>
-      <footer
-        className="text-gray-600 body-font"
-        style={{
-          position: "absolute",
-          bottom: "0px",
-          right: "16px",
-        }}
-      >
-        <div className="container px-5 py-2 mx-auto">
-          <span
-            className="feature"
-            style={{
-              fontSize: "0.75rem", // 👈 CHANGE THIS VALUE TO REDUCE / INCREASE SIZE
-            }}
+    <footer className="home-footer">
+      <div className="footer-container">
+        {/* Top Section: Links */}
+        <div className="footer-links">
+          <Link to="/about" className="footer-link">About Us</Link>
+          <Link to="/faqs" className="footer-link">FAQs</Link>
+          <a 
+            href="https://bitmesra.ac.in/" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="footer-link"
           >
-            © SEMINAR HALL BOOKING SYSTEM
+            Official BIT Mesra Site
+          </a>
+        </div>
+
+        {/* Bottom Section: Branding */}
+        <div className="footer-branding">
+          <span className="footer-copy">
+            © {new Date().getFullYear()} SEMINAR HALL BOOKING SYSTEM
           </span>
         </div>
-      </footer>
-    </>
+      </div>
+    </footer>
   );
 }

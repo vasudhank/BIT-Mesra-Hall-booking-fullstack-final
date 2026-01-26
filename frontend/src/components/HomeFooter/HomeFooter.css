@@ -2,3 +2,53 @@
     color: var(--text);
     
 }
+
+.home-footer {
+    width: 100%;
+    padding: 40px 20px;
+    border-top: 1px solid var(--border-color);
+    background-color: transparent; /* Inherits from body */
+    margin-top: 50px;
+}
+
+.footer-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.footer-links {
+    display: flex;
+    gap: 30px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.footer-link {
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: color 0.2s ease;
+}
+
+.footer-link:hover {
+    color: var(--text-primary);
+}
+
+.footer-branding {
+    text-align: center;
+}
+
+.footer-copy {
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    opacity: 0.8;
+}
+
+/* Ensure absolute positioning is removed so it stays at the bottom of the page flow */

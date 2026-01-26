@@ -26,6 +26,8 @@ import AdminForgot from './components/AdminForgot/AdminForgot';
 
 // NEW IMPORT
 import AdminApproveDepartment from './components/AdminApproveDepartment/AdminApproveDepartment';
+import About from './routes/About'; // NEW
+import FAQ from './routes/FAQ';
 
 import { checkauth } from './store/slices/userSlice';
 import { useDispatch } from 'react-redux';
@@ -64,6 +66,8 @@ function App() {
         {/* ===== PUBLIC ROUTES ===== */}
         {/* Pass theme props to Home */}
         <Route path="/" element={<Home lightMode={lightMode} toggleTheme={toggleTheme} />} />
+        <Route path="/about" element={<About />} /> {/* NEW */}
+        <Route path="/faqs" element={<FAQ />} /> {/* NEW */}
         <Route path="/schedule" element={<Schedule />} />
         <Route path="/admin_login" element={<AdminLoginRoute />} />
         <Route path="/department_login" element={<DepartmentLoginRoute />} />
