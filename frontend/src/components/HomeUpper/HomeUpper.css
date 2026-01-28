@@ -423,6 +423,7 @@ body.dark-mode .nav-date { color: #fff; }
   gap: 30px; /* Reduced gap */
   font-size: 1.6rem; /* Increased Size */
   font-weight: 600;
+  padding-right: 120px;
 }
 
 /* Hide Logos in scrolled state */
@@ -1014,41 +1015,148 @@ body.dark-mode .c-email {
   color: #cbd5e1;
 }
 
-/* --- 2. AI CARD STYLES (GRADIENT BORDER) --- */
-/* Base AI Card (Light & Dark) */
-.ai-card {
+/* =========================================================
+   === NEW GEMINI AI CARD STYLES (REPLACES OLD .ai-card) ===
+   ========================================================= */
+
+/* The Card Wrapper with Running Gradient Border */
+.gemini-modal-card {
   position: relative;
-  z-index: 1;
-  background-clip: padding-box;
+  width: 90%;
+  max-width: 480px; /* Wider for better chat view */
+  height: 600px;    /* Taller */
+  border-radius: 20px;
+  z-index: 201;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Clips the inner content */
+  animation: popup 0.3s ease-out;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+  padding: 5px; /* Space for the gradient border */
+  background: transparent;
 }
 
-/* Pseudo-element for Gradient Border */
-.ai-card::before {
+/* The Running Gradient Animation Background */
+.gemini-modal-card::before {
   content: "";
   position: absolute;
-  inset: -3px; /* Controls border thickness */
-  border-radius: 15px; /* Slightly larger than card radius */
-  background: linear-gradient(45deg, #4285f4, #9b72cb, #d96570, #fbbc05);
+  top: -100%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: conic-gradient(
+    from 0deg, 
+    transparent 0deg, 
+    #4285f4 90deg, 
+    #9b72cb 180deg, 
+    #d96570 270deg, 
+    transparent 360deg
+  );
+  animation: borderRotate 4s linear infinite;
   z-index: -1;
-  animation: borderRotate 4s linear infinite; /* Optional: Animated gradient */
 }
 
-/* Dark Mode AI Card Specifics */
-body.dark-mode .ai-card {
-  background: #0f172a; /* Dark background */
-  color: #ffffff;
+/* The Actual Content Container (Clean Background) */
+.gemini-card-header, .gemini-card-body {
+  background: #ffffff; /* Light Mode Background */
+  position: relative;
+  z-index: 1;
 }
 
-body.dark-mode .ai-header,
-body.dark-mode .ai-body {
-  color: #ffffff;
+.gemini-card-header {
+  border-top-left-radius: 17px;
+  border-top-right-radius: 17px;
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
 }
 
-body.dark-mode .ai-body strong {
-  color: #60a5fa; /* Highlight color in dark mode */
+.gemini-card-body {
+  flex: 1;
+  border-bottom-left-radius: 17px;
+  border-bottom-right-radius: 17px;
+  /* background: #ffffff; Already set above */
+  display: flex;
+  flex-direction: column;
 }
 
-body.dark-mode .ai-typing-box {
-  background: #1e293b;
-  color: #cbd5e1;
+/* Dark Mode Overrides for Content */
+body.dark-mode .gemini-card-header, 
+body.dark-mode .gemini-card-body {
+  background: #131314;
+}
+body.dark-mode .gemini-card-header {
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Header Elements */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-sparkle {
+  color: #4285f4;
+  animation: pulse 2s infinite;
+}
+
+.header-title {
+  font-family: 'RecklessNeue', serif;
+  font-weight: 600;
+  font-size: 1.1rem;
+  background: linear-gradient(135deg, #4285f4, #d96570);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Immersive Button Icon Style */
+.immersive-btn-icon {
+  background: rgba(66, 133, 244, 0.1);
+  border: none;
+  border-radius: 8px;
+  color: #4285f4;
+  padding: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.immersive-btn-icon:hover {
+  background: rgba(66, 133, 244, 0.2);
+  transform: scale(1.05);
+}
+
+.close-btn-icon {
+  cursor: pointer;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+.close-btn-icon:hover {
+  color: #0f172a;
+}
+body.dark-mode .close-btn-icon { color: #94a3b8; }
+body.dark-mode .close-btn-icon:hover { color: #ffffff; }
+
+/* Animations */
+@keyframes borderRotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
 }

@@ -52,6 +52,9 @@ router.get('/show_booking_requests', async (req, res) => {
 /* =========================================
    CREATE BOOKING REQUEST BY DEPARTMENT
    ========================================= */
+/* =========================================
+   CREATE BOOKING REQUEST BY DEPARTMENT
+   ========================================= */
 router.post('/create_booking', async (req, res) => {
   try {
     if (!(req.isAuthenticated && req.isAuthenticated() && req.user.type === 'Department')) {
@@ -61,6 +64,7 @@ router.post('/create_booking', async (req, res) => {
     const {
       hall,
       event,
+      description, // Extract description
       startDate,
       endDate,
       startTime12,
@@ -103,6 +107,7 @@ router.post('/create_booking', async (req, res) => {
       hall,
       department: req.user.id,
       event,
+      description, // Save description
       startDateTime: startDT,
       endDateTime: endDT,
       startTime12,
@@ -230,5 +235,19 @@ router.post('/change_booking_request', async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 });
+
+// SHOW CURRENT HALL STATUS (REAL DATA)
+router.get('/hall_status', async (req, res) => {
+  const halls = await Hall.find();
+  const now = new Date();
+
+  const result = halls.map(h => ({
+    hall: h.name,
+    status: h.isFilledAt(now) ? "BOOKED" : "FREE"
+  }));
+
+  res.json(result);
+});
+
 
 module.exports = router;

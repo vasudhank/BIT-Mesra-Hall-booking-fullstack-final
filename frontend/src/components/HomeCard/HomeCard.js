@@ -227,7 +227,7 @@ export default function HomeCard() {
                     component="div"
                     className="text-card-title"
                   >
-                    DEPARTMENT
+                    FACULTY
                   </Typography>
 
                   <div className="text-card-desc" style={{ textAlign: 'right' }}>

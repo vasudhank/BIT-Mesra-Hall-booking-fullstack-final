@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import "./DepartmentForgot.css";
-import { departmentSendOtpApi, departmentResetPasswordApi } from "../../api/departmentloginapi";
+import { departmentSendOtpApi, departmentResetPasswordApi, departmentVerifyOtpApi } from "../../api/departmentloginapi";
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -10,6 +10,7 @@ export default function DepartmentForgot() {
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
+  const [otpError, setOtpError] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [show, setShow] = useState(false);
@@ -18,22 +19,39 @@ export default function DepartmentForgot() {
 
   const sendOtp = async () => {
     const res = await departmentSendOtpApi({ email });
-    if(res?.data?.success){
+    if (res?.data?.success) {
       setStep(2);
       setTimer(60);
+      setOtpError("");
+    }
+  };
+
+  const verifyOtp = async () => {
+    try {
+      const res = await departmentVerifyOtpApi({ email, otp });
+      if (res.data.success) {
+        setStep(3);
+        setOtpError("");
+      }
+    } catch (err) {
+      if (err.data?.msg === "OTP expired") {
+        setOtpError("OTP Expired. Please click on Resend OTP.");
+      } else {
+        setOtpError("Wrong OTP. Please enter valid OTP.");
+      }
     }
   };
 
   const resetPassword = async () => {
-    if(password !== confirm) return;
+    if (password !== confirm) return;
     const res = await departmentResetPasswordApi({ email, otp, password });
-    if(res?.data?.success){
+    if (res?.data?.success) {
       setSuccess(true);
     }
   };
 
   useEffect(() => {
-    if(timer > 0){
+    if (timer > 0) {
       const t = setTimeout(() => setTimer(timer - 1), 1000);
       return () => clearTimeout(t);
     }
@@ -47,14 +65,14 @@ export default function DepartmentForgot() {
     special: /[^A-Za-z0-9]/.test(password)
   };
 
-  if(success){
+  if (success) {
     return (
       <div className="forgot-body">
         <div className="success-card glass">
           <CheckCircleIcon className="tick-icon" />
           <h2>Success!</h2>
           <p>Your password has been updated.</p>
-          <button autoFocus onClick={()=>window.location.href="/department_login"}>
+          <button autoFocus onClick={() => window.location.href = "/department_login"}>
             Go to Login
           </button>
         </div>
@@ -83,13 +101,7 @@ export default function DepartmentForgot() {
                 type="email"
                 placeholder="Email address"
                 value={email}
-                onChange={e=>setEmail(e.target.value)}
-                onKeyDown={(e)=>{
-                  if(e.key==="Enter"){
-                    e.preventDefault();
-                    sendOtp();
-                  }
-                }}
+                onChange={e => setEmail(e.target.value)}
               />
             </div>
             <button onClick={sendOtp}>Send OTP</button>
@@ -103,21 +115,23 @@ export default function DepartmentForgot() {
               <input
                 placeholder="Enter OTP"
                 value={otp}
-                onChange={e=>setOtp(e.target.value)}
-                onKeyDown={(e)=>{
-                  if(e.key==="Enter"){
-                    e.preventDefault();
-                    setStep(3);
-                  }
-                }}
+                onChange={e => setOtp(e.target.value)}
               />
             </div>
-            <button onClick={()=>setStep(3)}>Verify</button>
+            <button onClick={verifyOtp}>Verify</button>
+
+            {otpError && (
+              <p style={{ color: "red", marginTop: "10px" }}>
+                {otpError}
+              </p>
+            )}
 
             {timer > 0 ? (
               <p className="timer">Resend in {timer}s</p>
             ) : (
-              <button className="link-btn" onClick={sendOtp}>Resend OTP</button>
+              <button className="link-btn" onClick={sendOtp}>
+                Resend OTP
+              </button>
             )}
           </>
         )}
@@ -129,10 +143,10 @@ export default function DepartmentForgot() {
                 type={show ? "text" : "password"}
                 placeholder="New password"
                 value={password}
-                onChange={e=>setPassword(e.target.value)}
+                onChange={e => setPassword(e.target.value)}
               />
-              <span onClick={()=>setShow(!show)}>
-                {show ? <VisibilityOffIcon/> : <VisibilityIcon/>}
+              <span onClick={() => setShow(!show)}>
+                {show ? <VisibilityOffIcon /> : <VisibilityIcon />}
               </span>
             </div>
 
@@ -141,13 +155,7 @@ export default function DepartmentForgot() {
                 type={show ? "text" : "password"}
                 placeholder="Confirm password"
                 value={confirm}
-                onChange={e=>setConfirm(e.target.value)}
-                onKeyDown={(e)=>{
-                  if(e.key==="Enter"){
-                    e.preventDefault();
-                    resetPassword();
-                  }
-                }}
+                onChange={e => setConfirm(e.target.value)}
               />
             </div>
 

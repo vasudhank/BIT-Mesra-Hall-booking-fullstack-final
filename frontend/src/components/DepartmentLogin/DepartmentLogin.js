@@ -115,7 +115,7 @@ export default function DepartmentLogin() {
 
                 <Typography variant="h4" className="login-title">
 
-                  DEPARTMENT
+                  FACULTY
 
                 </Typography>
 
@@ -272,7 +272,7 @@ export default function DepartmentLogin() {
 
                     <Link to="/department_register" className="register-link">
 
-                      REQUEST YOUR DEPARTMENT HERE
+                      REQUEST YOUR FACULTY ACCOUNT HERE
 
                     </Link>
 

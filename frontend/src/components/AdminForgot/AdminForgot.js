@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import "./AdminForgot.css";
-import { adminSendOtpApi, adminResetPasswordApi } from "../../api/adminloginapi";
+import { adminSendOtpApi, adminResetPasswordApi, adminVerifyOtpApi } from "../../api/adminloginapi";
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -9,6 +9,7 @@ export default function AdminForgot() {
 
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState("");
+  const [otpError, setOtpError] = useState("");
   const [otp, setOtp] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -21,6 +22,24 @@ export default function AdminForgot() {
     if (res?.data?.success) {
       setStep(2);
       setTimer(60);
+      setOtpError("");
+    }
+  };
+
+  const verifyOtp = async () => {
+    try {
+      const res = await adminVerifyOtpApi({ email, otp });
+
+      if (res.data.success) {
+        setStep(3);
+        setOtpError("");
+      }
+    } catch (err) {
+      if (err.data?.msg === "OTP expired") {
+        setOtpError("OTP Expired. Please click on Resend OTP.");
+      } else {
+        setOtpError("Wrong OTP. Please enter valid OTP.");
+      }
     }
   };
 
@@ -84,12 +103,6 @@ export default function AdminForgot() {
                 placeholder="Email address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    sendOtp();
-                  }
-                }}
               />
             </div>
             <button onClick={sendOtp}>Send OTP</button>
@@ -104,15 +117,15 @@ export default function AdminForgot() {
                 placeholder="Enter OTP"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    setStep(3);
-                  }
-                }}
               />
             </div>
-            <button onClick={() => setStep(3)}>Verify</button>
+            <button onClick={verifyOtp}>Verify</button>
+
+            {otpError && (
+              <p style={{ fontSize: "14px",color: "white", marginTop: "10px" }}>
+                {otpError}
+              </p>
+            )}
 
             {timer > 0 ? (
               <p className="timer">Resend in {timer}s</p>
@@ -144,12 +157,6 @@ export default function AdminForgot() {
                 placeholder="Confirm password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    resetPassword();
-                  }
-                }}
               />
             </div>
 

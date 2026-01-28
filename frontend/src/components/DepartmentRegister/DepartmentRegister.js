@@ -91,7 +91,7 @@ export default function DepartmentRegister() {
                         <Card sx={{}} className='department-register-card'>
                             <CardContent>
                                 <Typography gutterBottom variant="h4" component="div" className='department-card-register-title'>
-                                    Register Your Department Here
+                                    Register Your Faculty Account Here
                                 </Typography>
                             </CardContent>
 
@@ -143,7 +143,7 @@ export default function DepartmentRegister() {
                                                 value={head}
                                                 onChange={handleHead}
                                                 type='text'
-                                                placeholder="Head of the Department"
+                                                placeholder="Faculty Name (Your Name) "
                                                 required={true}
                                                 disableUnderline={true}
                                                 className='department-register-input'

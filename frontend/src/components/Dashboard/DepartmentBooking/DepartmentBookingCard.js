@@ -14,6 +14,7 @@ import FormControl from "@mui/material/FormControl";
 import Input from "@mui/material/Input";
 import Alert from "@mui/material/Alert";
 import Snackbar from "@mui/material/Snackbar";
+import TextField from "@mui/material/TextField";
 
 export default function DepartmentBookingCard(props) {
   // --- MANUALLY CHANGE THESE PARAMETERS HERE ---
@@ -24,6 +25,7 @@ export default function DepartmentBookingCard(props) {
   const [successOpen, setSuccessOpen] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [description, setDescription] = useState("");
 
   const handleCloseSuccess = (event, reason) => {
     if (reason === "clickaway") return;
@@ -47,6 +49,7 @@ export default function DepartmentBookingCard(props) {
   const handleClose = () => {
     setModal(false);
     setEvent("");
+    setDescription("");
     setStartDate("");
     setEndDate("");
     setStartTime("");
@@ -119,6 +122,7 @@ export default function DepartmentBookingCard(props) {
     const data = {
       hall: props.data.name,
       event: event,
+      description: description,
       startDate, // "YYYY-MM-DD"
       endDate,
       // keep the original 12-hour strings for display if you want:
@@ -184,9 +188,11 @@ export default function DepartmentBookingCard(props) {
           className="modal"
           sx={{
             // Responsive width logic for Modal
-            width: { xs: '90%', sm: '70%', md: '50%' },
+            width: { xs: '90%', sm: '70%', md: '55%' },
             maxWidth: '600px',
+            maxHeight: '90vh',
             position: 'absolute',
+            overflowY: 'auto',
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
@@ -216,6 +222,27 @@ export default function DepartmentBookingCard(props) {
                 className="admin-input"
                 onChange={(e) => setEvent(e.target.value)}
                 sx={{ padding: "1rem" }}
+              />
+            </FormControl>
+
+            {/* Description Field */}
+            <FormControl fullWidth sx={{ marginBottom: "0.75rem" }}>
+              <TextField
+                multiline
+                rows={4}
+                placeholder="Describe Your Event in some detail here. Prefer to describe in short and be precise. (Optional)"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                inputProps={{ maxLength: 10000 }}
+                sx={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  borderRadius: '12px',
+                  '& .MuiOutlinedInput-root': {
+                    color: 'white',
+                    fontFamily: 'Inter',
+                    '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
+                  },
+                }}
               />
             </FormControl>
 

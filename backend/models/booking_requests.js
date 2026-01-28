@@ -11,6 +11,9 @@ const bookingrequestSchema = new mongoose.Schema({
   },
 
   event: { type: String, required: true },
+  
+  // NEW FIELD
+  description: { type: String, maxLength: 10000 }, 
 
   startDateTime: { type: Date, required: true },
   endDateTime: { type: Date, required: true },
@@ -27,7 +30,6 @@ const bookingrequestSchema = new mongoose.Schema({
     ref: 'User',
   },
 
-  /* 🔽 NEW FIELDS 🔽 */
   status: {
     type: String,
     enum: ['PENDING', 'APPROVED', 'REJECTED'],

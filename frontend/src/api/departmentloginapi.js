@@ -36,6 +36,11 @@ export const departmentSendOtpApi = async (data) => {
   }
 };
 
+export const departmentVerifyOtpApi = async (data) => {
+  return await api.post('/department/verify_otp', data);
+};
+
+
 export const departmentResetPasswordApi = async (data) => {
   try {
     const response = await api.post(

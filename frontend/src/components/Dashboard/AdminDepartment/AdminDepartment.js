@@ -136,7 +136,7 @@ export default function AdminDepartment() {
       >
         <Box className='modal'>
           <Typography className='modal-text' sx={{ marginBottom: '1rem', fontFamily: 'RecklessNeue' }} variant="h6" component="h2">
-            CREATE DEPARTMENT
+            CREATE FACULTY
           </Typography>
 
           <form onSubmit={handleCreateDepartmentSubmit}>
@@ -180,7 +180,7 @@ export default function AdminDepartment() {
               <Input
                 disableUnderline={true}
                 type='text'
-                placeholder="Head of the department"
+                placeholder="Faculty Name"
                 required={true}
                 value={head}
                 className='admin-input'
@@ -189,7 +189,7 @@ export default function AdminDepartment() {
               />
             </FormControl>
 
-            <Button size="medium" fullWidth className='btn-admin-hall' type='submit'>CREATE DEPARTMENT</Button>
+            <Button size="medium" fullWidth className='btn-admin-hall' type='submit'>CREATE FACULTY</Button>
 
           </form>
         </Box>
@@ -223,7 +223,7 @@ export default function AdminDepartment() {
             }}
           >
             <Button size="medium" className='btn-admin-department' onClick={createDepartment}>
-              CREATE DEPARTMENT
+              CREATE FACULTY
             </Button>
           </Box>
 
@@ -231,7 +231,7 @@ export default function AdminDepartment() {
           <Grid container justifyContent={'center'} alignItems="center" sx={{ mb: 4 }}>
             <Grid item xs={12}>
               <div className='admin-department-title-div'>
-                <h2 className='admin-department-title'>DEPARTMENTS</h2>
+                <h2 className='admin-department-title'>FACULTIES</h2>
               </div>
             </Grid>
           </Grid>

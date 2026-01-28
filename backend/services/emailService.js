@@ -8,6 +8,10 @@ const transporter = nodemailer.createTransport({
   auth: {
     user: process.env.EMAIL,
     pass: process.env.EMAIL_APP_PASSWORD
+  },
+  // 🟢 FIX: Allow connection through Antivirus/Firewall
+  tls: {
+    rejectUnauthorized: false
   }
 });
 
@@ -18,7 +22,7 @@ const formatDateTime = (date) =>
   });
 
 /* =========================================================
-   1. ADMIN: NEW DEPARTMENT REGISTRATION ALERT (MODIFIED)
+   1. ADMIN: NEW DEPARTMENT REGISTRATION ALERT
    ========================================================= */
 exports.sendRegistrationRequestToAdmin = async ({ adminEmails, requestData, approveUrl, rejectUrl }) => {
   const html = `

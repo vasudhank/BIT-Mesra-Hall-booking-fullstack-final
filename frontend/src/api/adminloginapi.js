@@ -35,6 +35,11 @@ export const adminSendOtpApi = async (data) => {
   }
 };
 
+export const adminVerifyOtpApi = async (data) => {
+  return await api.post('/admin/verify_otp', data);
+};
+
+
 /**
  * Reset admin password
  */

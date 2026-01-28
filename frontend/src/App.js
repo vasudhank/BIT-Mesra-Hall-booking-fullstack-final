@@ -23,7 +23,7 @@ import DepartmentAccount from './components/Dashboard/DepartmentAccount/Departme
 import Schedule from './components/Schedule/Schedule';
 import DepartmentForgot from './components/DepartmentForgot/DepartmentForgot';
 import AdminForgot from './components/AdminForgot/AdminForgot';
-
+import AIImmersive from "./pages/AIImmersive";
 // NEW IMPORT
 import AdminApproveDepartment from './components/AdminApproveDepartment/AdminApproveDepartment';
 import About from './routes/About'; // NEW
@@ -66,6 +66,7 @@ function App() {
         {/* ===== PUBLIC ROUTES ===== */}
         {/* Pass theme props to Home */}
         <Route path="/" element={<Home lightMode={lightMode} toggleTheme={toggleTheme} />} />
+        <Route path="/ai" element={<AIImmersive />} />
         <Route path="/about" element={<About />} /> {/* NEW */}
         <Route path="/faqs" element={<FAQ />} /> {/* NEW */}
         <Route path="/schedule" element={<Schedule />} />

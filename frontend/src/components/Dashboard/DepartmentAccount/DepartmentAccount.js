@@ -317,7 +317,7 @@ export default function DepartmentAccount() {
                     <PersonIcon />
                     <Box>
                       <Typography variant="body2">{hodName || '—'}</Typography>
-                      <Typography variant="caption" color="text.secondary">Head of Department</Typography>
+                      <Typography variant="caption" color="text.secondary">Faculty Name</Typography>
                     </Box>
                   </Box>
                 </Box>

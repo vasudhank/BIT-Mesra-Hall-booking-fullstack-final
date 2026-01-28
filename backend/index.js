@@ -38,16 +38,7 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 app.use(cors({
-  origin: function (origin, callback) {
-    // allow server-to-server / Postman / same-origin
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
-    return callback(new Error('CORS not allowed: ' + origin));
-  },
+  origin: true,
   credentials: true
 }));
 
@@ -80,7 +71,8 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-
+app.use('/api/ai', require('./routes/ai'));
+app.use('/api/ai', require('./routes/aiExecute'));
 /* =====================================================
    API ROUTES
 ===================================================== */

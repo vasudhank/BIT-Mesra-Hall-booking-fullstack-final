@@ -7,14 +7,9 @@
 }
 
 .admin-booking-body {
-  /* =========================================================
-     🔥 ISOLATION: FORCE CUSTOM DARK THEME
-     Overrides global 'body.dark-mode' variables so this page
-     always retains its original dark look.
-     ========================================================= */
   --bg-default: transparent;
-  --bg-paper: #303C5C;        /* Match card background */
-  --text-primary: #ffffff;    /* Always White Text */
+  --bg-paper: #303C5C;        
+  --text-primary: #ffffff;    
   --text-secondary: #e0e0e0;
   --border-color: rgba(255, 255, 255, 0.2);
 
@@ -26,7 +21,7 @@
   padding-bottom: 50px;
 }
 
-/* Force MUI Cards/Paper inside this page to use the custom variables */
+/* Force MUI Overrides */
 .admin-booking-body .MuiCard-root, 
 .admin-booking-body .MuiPaper-root {
   background-color: var(--bg-paper) !important; 
@@ -34,11 +29,11 @@
   background-image: none !important;
 }
 
-/* Force Typography to be white */
 .admin-booking-body .MuiTypography-root {
   color: var(--text-primary) !important;
 }
 
+/* Titles */
 .admin-booking-title {
   color: white !important;
   font-family: 'RecklessNeue' !important;
@@ -48,113 +43,271 @@
 }
 
 .admin-booking-title-div {
-  border-bottom: 1px solid #FFFFFF;
-  margin-bottom: 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  margin-bottom: 1.5rem;
   padding-bottom: 1rem;
   width: 90%;
   margin-left: auto;
   margin-right: auto;
 }
 
+.sub-hall-title {
+    color: #00d4ff;
+    text-align: center;
+    font-family: 'RecklessNeue';
+    font-size: 1.8rem;
+    margin-bottom: 2rem;
+}
+
+/* ================= FILTER BUTTONS ================= */
+.filter-buttons-container {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 3rem;
+    flex-wrap: wrap;
+    padding: 0 10px;
+}
+
+.filter-btn {
+    position: relative; /* Needed for badge positioning */
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #b0b0b0;
+    padding: 10px 25px; /* Added slight padding for spacing */
+    border-radius: 30px;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.filter-btn:hover {
+    background: rgba(255,255,255,0.15);
+    transform: translateY(-2px);
+}
+
+/* Active States */
+.filter-btn.active {
+    background: white;
+    color: #1B2033;
+    border-color: white;
+    font-weight: bold;
+    
+}
+
+/* Specific Conflict Colors when Active */
+.filter-btn.conflict-time.active {
+    background: #ff4d4d; /* Red */
+    color: white;
+    border-color: #ff4d4d;
+}
+
+.filter-btn.conflict-date.active {
+    background: #ff9f43; /* Orange */
+    color: white;
+    border-color: #ff9f43;
+    
+}
+
+.filter-btn.no-conflict.active {
+    background: #2ecc71; /* Green */
+    color: white;
+    border-color: #2ecc71;
+    
+}
+
+/* ================= BADGE STYLING ================= */
+.filter-btn-badge {
+    position: absolute;
+    top: -8px;
+    right: -5px;
+    background-color: #D72828; /* Deep Red */
+    color: white;
+    font-size: 0.7rem;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 50%;
+    min-width: 18px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    border: 2px solid #1B2033; /* Matches background to look like a cutout */
+}
+
+/* Active badge color adjustments */
+.filter-btn.conflict-time.active .filter-btn-badge {
+    background-color: white;
+    color: #ff4d4d;
+    border-color: #ff4d4d;
+}
+.filter-btn.conflict-date.active .filter-btn-badge {
+    background-color: white;
+    color: #ff9f43;
+    border-color: #ff9f43;
+}
+.filter-btn.no-conflict.active .filter-btn-badge {
+    background-color: white;
+    color: #2ecc71;
+    border-color: #2ecc71;
+}
+
+/* ================= HALL GROUP CARDS ================= */
+.hall-group-card {
+    width: 100%;
+    max-width: 320px;
+    border-radius: 1.5rem !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3) !important;
+    transition: transform 0.3s ease;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.hall-group-card:hover {
+    transform: translateY(-5px);
+    border-color: rgba(255,255,255,0.3);
+}
+
+.hall-card-title {
+    font-family: 'RecklessNeue' !important;
+    color: #ffffff;
+    margin-bottom: 0.5rem !important;
+}
+
+.hall-card-count {
+    font-family: 'Inter', sans-serif !important;
+    color: #a0a0a0;
+    margin-bottom: 1.5rem !important;
+}
+
+.hall-card-btn {
+    background: linear-gradient(90deg, #00d4ff, #005bea) !important;
+    color: white !important;
+    text-transform: none !important;
+    font-family: 'Inter', sans-serif !important;
+    border-radius: 10px !important;
+    padding: 8px 24px !important;
+    box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3) !important;
+}
+
+/* ================= UTILS ================= */
+.back-btn-icon {
+    cursor: pointer;
+    color: white;
+    font-size: 2rem !important;
+    transition: transform 0.2s;
+}
+
+.back-btn-icon:hover {
+    transform: translateX(-5px);
+    color: #00d4ff;
+}
+
+.no-data-text {
+    color: white;
+    margin-top: 2rem;
+    font-family: 'Inter';
+    opacity: 0.6;
+}
+
+/* Request Card Styling (Matches previous file) */
 .request-div-admin {
   width: 100%;
+  max-width: 380px;
   height: auto;
-  background: #303C5C; /* Matches other cards */
+  background: #303C5C;
   font-family: 'RecklessNeue' !important;
-  border-radius: 1.5rem;
+  border-radius: 1.2rem;
   box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.3);
-  padding-top: 10px;
+  padding: 10px 5px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .admin-booking-request-title {
   color: #ff7b00;
-  font-size: 1.5rem;
-  padding-top: 10px;
+  font-size: 1.2rem; 
+  padding-top: 5px;
   text-align: center;
-  margin-bottom: 5px;
+  margin-bottom: 2px;
+  font-weight: bold;
 }
 
 .admin-booking-request-desc-div {
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
-  margin-top: 0.5rem;
-  margin-bottom: 1.5rem;
-  font-family: 'RecklessNeue' !important;
-  text-align: center;
-  gap: 5px;
+  margin-bottom: 10px;
+  gap: 2px;
 }
 
-.admin-booking-request-desc {
-  font-size: 1.1rem;
-  color: #e0e0e0;
+.admin-booking-dept-name {
+    font-size: 0.95rem;
+    color: #ffffff;
+    font-weight: 500;
 }
 
-/* BUTTON STYLES */
-.btn-admin-booking-request-accept {
-  background: #28B006 !important;
-  border-radius: 1rem !important;
-  font-family: 'Times New Roman', Times, serif !important;
-  color: white !important;
-  font-size: 1rem !important;
-  font-weight: bold !important;
+.admin-booking-event-name {
+    font-size: 0.85rem;
+    color: #adb5bd;
+    font-style: italic;
+    font-family: 'Inter';
 }
 
+.admin-booking-datetime-range {
+    margin-top: 8px;
+    text-align: center;
+    background: rgba(0,0,0,0.2);
+    padding: 5px 10px;
+    border-radius: 8px;
+    width: 85%;
+}
+
+.admin-booking-datetime-range p {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #e0e0e0;
+    font-family: 'Inter', sans-serif;
+}
+
+.admin-booking-datetime-range .time-range {
+    color: #00d4ff;
+    font-weight: bold;
+}
+
+.btn-admin-booking-request-accept,
 .btn-admin-booking-request-reject {
-  background: #D72828 !important;
-  border-radius: 1rem !important;
-  font-family: 'Times New Roman', Times, serif !important;
-  color: white !important;
-  font-size: 1rem !important;
-  font-weight: bold !important;
+  border-radius: 0.8rem !important;
+  font-size: 0.85rem !important;
+  padding: 6px 0 !important;
 }
 
-/* Force override of all MUI button text, regardless of theme */
 .MuiButton-root.btn-admin-booking-request-accept,
 .MuiButton-root.btn-admin-booking-request-reject {
   font-family: "Times New Roman", Times, serif !important;
   text-transform: none !important;
 }
 
-/* ================= MOBILE RESPONSIVENESS ================= */
+/* Mobile Responsiveness */
 @media only screen and (max-width: 768px) {
-  .admin-booking-body {
-    padding-top: 0; 
-  }
-
-  .admin-booking-title {
-    font-size: 1.5rem;
-  }
-
-  .admin-booking-title-div {
-    margin-bottom: 2rem;
-  }
-
-  .btn-admin-booking-request-accept,
-  .btn-admin-booking-request-reject {
-    font-size: 0.9rem !important;
-  }
+  .admin-booking-body { padding-top: 0; }
+  .admin-booking-title { font-size: 1.5rem; }
+  .admin-booking-title-div { margin-bottom: 1rem; }
+  .filter-buttons-container { gap: 8px; margin-bottom: 2rem; }
+  .filter-btn { padding: 8px 16px; font-size: 0.8rem; }
+  .btn-admin-booking-request-accept, .btn-admin-booking-request-reject { font-size: 0.9rem !important; }
 }
 
-/* =========================================================
-   === APPBAR SEARCH BOX OVERRIDES (ALWAYS DARK & ROUNDED) ===
-   ========================================================= */
-
-/* 1. UNIVERSAL SEARCH BOX (Always Dark/Transparent + Rounded) */
+/* AppBar Search Overrides */
 .admin-booking-body .MuiInputBase-root {
   background-color: rgba(255, 255, 255, 0.15) !important; 
   color: #ffffff !important;
-  border-radius: 30px !important; /* Rounded Corners */
+  border-radius: 30px !important;
 }
-
-/* 2. UNIVERSAL PLACEHOLDER (Always White) */
 .admin-booking-body .MuiInputBase-root input::placeholder {
   color: rgba(255, 255, 255, 0.7) !important;
   opacity: 1 !important;
 }
-
-/* 3. UNIVERSAL ICON (Always White) */
 .admin-booking-body .MuiSvgIcon-root {
   color: #ffffff !important;
 }

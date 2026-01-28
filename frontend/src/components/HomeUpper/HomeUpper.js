@@ -14,9 +14,11 @@ import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'; 
 import CakeIcon from '@mui/icons-material/Cake'; 
+import OpenInFullIcon from '@mui/icons-material/OpenInFull'; // New icon for immersive
 
 // Import the API call
 import { getContactsApi } from "../../api/contactApi";
+import AIChatWidget from "../AI/AIChatWidget";
 
 // --- SUB-COMPONENT: FLIP DIGIT ---
 const FlipDigit = ({ digit }) => {
@@ -105,11 +107,12 @@ export default function HomeUpper({ lightMode, toggleTheme }) {
   // === RESPONSIVE STATE ===
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1364);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
+  const [showDeepDiveAnim, setShowDeepDiveAnim] = useState(false);
+  
   // Scroll & UI States
   const [showArrow, setShowArrow] = useState(true);
   const [scrolled, setScrolled] = useState(false);
-  
+   
   // FLIP CLOCK STATE
   const [timeData, setTimeData] = useState({
     hours: "00",
@@ -416,7 +419,7 @@ export default function HomeUpper({ lightMode, toggleTheme }) {
                       <Link to={auth.status === "Authenticated" && auth.user === "Admin" ? "/admin/hall" : "/admin_login"}>Admin</Link>
                     </div>
                     <div className="nav-link-item">
-                      <Link to={auth.status === "Authenticated" && auth.user === "Department" ? "/department/booking" : "/department_login"}>Department</Link>
+                      <Link to={auth.status === "Authenticated" && auth.user === "Department" ? "/department/booking" : "/department_login"}>Faculty</Link>
                     </div>
                     <div className="nav-link-item">
                       <Link to="/schedule">Schedule</Link>
@@ -555,23 +558,70 @@ export default function HomeUpper({ lightMode, toggleTheme }) {
         </div>
       )}
 
-      {/* AI Modal */}
+      {/* AI MODAL (GEMINI STYLE) */}
       {showAIModal && (
         <div className="popup-overlay-backdrop" onClick={closeModals}>
-          <div className="popup-card ai-card" onClick={(e) => e.stopPropagation()}>
-            <div className="popup-close" onClick={closeModals}>&times;</div>
-            <div style={{ textAlign: 'center' }}>
-              <div className="ai-modal-icon">✨</div>
-              <h2 className="ai-header">AI Assistant</h2>
-              <p className="ai-body">
-                Hello! I can help you navigate the <strong>Hall Booking System</strong>. 
-                <br/><br/>
-                • Looking for a free hall? Check the <em>Schedule</em>.<br/>
-                • Need to book? Go to <em>Department Login</em>.<br/>
-                • Any technical issues? Contact Admin.
-              </p>
-              <div className="ai-typing-box">Typing capability coming soon...</div>
+          
+          {/* Main Card Container with Running Gradient Border */}
+          <div className="gemini-modal-card" onClick={(e) => e.stopPropagation()}>
+            
+            {/* Header: Title + Immersive + Close */}
+            <div className="gemini-card-header">
+              <div className="header-left">
+                <AutoAwesomeIcon className="header-sparkle" />
+                <span className="header-title">AI Assistant</span>
+              </div>
+              
+              <div className="header-right">
+                <button 
+                  className="immersive-btn-icon" 
+                  onClick={() => {
+                    // --- 🔥 1. CUSTOM DEEP DIVE VOICE LOGIC ---
+                    if ('speechSynthesis' in window) {
+                      window.speechSynthesis.cancel(); // Stop current speech
+                      const u = new SpeechSynthesisUtterance("Deep diving in Immersive Mode");
+                      
+                      // Attempt to find a high-quality female voice
+                      const voices = window.speechSynthesis.getVoices();
+                      const deepVoice = voices.find(v => 
+                         
+                        v.name.includes("Heera") || 
+                        v.name.includes("Samantha")
+                      );
+                      
+                      if (deepVoice) u.voice = deepVoice;
+                      
+                      // "Immersive" Settings: Slower rate, slightly lower pitch
+                      u.rate = 0.9; 
+                      u.pitch = 0.1;
+                      u.volume = 1.0;
+                      
+                      window.speechSynthesis.speak(u);
+                    }
+
+                    // 2. Animation & Navigation
+                    setShowDeepDiveAnim(true);
+                    setTimeout(() => {
+                      navigate("/ai");
+                      setShowDeepDiveAnim(false);
+                    }, 2500); 
+                  }}
+                  title="Immersive Mode"
+                >
+                  <OpenInFullIcon fontSize="small" />
+                </button>
+
+                <div className="close-btn-icon" onClick={closeModals}>
+                  <CloseIcon fontSize="small" />
+                </div>
+              </div>
             </div>
+
+            {/* Content: The Chat Widget */}
+            <div className="gemini-card-body">
+               <AIChatWidget />
+            </div>
+
           </div>
         </div>
       )}
@@ -809,6 +859,39 @@ export default function HomeUpper({ lightMode, toggleTheme }) {
           </div>
         )}
       </section>
+      
+      {/* DEEP DIVE ANIMATION OVERLAY */}
+      {showDeepDiveAnim && (
+        <div style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            background: 'black',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            animation: 'fadeIn 0.5s ease'
+        }}>
+            <div style={{
+                width: '100%', height: '100%',
+                background: 'linear-gradient(45deg, #4285f4, #9b72cb, #d96570, #fbbc05)',
+                backgroundSize: '400% 400%',
+                animation: 'gradientShift 2s ease infinite',
+                opacity: 0.8,
+                filter: 'blur(50px)'
+            }}></div>
+            <h1 style={{
+                position: 'absolute',
+                color: 'white',
+                fontFamily: 'RecklessNeue',
+                fontSize: '3rem',
+                textShadow: '0 0 20px rgba(255,255,255,0.8)',
+                animation: 'popup 1s ease'
+            }}>
+                Deep Diving...
+            </h1>
+        </div>
+      )}
     </>
   );
 }

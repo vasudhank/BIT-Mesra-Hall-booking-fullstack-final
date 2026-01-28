@@ -201,6 +201,49 @@ router.post('/department_login', (req, res, next) => {
   })(req, res, next);
 });
 
+/* ---------------- VERIFY OTP (ADMIN) ---------------- */
+router.post('/admin/verify_otp', async (req, res) => {
+  const { email, otp } = req.body;
+  const admin = await Admin.findOne({ email });
+
+  if (!admin) {
+    return res.status(404).send({ success: false, msg: 'User not found' });
+  }
+
+  if (!admin.otp || admin.otpExpiry < Date.now()) {
+    return res.status(400).send({ success: false, msg: 'OTP expired' });
+  }
+
+  if (!compareSync(otp, admin.otp)) {
+    return res.status(400).send({ success: false, msg: 'Invalid OTP' });
+  }
+
+  res.send({ success: true });
+});
+
+/* ---------------- VERIFY OTP (DEPARTMENT) ---------------- */
+router.post('/department/verify_otp', async (req, res) => {
+  const { email, otp } = req.body;
+  const dept = await Department.findOne({ email });
+
+  if (!dept) {
+    return res.status(404).send({ success: false, msg: 'User not found' });
+  }
+
+  if (!dept.otp || dept.otpExpiry < Date.now()) {
+    return res.status(400).send({ success: false, msg: 'OTP expired' });
+  }
+
+  if (!compareSync(otp, dept.otp)) {
+    return res.status(400).send({ success: false, msg: 'Invalid OTP' });
+  }
+
+  res.send({ success: true });
+});
+
+
+
+
 /* ---------------- AUTH DETAILS ---------------- */
 router.get('/details', (req, res) => {
   if (req.isAuthenticated()) {
