@@ -107,14 +107,14 @@ export default function AdminHall() {
           <Box className='modal'>
             <Typography
               className='modal-text'
-              sx={{ mb: 2 }}
+              sx={{ mb: 3 }}
               variant="h6"
             >
               CREATE HALL
             </Typography>
 
             <form onSubmit={handleCreateHallSubmit}>
-              <FormControl fullWidth>
+              <FormControl fullWidth sx={{ mb: 2 }}>
                 <Input
                   disableUnderline
                   placeholder="Hall Name"
@@ -122,11 +122,11 @@ export default function AdminHall() {
                   value={name}
                   className='admin-input'
                   onChange={(e) => setName(e.target.value)}
-                  sx={{ p: 2 }}
+                  sx={{ p: 1 }}
                 />
               </FormControl>
 
-              <FormControl fullWidth>
+              <FormControl fullWidth sx={{ mb: 2 }}>
                 <Input
                   disableUnderline
                   type="number"
@@ -135,7 +135,7 @@ export default function AdminHall() {
                   value={capacity}
                   className='admin-input'
                   onChange={(e) => setCapacity(e.target.value)}
-                  sx={{ p: 2 }}
+                  sx={{ p: 1 }}
                 />
               </FormControl>
 

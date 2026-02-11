@@ -3,7 +3,6 @@ const fetch = require('node-fetch');
 const router = express.Router();
 const Hall = require('../models/hall');
 const Fuse = require('fuse.js'); 
-const { extractJSON } = require('../utils/jsonHelper'); 
 const { getEmailNotices } = require('../services/emailNoticeService');
 
 const getISTDate = () => {
@@ -15,14 +14,46 @@ const getISTDate = () => {
   const dd = String(dateObj.getDate()).padStart(2, '0');
   const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
   const time = dateObj.toLocaleTimeString('en-US', { hour12: true, hour: 'numeric', minute:'2-digit' });
-  return { fullDate: `${yyyy}-${mm}-${dd}`, dayName, time };
+  return { fullDate: `${yyyy}-${mm}-${dd}`, dayName, time, year: yyyy };
 };
 
+// Fuzzy search to fix hall names
 const fixHallName = (inputName, allHalls) => {
   if (!inputName) return null;
   const fuse = new Fuse(allHalls, { keys: ['name'], threshold: 0.4 });
   const result = fuse.search(inputName);
   return result.length > 0 ? result[0].item.name : inputName;
+};
+
+// --- 🔥 SMART JSON EXTRACTOR ---
+const extractFirstJSON = (txt) => {
+    const start = txt.indexOf('{');
+    if (start === -1) return null;
+
+    let balance = 0;
+    let end = -1;
+
+    // Scan from the first '{' to find the matching '}'
+    for (let i = start; i < txt.length; i++) {
+        if (txt[i] === '{') balance++;
+        else if (txt[i] === '}') balance--;
+
+        if (balance === 0) {
+            end = i;
+            break;
+        }
+    }
+
+    if (end !== -1) {
+        const jsonStr = txt.substring(start, end + 1);
+        try {
+            return JSON.parse(jsonStr);
+        } catch (e) {
+            console.error("Manual Extraction Parse Error:", e);
+            return null;
+        }
+    }
+    return null;
 };
 
 router.post('/chat', async (req, res) => {
@@ -35,38 +66,59 @@ router.post('/chat', async (req, res) => {
 
     const halls = await Hall.find({}, 'name');
     const hallNames = halls.map(h => h.name).join(", ");
+    // eslint-disable-next-line no-unused-vars
     const emailContext = await getEmailNotices().catch(() => "No recent notices."); 
-    const { fullDate, dayName, time } = getISTDate();
+    const { fullDate, dayName, time, year } = getISTDate();
 
-    // IMPROVED SYSTEM PROMPT
+    // SYSTEM PROMPT
     const systemPrompt = `
-    You are a helpful and versatile AI Assistant for the BIT Mesra Hall Booking System.
-    
-    CONTEXT:
-    - Current Time: ${fullDate}, ${time} (${dayName})
-    - Available Halls: [${hallNames}]
+    You are a versatile and helpful AI Assistant.
+
+    YOUR ROLES:
+    1. **Hall Booking Agent:** You manage the BIT Mesra Hall Booking System.
+    2. **General Assistant:** You answer general questions about the world (Science, Sports, Coding, History, etc.).
+
+    SYSTEM CONTEXT:
+    - Today: ${fullDate} (${dayName})
+    - Time: ${time}
+    - Year: ${year}
     - User Role: ${userRole}
-    - Recent Notices: ${emailContext}
+    - Available Halls: [${hallNames}]
 
-    GOAL:
-    You have two modes:
-    1. CONVERSATIONAL: If the user asks general questions (Elon Musk, science, greetings, help), respond naturally and comprehensively.
-    2. AGENTIC: If the user wants to book, check status, or manage halls, provide the structured JSON action.
+    INSTRUCTIONS:
+    - If the user asks about booking, halls, or admin tasks -> Use "type": "ACTION".
+    - If the user asks anything else (Who is Virat Kohli? What is React? Hello) -> Use "type": "CHAT" and put your answer in the "message" field.
+    - Output EXACTLY ONE JSON object.
 
-    OUTPUT FORMAT:
-    You MUST output a single JSON object with this structure:
-    {
-      "type": "CHAT" | "ACTION",
-      "action": "BOOK_REQUEST" | "ADMIN_QUERY" | "ADMIN_EXECUTE" | "SHOW_HALL_STATUS" | null,
-      "payload": { ... },
-      "message": "Your long-form conversational reply here for CHAT type",
-      "reply": "Short acknowledgement for ACTION type"
+    --- FEW-SHOT EXAMPLES ---
+
+    User: "Hi, who are you?"
+    Response: { "type": "CHAT", "action": null, "message": "I am the Hall Booking Assistant. I can also help with general questions!" }
+
+    User: "Tell me about Virat Kohli in short."
+    Response: { "type": "CHAT", "action": null, "message": "Virat Kohli is a famous Indian cricketer and former captain of the Indian national team. He is regarded as one of the greatest batsmen in the history of the sport." }
+
+    User: "Book Hall 20 for Coding Event on 11th Feb from 10am to 12pm"
+    Response: {
+      "type": "ACTION",
+      "action": "BOOK_REQUEST",
+      "payload": {
+        "requests": [
+          { "hall": "Hall 20", "date": "${year}-02-11", "start": "10:00 AM", "end": "12:00 PM", "event": "Coding Event" }
+        ]
+      },
+      "reply": "I have initiated the booking for Hall 20."
     }
 
-    RULES:
-    - If "type" is "CHAT", put your entire helpful response in the "message" field. (e.g., if asked for 100 words on Elon Musk, write them inside "message").
-    - If "type" is "ACTION", fill the "action" and "payload" fields.
-    - NEVER add text outside the JSON.
+    User: "Approve Hall 20 booking" (Admin Only)
+    Response: {
+      "type": "ACTION",
+      "action": "ADMIN_EXECUTE",
+      "payload": { "subAction": "APPROVE_SPECIFIC", "targetHall": "Hall 20" },
+      "reply": "Approving Hall 20."
+    }
+
+    --- END EXAMPLES ---
 
     User Input: "${message}"
     Response:`;
@@ -79,9 +131,9 @@ router.post('/chat', async (req, res) => {
         prompt: systemPrompt,
         stream: false,
         options: { 
-          temperature: 0.3, // Slightly higher for better conversation
-          num_predict: 2048, // Increased for long replies like "100 lines"
-          stop: ["<|end|>", "User:"] 
+          temperature: 0.3, // Slightly higher to allow creative general answers
+          num_predict: 500,
+          stop: ["User Input:", "User:", "Response:", "<|end|>"] 
         }
       })
     });
@@ -89,17 +141,34 @@ router.post('/chat', async (req, res) => {
     const data = await response.json();
     const rawText = (data.response || '').trim();
 
-    let parsed = extractJSON(rawText);
+    console.log("AI Raw Output:", rawText); // Debugging
 
-    // Fallback if the model fails to JSON format a long reply
+    // 1. Attempt smart extraction
+    let parsed = extractFirstJSON(rawText);
+
+    // 2. Fallback: If no JSON found, treat as plain text chat
     if (!parsed) {
-      parsed = { type: "CHAT", message: rawText, action: null };
+        // Strip out markdown code blocks if they exist but failed parsing
+        const cleaned = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+        parsed = { 
+            type: "CHAT", 
+            message: cleaned || "I didn't understand that.", 
+            action: null 
+        };
     }
 
-    if (parsed.type === 'ACTION' && parsed.action === 'BOOK_REQUEST' && parsed.payload?.requests) {
-      parsed.payload.requests.forEach(req => {
-        if (req.hall) req.hall = fixHallName(req.hall, halls);
-      });
+    // 3. Post-Processing: Fix Hall Names
+    if (parsed.type === 'ACTION' && parsed.payload) {
+        if (parsed.payload.requests) {
+            parsed.payload.requests.forEach(req => {
+                if (req.hall && req.hall.toLowerCase() !== 'any') {
+                    req.hall = fixHallName(req.hall, halls) || req.hall; 
+                }
+            });
+        }
+        if (parsed.payload.targetHall) {
+            parsed.payload.targetHall = fixHallName(parsed.payload.targetHall, halls) || parsed.payload.targetHall;
+        }
     }
 
     res.json({ reply: parsed });

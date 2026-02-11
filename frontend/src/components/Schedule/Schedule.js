@@ -19,9 +19,9 @@ function formatTime(dt) {
 
 function bookingOverlapsDay(booking, dateStr) {
   const dayStart = new Date(dateStr);
-  dayStart.setHours(0,0,0,0);
+  dayStart.setHours(0, 0, 0, 0);
   const dayEnd = new Date(dateStr);
-  dayEnd.setHours(23,59,59,999);
+  dayEnd.setHours(23, 59, 59, 999);
   const s = new Date(booking.startDateTime);
   const e = new Date(booking.endDateTime);
   return s <= dayEnd && e >= dayStart;
@@ -39,9 +39,43 @@ function bookingRangeText(start, end) {
 function colorFromString(str) {
   if (!str) return '#888';
   let hash = 0;
-  for (let i=0;i<str.length;i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
   const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
   return `#${'00000'.slice(0, 6 - c.length)}${c}`;
+}
+
+// Helper to calculate position and width percentage for the timeline
+// Range: 8:00 AM (480 mins) to 10:00 PM (1320 mins) -> Total 840 mins
+const START_HOUR = 8;
+const END_HOUR = 22;
+const TOTAL_MINUTES = (END_HOUR - START_HOUR) * 60; // 14 hours * 60 = 840
+
+function getBookingPosition(booking, selectedDateStr) {
+  const start = new Date(booking.startDateTime);
+  const end = new Date(booking.endDateTime);
+  
+  // Normalize dates to the selected day for calculation if they span multiple days
+  // (Assuming simple day view logic, clamping to 8am-10pm of selected day)
+  const viewStart = new Date(selectedDateStr);
+  viewStart.setHours(START_HOUR, 0, 0, 0);
+  
+  const viewEnd = new Date(selectedDateStr);
+  viewEnd.setHours(END_HOUR, 0, 0, 0);
+
+  // If completely outside range
+  if (end < viewStart || start > viewEnd) return null;
+
+  // Clamp times
+  const actualStart = start < viewStart ? viewStart : start;
+  const actualEnd = end > viewEnd ? viewEnd : end;
+
+  const startMinutes = (actualStart.getHours() * 60 + actualStart.getMinutes()) - (START_HOUR * 60);
+  const durationMinutes = (actualEnd - actualStart) / 1000 / 60;
+
+  const left = (startMinutes / TOTAL_MINUTES) * 100;
+  const width = (durationMinutes / TOTAL_MINUTES) * 100;
+
+  return { left: `${left}%`, width: `${width}%` };
 }
 
 export default function Schedule() {
@@ -52,15 +86,19 @@ export default function Schedule() {
   const [halls, setHalls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
-  const [viewMode, setViewMode] = useState(location.state?.mode || 'list'); 
-  const [searchTerm, setSearchTerm] = useState('');    
-  const [searchQuery, setSearchQuery] = useState('');  
-  const weekHeaderRef = useRef(null); 
+  // Set Default View to 'today'
+  const [viewMode, setViewMode] = useState(location.state?.mode || 'today'); 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Refs for scrolling synchronization
+  const weekHeaderRef = useRef(null);
   const bodyRef = useRef(null);
-  const topStripRef = useRef(null); 
+  
+  const topStripRef = useRef(null);
   const [topStripHeight, setTopStripHeight] = useState(0);
   const [dateTime, setDateTime] = useState("");
-  const topOffsetPx = 20; 
+  const topOffsetPx = 20;
   const navbarHeightPx = 0;
 
   useLayoutEffect(() => {
@@ -69,7 +107,7 @@ export default function Schedule() {
       if (el) {
         const r = el.getBoundingClientRect();
         setTopStripHeight(Math.ceil(r.height));
-            } else {
+      } else {
         setTopStripHeight(0);
       }
     };
@@ -83,7 +121,7 @@ export default function Schedule() {
     const monday = dt.isoWeekday() === 1 ? dt.startOf('day') : dt.subtract(dt.isoWeekday() - 1, 'day');
     const days = [];
     for (let i = 0; i < 7; ++i) days.push(monday.add(i, 'day'));
-    return days; 
+    return days;
   }, [selectedDate]);
 
   useEffect(() => { fetchHalls(); }, []);
@@ -100,26 +138,29 @@ export default function Schedule() {
   };
 
   const bookingsForDate = (hall) => {
-    return (hall.bookings || []).filter(b => bookingOverlapsDay(b, selectedDate)).sort((a,b)=> new Date(a.startDateTime)-new Date(b.startDateTime));
+    return (hall.bookings || []).filter(b => bookingOverlapsDay(b, selectedDate)).sort((a, b) => new Date(a.startDateTime) - new Date(b.startDateTime));
   };
 
+  // Process data for Grid/List views
   const gridData = useMemo(() => {
-    const cols = weekDates.map(d => ({ label: d.format('ddd'), date: d.format('YYYY-MM-DD'), longLabel: d.format('DD MMM') })); 
+    const cols = weekDates.map(d => ({ label: d.format('ddd'), date: d.format('YYYY-MM-DD'), longLabel: d.format('DD MMM') }));
     const filteredRows = (halls || []).filter(h => {
       if (!searchQuery) return true;
       return (h.name || '').toLowerCase().includes(searchQuery.toLowerCase());
     }).map(h => ({ id: h._id || h.name, name: h.name, capacity: h.capacity, bookings: h.bookings || [], status: h.status }));
+    
     const map = {};
     filteredRows.forEach(r => {
       map[r.id] = {};
       cols.forEach(c => {
-        const b = (r.bookings || []).filter(bb => bookingOverlapsDay(bb, c.date)).sort((x,y)=> new Date(x.startDateTime)-new Date(y.startDateTime));
+        const b = (r.bookings || []).filter(bb => bookingOverlapsDay(bb, c.date)).sort((x, y) => new Date(x.startDateTime) - new Date(y.startDateTime));
         map[r.id][c.date] = b;
       });
     });
     return { cols, rows: filteredRows, map };
   }, [halls, weekDates, searchQuery]);
 
+  // Scroll Sync Effect
   useEffect(() => {
     const bodyEl = bodyRef.current;
     if (!bodyEl) return;
@@ -143,7 +184,7 @@ export default function Schedule() {
   }, []);
 
   const topStripStickyTop = navbarHeightPx + topOffsetPx;
-  const weekHeaderStickyTop = navbarHeightPx + topOffsetPx + topStripHeight - 2; 
+  const weekHeaderStickyTop = navbarHeightPx + topOffsetPx + topStripHeight - 2;
 
   const onSearchChange = (e) => {
     setSearchTerm(e.target.value);
@@ -161,22 +202,53 @@ export default function Schedule() {
   };
 
   useEffect(() => {
-  const updateTime = () => {
-    const now = new Date(
-      new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
-    );
-    const days = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
-    const months = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
-    const formatted = `${days[now.getDay()]}, ${months[now.getMonth()]} ${String(now.getDate()).padStart(2, "0")}, ${now.getFullYear()} - ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")} IST`;
-    setDateTime(formatted);
-  };
-  updateTime();
-  const interval = setInterval(updateTime, 1000);
-  return () => clearInterval(interval);
-}, []);
+    const updateTime = () => {
+      const now = new Date(
+        new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
+      );
+      const days = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+      const months = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
+      const formatted = `${days[now.getDay()]}, ${months[now.getMonth()]} ${String(now.getDate()).padStart(2, "0")}, ${now.getFullYear()} - ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")} IST`;
+      setDateTime(formatted);
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const rowHeaderWidth = isMobile ? '120px' : '220px';
   const dayColWidth = isMobile ? 'minmax(140px, 1fr)' : 'minmax(180px, 1fr)';
+
+  // ----- TODAY VIEW HELPERS -----
+  // Generate time slots: 8:00 AM to 10:00 PM
+  const timeSlots = useMemo(() => {
+    const slots = [];
+    for (let i = START_HOUR; i < END_HOUR; i++) {
+      const hour = i % 12 === 0 ? 12 : i > 12 ? i - 12 : i;
+      const ampm = i < 12 ? 'AM' : 'PM';
+      // Next hour for label
+      const nextI = i + 1;
+      const nextHour = nextI % 12 === 0 ? 12 : nextI > 12 ? nextI - 12 : nextI;
+      const nextAmpm = nextI < 12 ? 'AM' : 'PM';
+      
+      slots.push({
+        label: `${hour}:00 ${ampm} - ${nextHour}:00 ${nextAmpm}`,
+        shortLabel: `${hour} ${ampm}`
+      });
+    }
+    return slots;
+  }, []);
+
+  // Filter rows for Today view (reuses searchQuery)
+  const todayRows = useMemo(() => {
+    return (halls || []).filter(h => {
+      if (!searchQuery) return true;
+      return (h.name || '').toLowerCase().includes(searchQuery.toLowerCase());
+    });
+  }, [halls, searchQuery]);
+
+  // Width for one hour column in Today View
+  const hourColumnWidth = 140; 
 
   return (
     <Container maxWidth={false} sx={{ paddingLeft: 0, paddingRight: 0, marginTop: 0 }}>
@@ -190,15 +262,15 @@ export default function Schedule() {
         }}
       />
 
-      {/* TOP CONTROL STRIP (make only this sticky) */}
+      {/* TOP CONTROL STRIP */}
       <Box
         ref={topStripRef}
         sx={{
           position: 'sticky',
-          top: `${topStripStickyTop}px`,   
+          top: `${topStripStickyTop}px`,
           zIndex: 1600,
-          backgroundColor: 'var(--bg-paper)', 
-          color: 'var(--text-primary)',       
+          backgroundColor: 'var(--bg-paper)',
+          color: 'var(--text-primary)',
           borderBottom: '1px solid var(--border-color)',
           boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
           px: { xs: 2, md: 3 },
@@ -211,18 +283,18 @@ export default function Schedule() {
           </Typography>
 
           <Box display="flex" gap={isMobile ? 1 : 2} alignItems="center" flexWrap="wrap" sx={{ justifyContent: { xs: 'space-between', md: 'flex-end' }, width: { xs: '100%', md: 'auto' } }}>
-          <Typography
-            sx={{
-              fontSize: "0.85rem",
-              fontWeight: 600,
-              whiteSpace: "nowrap",
-              color: "var(--text-secondary)", 
-              display: { xs: 'none', md: 'block' }, 
-              mr: 1
-            }}
-          >
-            {dateTime}
-          </Typography>
+            <Typography
+              sx={{
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                whiteSpace: "nowrap",
+                color: "var(--text-secondary)",
+                display: { xs: 'none', md: 'block' },
+                mr: 1
+              }}
+            >
+              {dateTime}
+            </Typography>
             <TextField
               placeholder="Type your room name here"
               value={searchTerm}
@@ -235,13 +307,13 @@ export default function Schedule() {
                   borderRadius: '24px',
                   paddingRight: 0,
                 },
-                minWidth: { xs: '100%', sm: 260 }, 
+                minWidth: { xs: '100%', sm: 260 },
                 flexGrow: { xs: 1, sm: 0 },
                 '& .MuiOutlinedInput-notchedOutline': {
                   borderColor: 'var(--border-color)',
                 },
                 '& input::placeholder': {
-                  fontSize: '12px',       
+                  fontSize: '12px',
                   opacity: 1,
                   color: 'var(--text-secondary)'
                 }
@@ -268,19 +340,26 @@ export default function Schedule() {
               sx={{ flexGrow: { xs: 1, sm: 0 } }}
             />
 
-            {/* 🔥 UPDATED CHIP: Uses CSS Variables for Dark Mode Support */}
-            <Chip 
-              label={loading ? "Loading..." : `${(gridData.rows || []).length} halls`} 
+            <Chip
+              label={loading ? "Loading..." : `${(gridData.rows || []).length} halls`}
               variant="outlined"
-              sx={{ 
+              sx={{
                 display: { xs: 'none', sm: 'flex' },
-                color: 'var(--text-primary)',        // Adapts to theme
-                borderColor: 'var(--border-color)',  // Adapts to theme
+                color: 'var(--text-primary)',
+                borderColor: 'var(--border-color)',
                 backgroundColor: 'transparent'
-              }} 
+              }}
             />
 
             <Stack direction="row" spacing={1}>
+              <Button
+                variant={viewMode === 'today' ? 'contained' : 'outlined'}
+                onClick={() => setViewMode('today')}
+                size="small"
+                sx={{ minWidth: 'auto' }}
+              >
+                Today
+              </Button>
               <Button
                 variant={viewMode === 'list' ? 'contained' : 'outlined'}
                 onClick={() => setViewMode('list')}
@@ -300,10 +379,10 @@ export default function Schedule() {
             </Stack>
             <IconButton
               size="small"
-              onClick={() => window.location.href = "/"}   
+              onClick={() => window.location.href = "/"}
               aria-label="go home"
             >
-              <HomeIcon sx={{ color: 'var(--text-primary)' }}/>
+              <HomeIcon sx={{ color: 'var(--text-primary)' }} />
             </IconButton>
 
           </Box>
@@ -312,6 +391,7 @@ export default function Schedule() {
 
       <Box sx={{ height: `0px` }} />
 
+      {/* --- LIST VIEW --- */}
       {viewMode === 'list' && (
         <Container sx={{ px: { xs: 2, md: 3 }, pt: 2 }}>
           <Grid container spacing={3}>
@@ -354,6 +434,7 @@ export default function Schedule() {
         </Container>
       )}
 
+      {/* --- GRID VIEW (WEEKLY) --- */}
       {viewMode === 'grid' && (
         <Box sx={{ width: '100%' }}>
           <Box
@@ -362,7 +443,7 @@ export default function Schedule() {
               position: 'sticky',
               top: `${weekHeaderStickyTop}px`,
               zIndex: 1500,
-              backgroundColor: 'var(--bg-paper)', 
+              backgroundColor: 'var(--bg-paper)',
               boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
               overflowX: 'hidden',
               marginTop: '-2px'
@@ -373,13 +454,13 @@ export default function Schedule() {
               gridTemplateColumns: `${rowHeaderWidth} repeat(${gridData.cols.length}, ${dayColWidth})`,
               width: 'max-content'
             }}>
-              <Box sx={{ 
-                borderRight: '1px solid var(--border-color)', 
-                borderBottom: '1px solid var(--border-color)', 
-                p: 1, 
-                bgcolor: 'var(--bg-default)', 
-                color: 'var(--text-primary)', 
-                position: 'sticky', 
+              <Box sx={{
+                borderRight: '1px solid var(--border-color)',
+                borderBottom: '1px solid var(--border-color)',
+                p: 1,
+                bgcolor: 'var(--bg-default)',
+                color: 'var(--text-primary)',
+                position: 'sticky',
                 left: 0,
                 zIndex: 10
               }}>
@@ -410,13 +491,13 @@ export default function Schedule() {
                   width: 'max-content'
                 }}>
                   {/* left room cell */}
-                  <Box sx={{ 
-                    borderRight: '1px solid var(--border-color)', 
-                    borderBottom: '1px solid var(--border-color)', 
-                    p: 1, 
-                    bgcolor: 'var(--bg-paper)', 
+                  <Box sx={{
+                    borderRight: '1px solid var(--border-color)',
+                    borderBottom: '1px solid var(--border-color)',
+                    p: 1,
+                    bgcolor: 'var(--bg-paper)',
                     minWidth: isMobile ? 120 : 220,
-                    position: 'sticky', 
+                    position: 'sticky',
                     left: 0,
                     zIndex: 10
                   }}>
@@ -435,7 +516,7 @@ export default function Schedule() {
                         p: 1,
                         minHeight: 70,
                         minWidth: isMobile ? 140 : 180,
-                        bgcolor: bookings.length ? 'var(--bg-default)' : 'var(--bg-paper)' 
+                        bgcolor: bookings.length ? 'var(--bg-default)' : 'var(--bg-paper)'
                       }}>
                         {bookings.length === 0 ? (
                           <Typography variant="body2" color="text.secondary">—</Typography>
@@ -470,6 +551,177 @@ export default function Schedule() {
           </Box>
         </Box>
       )}
+
+      {/* --- TODAY VIEW (NEW) --- */}
+      {viewMode === 'today' && (
+        <Box sx={{ width: '100%' }}>
+          {/* Header showing Selected Date */}
+          <Box sx={{ 
+            px: { xs: 2, md: 3 }, 
+            py: 1, 
+            bgcolor: 'var(--bg-default)', 
+            borderBottom: '1px solid var(--border-color)' 
+          }}>
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+              {dayjs(selectedDate).format('DD MMMM YYYY')}
+            </Typography>
+          </Box>
+
+          <Box
+            ref={weekHeaderRef}
+            sx={{
+              position: 'sticky',
+              top: `${weekHeaderStickyTop}px`,
+              zIndex: 1500,
+              backgroundColor: 'var(--bg-paper)',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+              overflowX: 'hidden',
+              marginTop: '-2px'
+            }}
+          >
+            {/* Header Row: Room Label + Time Slots */}
+            <Box sx={{
+              display: 'flex',
+              width: 'max-content'
+            }}>
+              {/* Sticky Corner */}
+              <Box sx={{
+                borderRight: '1px solid var(--border-color)',
+                borderBottom: '1px solid var(--border-color)',
+                p: 1,
+                bgcolor: 'var(--bg-default)',
+                color: 'var(--text-primary)',
+                position: 'sticky',
+                left: 0,
+                zIndex: 10,
+                width: rowHeaderWidth,
+                minWidth: rowHeaderWidth,
+                display: 'flex',
+                alignItems: 'center'
+              }}>
+                <Typography variant="subtitle2">Room / Time</Typography>
+              </Box>
+
+              {/* Time Slot Headers */}
+              {timeSlots.map((slot, index) => (
+                <Box key={index} sx={{
+                  borderRight: '1px solid var(--border-color)',
+                  borderBottom: '1px solid var(--border-color)',
+                  p: 1,
+                  bgcolor: 'var(--bg-default)',
+                  textAlign: 'center',
+                  width: hourColumnWidth,
+                  minWidth: hourColumnWidth
+                }}>
+                  <Typography variant="subtitle2" color="var(--text-primary)">{slot.label}</Typography>
+                </Box>
+              ))}
+            </Box>
+          </Box>
+
+          <Box
+            ref={bodyRef}
+            sx={{
+              width: '100%',
+              overflowX: 'auto',
+              overflowY: 'visible'
+            }}
+          >
+            <Box>
+              {todayRows.map(row => (
+                <Box key={row.id} sx={{
+                  display: 'flex',
+                  width: 'max-content',
+                  position: 'relative' // Needed for absolute positioning context if we wanted, but we put bookings inside the time track
+                }}>
+                  {/* Left Sticky Room Cell */}
+                  <Box sx={{
+                    borderRight: '1px solid var(--border-color)',
+                    borderBottom: '1px solid var(--border-color)',
+                    p: 1,
+                    bgcolor: 'var(--bg-paper)',
+                    width: rowHeaderWidth,
+                    minWidth: rowHeaderWidth,
+                    position: 'sticky',
+                    left: 0,
+                    zIndex: 10,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center'
+                  }}>
+                    <Typography variant="subtitle2">{row.name}</Typography>
+                    <Typography variant="caption" color="text.secondary">{row.capacity} seats</Typography>
+                    <Chip label={row.status} size="small" sx={{ mt: 0.5, width: 'fit-content' }} color={row.status === 'Filled' ? 'error' : 'success'} />
+                  </Box>
+
+                  {/* The Timeline Track for this Hall */}
+                  <Box sx={{ position: 'relative', display: 'flex' }}>
+                    
+                    {/* Background Grid Cells (1 hour each) */}
+                    {timeSlots.map((slot, index) => (
+                      <Box key={index} sx={{
+                        borderRight: '1px solid var(--border-color)',
+                        borderBottom: '1px solid var(--border-color)',
+                        width: hourColumnWidth,
+                        minWidth: hourColumnWidth,
+                        minHeight: 80, 
+                        bgcolor: 'var(--bg-paper)'
+                      }} />
+                    ))}
+
+                    {/* Foreground Bookings */}
+                    {bookingsForDate(row).map(b => {
+                       const pos = getBookingPosition(b, selectedDate);
+                       if (!pos) return null; // Outside 8am-10pm range
+                       
+                       const baseColor = colorFromString(b._id ? b._id.toString() : (b.event || b.startDateTime));
+                       
+                       return (
+                         <Box 
+                           key={b._id || `${b.startDateTime}`}
+                           sx={{
+                             position: 'absolute',
+                             top: 4,
+                             bottom: 4,
+                             left: pos.left,
+                             width: pos.width,
+                             backgroundColor: `${baseColor}44`, // Low opacity background (hex + 44)
+                             borderLeft: `4px solid ${baseColor}`,
+                             borderRadius: 1,
+                             padding: '2px 6px',
+                             overflow: 'visible', // <--- FIXED: Changed from 'hidden' to 'visible'
+                             whiteSpace: 'nowrap',
+                             zIndex: 5,
+                             display: 'flex',
+                             flexDirection: 'column',
+                             justifyContent: 'center'
+                           }}
+                         >
+                            <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'var(--text-primary)', lineHeight: 1.2 }}>
+                              {formatTime(b.startDateTime)} - {formatTime(b.endDateTime)}
+                            </Typography>
+                            <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'var(--text-primary)', fontSize: '0.85rem' }}>
+                              {b.event || 'Booked'}
+                            </Typography>
+                         </Box>
+                       );
+                    })}
+
+                  </Box>
+                </Box>
+              ))}
+              
+              {todayRows.length === 0 && (
+                <Box sx={{ p: 3, textAlign: 'center' }}>
+                  <Typography color="text.secondary">No halls found matching your search.</Typography>
+                </Box>
+              )}
+
+            </Box>
+          </Box>
+        </Box>
+      )}
+
     </Container>
   );
 }

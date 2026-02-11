@@ -15,46 +15,42 @@
 .admin-hall-body {
   /* =========================================================
      🔥 ISOLATION: REVERT TO CUSTOM DARK THEME
-     This overrides the global 'body.dark-mode' variables
-     so this page always looks like the original design.
      ========================================================= */
-  --bg-default: transparent;       /* Let the gradient show through */
-  --bg-paper: #303C5C;             /* Your original Hall Card Blue */
-  --text-primary: #ffffff;         /* Always White Text */
-  --text-secondary: #e0e0e0;       /* Light Grey for secondary text */
+  --bg-default: transparent;       
+  --bg-paper: #303C5C;             
+  --text-primary: #ffffff;         
+  --text-secondary: #e0e0e0;       
   --border-color: rgba(255, 255, 255, 0.2);
 
-  /* Original Background */
   background: linear-gradient(243.81deg, #25354F 0.9%, #1B2033 100%) !important;
   min-height: 100vh;
   box-sizing: border-box;
   padding-top: calc(var(--appbar-height) + var(--content-gap));
 
-  /* ONLY offset for fixed AppBar */
   padding-left: 70px;
   padding-right: 70px;
   padding-bottom: 40px;
   overflow-y: auto;
 }
 
-/* Force MUI Cards inside this page to use the custom blue variable defined above */
+/* Force MUI Cards inside this page to use the custom blue variable */
 .admin-hall-body .MuiCard-root, 
 .admin-hall-body .MuiPaper-root {
   background-color: var(--bg-paper) !important; 
   color: var(--text-primary) !important;
-  background-image: none !important; /* Remove Material UI overlays */
+  background-image: none !important;
 }
 
-/* Force Typography to be white */
 .admin-hall-body .MuiTypography-root {
   color: var(--text-primary) !important;
 }
 
+/* Base button style (Used for Create Hall) */
 .btn-admin-hall {
   background: #8d6850 !important;
   border-radius: 1rem !important;
   font-family: 'RecklessNeue';
-  width: 30%;
+  width: 30%; 
   color: white !important;
   font-size: large;
   margin-bottom: 1rem !important;
@@ -62,15 +58,72 @@
   justify-content: center;
 }
 
+.modal .btn-admin-hall {
+  width: 100% !important;
+  margin-top: 1.5rem !important;
+}
+
+/* --- CARD BUTTON STYLES --- */
+
+/* Status Button Common */
+.btn-admin-hall-status {
+  border-radius: 1rem !important;
+  font-family: 'RecklessNeue' !important;
+  color: white !important;
+  font-size: 1rem !important;
+  text-transform: none !important;
+  pointer-events: none; /* Make status just a label unless you want it clickable */
+}
+
+/* Filled Status */
+.status-filled {
+  background-color: #d32f2f !important; /* Red */
+}
+
+/* Free Status */
+.status-free {
+  background-color: #2e7d32 !important; /* Green */
+}
+
+/* Vacate Button */
+.btn-admin-hall-vacate {
+  background-color: #ed6c02 !important; /* Warning Orange */
+  border-radius: 1rem !important;
+  font-family: 'RecklessNeue' !important;
+  color: white !important;
+  font-size: 1rem !important;
+  text-transform: none !important;
+  font-weight: 600 !important;
+}
+
+.btn-admin-hall-vacate:hover {
+  background-color: #c75b00 !important;
+}
+
+/* DELETE ICON STYLES */
+.delete-icon-btn {
+    position: absolute !important;
+    top: 5px;
+    right: 5px;
+    color: rgba(255, 255, 255, 0.6) !important;
+    z-index: 10;
+    transition: all 0.2s ease-in-out !important;
+}
+
+.delete-icon-btn:hover {
+    background-color: rgba(255, 0, 0, 0.1) !important;
+    color: #ff4444 !important;
+    transform: scale(1.1);
+}
+
 .hall-admin-card {
-  /* Using the variable ensures it fights back against global themes if needed */
   background: #303C5C !important;
   border-radius: 1.5rem !important;
   box-shadow: 0px 0px 34px rgba(0, 0, 0, 0.25) !important;
 }
 
 .hall-card-text {
-  font-family: 'RecklessNeue', !important;
+  font-family: 'RecklessNeue' !important;
   color: white !important;
 }
 
@@ -79,23 +132,27 @@
   font-size: 1.3rem;
 }
 
+/* FIXED MODAL STYLE */
 .modal {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 50%;
+  width: 90%; 
+  max-width: 500px; 
   background: linear-gradient(264.79deg, #3A517C 0%, #314064 100%);
-  padding: 1rem;
-  border-radius: 10rem;
+  padding: 2rem; 
+  border-radius: 1.5rem; 
+  box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.5); 
+  outline: none;
 }
 
 .modal-text {
   color: white !important;
   font-family: 'RecklessNeue' !important;
+  text-align: center;
 }
 
-/* Force Modal Input fields to have white text (Original Look) */
 .admin-hall-body .admin-input .MuiInputBase-input,
 .admin-hall-body .admin-input .MuiInput-root {
     color: white !important;
@@ -106,13 +163,14 @@
 
 @media only screen and (max-width: 500px) {
   .modal {
-    width: 70%;
+    width: 85%;
+    padding: 1.5rem;
   }
 }
 
 @media only screen and (max-width: 300px) {
   .modal {
-    width: 80%;
+    width: 90%;
   }
 }
 
@@ -136,32 +194,20 @@
     text-transform: none !important;
     font-weight: 600 !important;
   }
-
-  .modal {
-    width: 90%;
-  }
 }
 
-/* =========================================================
-   === APPBAR SEARCH BOX OVERRIDES (ALWAYS DARK & ROUNDED) ===
-   We target the InputBase inside the body but EXCLUDE (.not) 
-   the .admin-input class used by the Modal.
-   ========================================================= */
-
-/* 1. UNIVERSAL SEARCH BOX STYLE (Applied to both Light & Dark Mode) */
+/* APPBAR SEARCH BOX OVERRIDES */
 .admin-hall-body .MuiInputBase-root:not(.admin-input) {
-  background-color: rgba(255, 255, 255, 0.15) !important; /* Semi-transparent Dark */
+  background-color: rgba(255, 255, 255, 0.15) !important; 
   color: #ffffff !important;
-  border-radius: 30px !important; /* 🔥 Rounded Corners */
+  border-radius: 30px !important; 
 }
 
-/* 2. UNIVERSAL PLACEHOLDER (Always White) */
 .admin-hall-body .MuiInputBase-root:not(.admin-input) input::placeholder {
   color: rgba(255, 255, 255, 0.7) !important;
   opacity: 1 !important;
 }
 
-/* 3. UNIVERSAL SEARCH ICON (Always White) */
 .admin-hall-body .MuiSvgIcon-root {
   color: #ffffff !important;
 }

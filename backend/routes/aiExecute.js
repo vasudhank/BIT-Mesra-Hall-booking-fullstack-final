@@ -31,9 +31,11 @@ const to12 = (t) => {
 
 const to24 = (t) => {
    if (!t) return "00:00";
-   if (!t.toLowerCase().includes('m')) return t; 
+   if (!t.toLowerCase().includes('m')) {
+       return t.length === 4 ? `0${t}` : t; 
+   }
    const match = t.match(/^(\d{1,2})(:(\d{2}))?\s*(AM|PM)$/i);
-   if (!match) return t;
+   if (!match) return "00:00"; 
    let h = parseInt(match[1]);
    const m = match[3] || "00";
    const ampm = match[4].toUpperCase();
@@ -43,12 +45,11 @@ const to24 = (t) => {
 }
 
 // --- CONFLICT CHECK HELPER ---
-// Checks a specific request against the DB + other pending requests
 const analyzeRequestConflict = async (req, allPending) => {
     const startA = new Date(req.startDateTime).getTime();
     const endA = new Date(req.endDateTime).getTime();
     
-    // 1. Check DB (Approved Bookings)
+    // Check DB (Approved Bookings)
     const dbConflict = await Hall.findOne({
         name: req.hall,
         bookings: {
@@ -60,7 +61,7 @@ const analyzeRequestConflict = async (req, allPending) => {
     });
     if (dbConflict) return "TIME_CONFLICT";
 
-    // 2. Check against other Pending Requests in the same batch
+    // Check against other Pending Requests
     for (let other of allPending) {
         if (req._id.equals(other._id)) continue;
         if (req.hall !== other.hall) continue;
@@ -68,14 +69,8 @@ const analyzeRequestConflict = async (req, allPending) => {
         const startB = new Date(other.startDateTime).getTime();
         const endB = new Date(other.endDateTime).getTime();
 
-        // Exact time overlap
         if (startA < endB && endA > startB) return "TIME_CONFLICT";
-        
-        // Date overlap (Same day, different time)
-        // Note: Simple logic - if dates match but times don't.
-        if (req.startDate === other.startDate) return "DATE_OVERLAP"; 
     }
-
     return "SAFE";
 };
 
@@ -90,32 +85,35 @@ router.post('/execute', async (req, res) => {
   const payload = intent.payload || {};
 
   /* =======================
-     ACTION: BOOK_REQUEST (Handles Single & Multiple)
-  ======================= */
+     ACTION: BOOK_REQUEST
+     ======================= */
   if (actionType === 'BOOK_REQUEST') {
     if (user.type !== 'Department' && user.type !== 'Admin') {
-      return res.json({ status: 'ERROR', msg: 'Permission Denied.' });
+      return res.json({ status: 'ERROR', msg: 'Permission Denied. Only Departments can book.' });
     }
 
     const requests = payload.requests || [];
-    if (requests.length === 0) return res.json({ status: 'ERROR', msg: 'No booking details found.' });
+    if (requests.length === 0) return res.json({ status: 'ERROR', msg: 'AI understood booking, but missed details.' });
 
     let successCount = 0;
     let failMsg = "";
 
     for (let reqItem of requests) {
       try {
-        if (!reqItem.hall || !reqItem.date || !reqItem.start || !reqItem.end) continue;
+        if (!reqItem.hall || !reqItem.date || !reqItem.start || !reqItem.end) {
+             failMsg += `Missing details for one request. `;
+             continue;
+        }
 
         const start24 = to24(reqItem.start);
         const end24 = to24(reqItem.end);
-        const startDateTime = `${reqItem.date}T${start24}:00`;
-        const endDateTime = `${reqItem.date}T${end24}:00`;
-
-        const startDT = new Date(startDateTime);
-        const endDT = new Date(endDateTime);
         
-        // Immediate conflict check
+        const startDateTimeStr = `${reqItem.date}T${start24}:00`;
+        const endDateTimeStr = `${reqItem.date}T${end24}:00`;
+
+        const startDT = new Date(startDateTimeStr);
+        const endDT = new Date(endDateTimeStr);
+        
         const existingOverlap = await Hall.findOne({
           name: reqItem.hall,
           bookings: {
@@ -127,7 +125,7 @@ router.post('/execute', async (req, res) => {
         });
 
         if (existingOverlap) {
-          failMsg += `${reqItem.hall} on ${reqItem.date} occupied. `;
+          failMsg += `${reqItem.hall} is occupied on ${reqItem.date}. `;
           continue;
         }
 
@@ -138,7 +136,7 @@ router.post('/execute', async (req, res) => {
           hall: reqItem.hall,
           department: user.id,
           event: reqItem.event || 'AI Booking',
-          description: "AI Generated",
+          description: "Booked via AI Assistant",
           startDateTime: startDT,
           endDateTime: endDT,
           startTime12: to12(start24),
@@ -154,7 +152,6 @@ router.post('/execute', async (req, res) => {
 
         const saved = await newRequest.save();
 
-        // Notification
         const baseUrl = `${process.env.PUBLIC_BASE_URL}/api/approval`;
         safeExecute(() => sendBookingApprovalMail({
             adminEmail: process.env.EMAIL,
@@ -171,64 +168,37 @@ router.post('/execute', async (req, res) => {
 
       } catch (err) {
         console.error("Single Booking Error:", err);
+        failMsg += `Error processing ${reqItem.hall}. `;
       }
     }
 
     if (successCount === 0) return res.json({ status: 'ERROR', msg: failMsg || 'Failed to book.' });
-    
-    return res.json({ 
-      status: 'DONE', 
-      message: `Successfully created ${successCount} booking request(s). ${failMsg}` 
-    });
+    return res.json({ status: 'DONE', message: `Created ${successCount} booking request(s). ${failMsg}` });
   }
 
   /* =======================
-     ACTION: ADMIN_QUERY (Filter & Show)
-  ======================= */
-  if (actionType === 'ADMIN_QUERY') {
-    if (user.type !== 'Admin') return res.json({ status: 'ERROR', msg: 'Admin Only.' });
-    
-    const filter = payload.filter; // "TIME_CONFLICT", "DATE_OVERLAP", "SAFE"
-    const requests = await Booking_Requests.find({ status: 'PENDING' }).populate('department');
-    
-    // Categorize
-    const results = [];
-    for (let req of requests) {
-        const status = await analyzeRequestConflict(req, requests);
-        if (filter === "SAFE" && status === "SAFE") results.push(req);
-        if (filter === "TIME_CONFLICT" && status === "TIME_CONFLICT") results.push(req);
-        if (filter === "DATE_OVERLAP" && status === "DATE_OVERLAP") results.push(req);
-    }
-
-    if(results.length === 0) {
-        return res.json({ status: 'DONE', message: `No requests found with status: ${filter}` });
-    }
-
-    // Return format suitable for AI Chat table
-    const formattedData = results.map(r => ({
-        hall: r.hall,
-        status: `${r.event} (${r.startDate})`,
-        currentEvent: filter // reusing field for display
-    }));
-
-    return res.json({ status: 'INFO', data: formattedData });
-  }
-
-  /* =======================
-     ACTION: ADMIN_EXECUTE (Bulk Approve/Reject)
-  ======================= */
+     ACTION: ADMIN_EXECUTE
+     ======================= */
   if (actionType === 'ADMIN_EXECUTE') {
     if (user.type !== 'Admin') return res.json({ status: 'ERROR', msg: 'Admin Only.' });
     
-    const subAction = payload.subAction; // "APPROVE_SAFE", "REJECT_CONFLICTS"
+    const subAction = payload.subAction; 
+    const targetHall = payload.targetHall; // e.g., "Hall 20"
+    
     const requests = await Booking_Requests.find({ status: 'PENDING' }).populate('department');
     let count = 0;
 
     for (let reqDoc of requests) {
+      // If a specific hall was targeted, skip others
+      if (targetHall && reqDoc.hall.toLowerCase() !== targetHall.toLowerCase()) {
+          continue; 
+      }
+
       const status = await analyzeRequestConflict(reqDoc, requests);
 
-      // APPROVE SAFE LOGIC
-      if (subAction === "APPROVE_SAFE" && status === "SAFE") {
+      // APPROVE
+      if ((subAction === "APPROVE_SAFE" && status === "SAFE") || subAction === "APPROVE_SPECIFIC") {
+        
         reqDoc.status = 'APPROVED';
         await reqDoc.save();
 
@@ -248,9 +218,9 @@ router.post('/execute', async (req, res) => {
         }), 'DEPT EMAIL');
         count++;
       }
-      
-      // REJECT CONFLICT LOGIC
-      else if (subAction === "REJECT_CONFLICTS" && status === "TIME_CONFLICT") {
+
+      // REJECT
+      else if ((subAction === "REJECT_CONFLICTS" && status === "TIME_CONFLICT") || subAction === "REJECT_SPECIFIC") {
         reqDoc.status = 'REJECTED';
         await reqDoc.save();
         
@@ -261,12 +231,16 @@ router.post('/execute', async (req, res) => {
       }
     }
 
-    return res.json({ status: 'DONE', message: `Processed ${count} requests via ${subAction}.` });
+    if (count === 0 && targetHall) {
+        return res.json({ status: 'DONE', message: `No pending requests found for ${targetHall}.` });
+    }
+
+    return res.json({ status: 'DONE', message: `Processed ${count} requests.` });
   }
 
   /* =======================
      ACTION: SHOW_HALL_STATUS
-  ======================= */
+     ======================= */
   if (actionType === "SHOW_HALL_STATUS") {
     const halls = await Hall.find();
     const now = new Date();
