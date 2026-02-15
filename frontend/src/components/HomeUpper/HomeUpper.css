@@ -96,6 +96,10 @@
   transform: translateY(0px) scale(1.02);
   z-index: 14;
 }
+.navbar-shell.navbar-shell--scrolled {
+  width: 100vw;
+  max-width: 4000px;
+}
 .navbar {
   background: #e6e9ec;
   padding: 13px 44px;
@@ -955,7 +959,20 @@ body.dark-mode .mobile-datetime-bar {
 .mobile-nav-item { font-family: 'RecklessNeue'; font-size: 2rem; color: white; text-decoration: none; font-weight: 500; transition: transform 0.2s; }
 .mobile-nav-item:hover { transform: scale(1.1); color: #cbd5e1; }
 
-@media (max-width: 1500px) { .hero-content h1 { font-size: 3.8rem; } .navbar-shell { width: 80vw; } .calendar-3d-wrapper { right: -0.4%; top: 42.8%; transform: perspective(600px) rotateY(3deg) rotateX(2deg) rotateZ(0deg) skewY(2.5deg) scale(0.85); } .steam-layer { left: 15%; bottom: 37.4%; } }
+/* MacBook-class desktop tuning: keep calendar mask locked on the table page */
+@media (min-width: 1450px) and (max-width: 1600px) and (min-height: 780px) {
+  .calendar-3d-wrapper {
+    top: 42.7%;
+    right: -0.2%;
+    transform: perspective(600px) rotateY(3deg) rotateX(2deg) rotateZ(0deg) skewY(2.5deg) scale(0.92);
+  }
+}
+
+@media (max-width: 1500px) {
+  .hero-content h1 { font-size: 3.8rem; }
+  .navbar-shell:not(.navbar-shell--scrolled) { width: 80vw; }
+  .steam-layer { left: 15%; bottom: 37.4%; }
+}
 
 @media (max-width: 1364px) {
   .hero-video-wrapper { position: sticky; top: 0; z-index: 1; }

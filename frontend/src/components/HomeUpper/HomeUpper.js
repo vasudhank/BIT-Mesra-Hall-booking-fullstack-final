@@ -24,6 +24,7 @@ import { playElevenLabsSpeech, stopElevenLabsPlayback } from "../../utils/eleven
 // --- SUB-COMPONENT: FLIP UNIT (2-DIGIT) ---
 const FOLD_PHASE_MS = 250;
 const UNFOLD_PHASE_MS = 340;
+const DESKTOP_BREAKPOINT = 1364;
 
 const FlipDigit = ({ value }) => {
   const normalized = String(value ?? "00").padStart(2, "0");
@@ -138,7 +139,7 @@ export default function HomeUpper({ lightMode, toggleTheme }) {
   const videoRef = useRef(null);
 
   // === RESPONSIVE STATE ===
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 1364);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= DESKTOP_BREAKPOINT);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showDeepDiveAnim, setShowDeepDiveAnim] = useState(false);
   
@@ -198,7 +199,7 @@ export default function HomeUpper({ lightMode, toggleTheme }) {
   // --- Effect: Detect Mobile Resize ---
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth <= 1364);
+      setIsMobile(window.innerWidth <= DESKTOP_BREAKPOINT);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);

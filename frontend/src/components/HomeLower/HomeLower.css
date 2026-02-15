@@ -155,6 +155,34 @@
   .mag-big-text { font-size: 12rem; }
 }
 
+@media (min-width: 1025px) and (max-width: 1600px) {
+  .magazine-hero-section {
+    padding-top: 12vh;
+    min-height: 74vh;
+  }
+
+  .mag-headline-wrapper {
+    height: 400px;
+  }
+
+  .mag-big-text {
+    font-size: 8.8rem;
+  }
+
+  .mag-subtext {
+    font-size: 1.1rem;
+    max-width: 540px;
+  }
+
+  .marquee-word {
+    font-size: 4.8rem;
+  }
+
+  .marquee-wrapper {
+    margin-bottom: 6rem;
+  }
+}
+
 @media (min-width: 1800px) {
   .mag-big-text { font-size: 14rem; }
 }
