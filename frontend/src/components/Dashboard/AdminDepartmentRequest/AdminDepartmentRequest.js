@@ -61,7 +61,8 @@ export default function AdminDepartmentRequest() {
     const filtered = list.filter(req => 
       (req.department && req.department.toLowerCase().includes(q)) ||
       (req.head && req.head.toLowerCase().includes(q)) ||
-      (req.email && req.email.toLowerCase().includes(q))
+      (req.email && req.email.toLowerCase().includes(q)) ||
+      (req.phone && req.phone.toLowerCase().includes(q))
     );
     setFilteredList(filtered);
   };
@@ -83,7 +84,7 @@ export default function AdminDepartmentRequest() {
           searchValue={search}
           onSearchChange={onSearchChange}
           onSearchSubmit={onSearchSubmit}
-          searchPlaceholder="Search dept. , HOD, email..."
+          searchPlaceholder="Search dept., HOD, email, phone..."
         />
 
         {/* Added margin-top for mobile to clear the stacked AppBar */}

@@ -3,6 +3,7 @@ const router = express.Router();
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const { hashSync, compareSync } = require('bcrypt');
+const path = require('path');
 
 const Admin = require('./models/admin');
 const Department = require('./models/department');
@@ -12,7 +13,7 @@ const passport = require('./config/passport');
 
 const details = require('./routes/constants');
 
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 /* ---------------- BASIC TEST ROUTE ---------------- */
 router.get('/', (req, res) => {

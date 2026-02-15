@@ -11,6 +11,7 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
 import api from '../../../api/axiosInstance';
+import { changeBookingRequestApi } from '../../../api/changebookingrequestapi';
 import { Container, useMediaQuery, useTheme } from '@mui/material';
 
 export default function AdminBooking() {
@@ -19,6 +20,7 @@ export default function AdminBooking() {
   const [filteredRequests, setFilteredRequests] = useState([]); 
   const [open, setOpen] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedRequestIds, setSelectedRequestIds] = useState([]);
 
   // --- VIEW STATE MANAGEMENT ---
   const [viewMode, setViewMode] = useState('ALL'); 
@@ -63,6 +65,11 @@ export default function AdminBooking() {
   useEffect(() => {
     get_booking_requests();
   }, []);
+
+  useEffect(() => {
+    const validIds = new Set(bookingRequests.map((req) => req._id));
+    setSelectedRequestIds((prev) => prev.filter((id) => validIds.has(id)));
+  }, [bookingRequests]);
 
   // --- 2. ROBUST CONFLICT LOGIC ---
   const processCategorization = (requests) => {
@@ -216,14 +223,91 @@ export default function AdminBooking() {
     }
     const q = search.toLowerCase();
     const filtered = bookingRequests.filter(req => 
-      req.hall.toLowerCase().includes(q) ||
-      req.department.department.toLowerCase().includes(q) ||
-      req.event.toLowerCase().includes(q)
+      (req.hall || "").toLowerCase().includes(q) ||
+      (req.department?.department || "").toLowerCase().includes(q) ||
+      (req.department?.head || "").toLowerCase().includes(q) ||
+      (req.department?.email || "").toLowerCase().includes(q) ||
+      (req.event || "").toLowerCase().includes(q)
     );
     setFilteredRequests(filtered);
     setViewMode('ALL'); 
     setActiveCategory('ALL');
   };
+
+  const getMapForActiveCategory = () => {
+    if (activeCategory === 'TIME') return categorizedData.timeConflicts;
+    if (activeCategory === 'DATE') return categorizedData.dateConflicts;
+    if (activeCategory === 'SAFE') return categorizedData.noConflicts;
+    return {};
+  };
+
+  const getVisibleRequests = () => {
+    if (viewMode === 'ALL') return filteredRequests;
+    if (viewMode === 'REQUEST_LIST') return selectedHallGroup?.requests || [];
+    if (viewMode === 'HALL_LIST') return Object.values(getMapForActiveCategory()).flat();
+    return [];
+  };
+
+  const toggleRequestSelection = (id) => {
+    setSelectedRequestIds((prev) =>
+      prev.includes(id) ? prev.filter((reqId) => reqId !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllVisible = (visibleIds, allSelected) => {
+    setSelectedRequestIds((prev) => {
+      const merged = new Set(prev);
+      if (allSelected) {
+        visibleIds.forEach((id) => merged.delete(id));
+      } else {
+        visibleIds.forEach((id) => merged.add(id));
+      }
+      return Array.from(merged);
+    });
+  };
+
+  const runBulkDecision = async (requests, decision, label) => {
+    if (!requests.length) return;
+
+    const confirmMsg = `Are you sure you want to ${label} (${requests.length} request${requests.length > 1 ? 's' : ''})?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setOpen(true);
+    try {
+      const operations = requests.map((req) => {
+        const payload = { decision, id: req._id };
+        if (decision === 'Yes') {
+          payload.name = req.hall;
+          payload.department = req.department?.department || '';
+          payload.event = req.event;
+        }
+        return changeBookingRequestApi(payload);
+      });
+
+      const results = await Promise.allSettled(operations);
+      const successCount = results.filter((r) => r.status === 'fulfilled').length;
+      const failedCount = results.length - successCount;
+
+      await get_booking_requests();
+      setSelectedRequestIds([]);
+
+      if (failedCount > 0) {
+        window.alert(`${successCount} request(s) updated, ${failedCount} failed.`);
+      }
+    } catch (err) {
+      console.log(err);
+      window.alert('Bulk action failed. Please try again.');
+    } finally {
+      setOpen(false);
+    }
+  };
+
+  const visibleRequests = getVisibleRequests();
+  const visibleIds = visibleRequests.map((req) => req._id).filter(Boolean);
+  const selectedVisibleRequests = visibleRequests.filter((req) => selectedRequestIds.includes(req._id));
+  const selectedVisibleCount = selectedVisibleRequests.length;
+  const allVisibleSelected = visibleIds.length > 0 && selectedVisibleCount === visibleIds.length;
+  const canAcceptAllVisible = (activeCategory === 'DATE' || activeCategory === 'SAFE') && visibleRequests.length > 0;
 
   // --- RENDER HELPERS ---
   const renderCategoryButtons = () => (
@@ -261,6 +345,62 @@ export default function AdminBooking() {
     </div>
   );
 
+  const renderBulkActionBar = () => (
+    <div className='bulk-actions-container'>
+      {viewMode !== 'HALL_LIST' && (
+        <button
+          className='bulk-btn bulk-btn-select'
+          onClick={() => toggleSelectAllVisible(visibleIds, allVisibleSelected)}
+          disabled={!visibleIds.length}
+        >
+          {allVisibleSelected ? 'Unselect Visible' : `Select Visible (${visibleIds.length})`}
+        </button>
+      )}
+
+      {viewMode !== 'HALL_LIST' && (
+        <>
+          <button
+            className='bulk-btn bulk-btn-accept'
+            onClick={() => runBulkDecision(selectedVisibleRequests, 'Yes', 'accept selected')}
+            disabled={!selectedVisibleCount}
+          >
+            Accept Selected ({selectedVisibleCount})
+          </button>
+          <button
+            className='bulk-btn bulk-btn-reject'
+            onClick={() => runBulkDecision(selectedVisibleRequests, 'No', 'reject selected')}
+            disabled={!selectedVisibleCount}
+          >
+            Reject Selected ({selectedVisibleCount})
+          </button>
+        </>
+      )}
+
+      {canAcceptAllVisible && (
+        <button
+          className='bulk-btn bulk-btn-accept-all'
+          onClick={() =>
+            runBulkDecision(
+              visibleRequests,
+              'Yes',
+              `accept all ${activeCategory === 'DATE' ? 'date-overlap' : 'no-overlap'}`
+            )
+          }
+        >
+          Accept All Visible ({visibleRequests.length})
+        </button>
+      )}
+
+      <button
+        className='bulk-btn bulk-btn-reject-all'
+        onClick={() => runBulkDecision(visibleRequests, 'No', 'reject all visible')}
+        disabled={!visibleRequests.length}
+      >
+        Reject All Visible ({visibleRequests.length})
+      </button>
+    </div>
+  );
+
   return (
     <>
       <Backdrop sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }} open={open}>
@@ -292,13 +432,19 @@ export default function AdminBooking() {
 
           {/* Filter Buttons */}
           {viewMode !== 'REQUEST_LIST' && renderCategoryButtons()}
+          {renderBulkActionBar()}
 
           {/* --- VIEW 1: MAIN DASHBOARD (ALL) --- */}
           {viewMode === 'ALL' && (
             <Grid container spacing={4} justifyContent={'center'}>
               {filteredRequests.map((data) => (
                 <Grid item xs={11} sm={6} md={4} lg={3} key={data._id} display="flex" justifyContent="center">
-                  <AdminBookingCard data={data} getrequest={get_booking_requests} />
+                  <AdminBookingCard
+                    data={data}
+                    getrequest={get_booking_requests}
+                    isSelected={selectedRequestIds.includes(data._id)}
+                    onToggleSelect={toggleRequestSelection}
+                  />
                 </Grid>
               ))}
               {filteredRequests.length === 0 && !open && (
@@ -311,11 +457,7 @@ export default function AdminBooking() {
           {viewMode === 'HALL_LIST' && (
             <Grid container spacing={4} justifyContent={'center'}>
               {(() => {
-                const mapToUse = 
-                  activeCategory === 'TIME' ? categorizedData.timeConflicts :
-                  activeCategory === 'DATE' ? categorizedData.dateConflicts :
-                  categorizedData.noConflicts;
-
+                const mapToUse = getMapForActiveCategory();
                 const hallKeys = Object.keys(mapToUse);
 
                 if (hallKeys.length === 0) return <h3 className="no-data-text">No Halls found in this category.</h3>;
@@ -350,7 +492,12 @@ export default function AdminBooking() {
                <Grid container spacing={4} justifyContent={'center'}>
                   {selectedHallGroup.requests.map((data) => (
                     <Grid item xs={11} sm={6} md={4} lg={3} key={data._id} display="flex" justifyContent="center">
-                      <AdminBookingCard data={data} getrequest={get_booking_requests} />
+                      <AdminBookingCard
+                        data={data}
+                        getrequest={get_booking_requests}
+                        isSelected={selectedRequestIds.includes(data._id)}
+                        onToggleSelect={toggleRequestSelection}
+                      />
                     </Grid>
                   ))}
                </Grid>

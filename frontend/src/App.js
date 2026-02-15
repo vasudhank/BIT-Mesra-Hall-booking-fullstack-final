@@ -15,6 +15,7 @@ import AdminHallRoute from './routes/AdminHallRoute';
 import AdminBookingRoute from './routes/AdminBookingRoute';
 import AdminDepartmentRoute from './routes/AdminDepartmentRoute';
 import AdminDepartmentRequestRoute from './routes/AdminDepartmentRequestRoute';
+import AdminContactsRoute from './routes/AdminContactsRoute';
 
 import DepartmentBookingRoute from './routes/DepartmentBookingRoute';
 import DepartmentHistoryRoute from './routes/DepartmentHistoryRoute';
@@ -85,6 +86,7 @@ function App() {
         <Route path="/admin/booking" element={<AdminBookingRoute />} />
         <Route path="/admin/department" element={<AdminDepartmentRoute />} />
         <Route path="/admin/department/request" element={<AdminDepartmentRequestRoute />} />
+        <Route path="/admin/contacts" element={<AdminContactsRoute />} />
 
         {/* ===== DEPARTMENT PROTECTED ROUTES ===== */}
         <Route path="/department/booking" element={<DepartmentBookingRoute />} />

@@ -6,6 +6,7 @@ import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
 import Person2Icon from '@mui/icons-material/Person2';
 import EmailIcon from '@mui/icons-material/Email';
+import LocalPhoneOutlinedIcon from '@mui/icons-material/LocalPhoneOutlined';
 import { cancelDepartmentApi } from "../../../api/canceldepartmentapi";
 import Modal from '@mui/material/Modal';
 import Box from '@mui/material/Box';
@@ -34,7 +35,8 @@ export default function AdminDepartmentRequestCard(props) {
             email: props.data.email,
             password: password,
             department: props.data.department,
-            head: props.data.head
+            head: props.data.head,
+            phone: props.data.phone
         };
 
         try {
@@ -124,6 +126,11 @@ export default function AdminDepartmentRequestCard(props) {
                     <Typography variant="body2" className='department-admin-request-text' sx={{ display: 'flex', alignItems: 'center' }}>
                         <EmailIcon sx={{ marginRight: '1rem' }} />
                         {props.data.email}
+                    </Typography>
+
+                    <Typography variant="body2" className='department-admin-request-text' sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                        <LocalPhoneOutlinedIcon sx={{ marginRight: '1rem' }} />
+                        {props.data.phone || "-"}
                     </Typography>
                 </CardContent>
 

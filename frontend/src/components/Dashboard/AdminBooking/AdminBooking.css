@@ -209,28 +209,105 @@
     opacity: 0.6;
 }
 
+/* Bulk Action Bar */
+.bulk-actions-container {
+    width: 94%;
+    margin: 0 auto 1.4rem auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(12, 18, 32, 0.5);
+    backdrop-filter: blur(8px);
+}
+
+.bulk-btn {
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 0.78rem;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    color: #e8edf7;
+    background: rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.bulk-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    border-color: rgba(255, 255, 255, 0.24);
+}
+
+.bulk-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.bulk-btn-select {
+    background: rgba(255, 255, 255, 0.09);
+}
+
+.bulk-btn-accept {
+    background: rgba(0, 212, 255, 0.16);
+    border-color: rgba(0, 212, 255, 0.3);
+}
+
+.bulk-btn-accept-all {
+    background: linear-gradient(90deg, rgba(0, 212, 255, 0.3), rgba(0, 91, 234, 0.3));
+    border-color: rgba(0, 212, 255, 0.35);
+}
+
+.bulk-btn-reject,
+.bulk-btn-reject-all {
+    background: rgba(255, 77, 77, 0.16);
+    border-color: rgba(255, 77, 77, 0.3);
+}
+
 /* Request Card Styling (Matches previous file) */
 .request-div-admin {
   width: 100%;
-  max-width: 380px;
+  max-width: 340px;
   height: auto;
   background: #303C5C;
   font-family: 'RecklessNeue' !important;
   border-radius: 1.2rem;
   box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.3);
-  padding: 10px 5px;
+  padding: 8px 6px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  position: relative;
+}
+
+.admin-booking-card-select {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
+.admin-booking-select-checkbox {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.admin-booking-select-checkbox.Mui-checked {
+  color: #00d4ff !important;
 }
 
 .admin-booking-request-title {
   color: #ff7b00;
-  font-size: 1.2rem; 
-  padding-top: 5px;
+  font-size: 1.05rem; 
+  padding-top: 2px;
   text-align: center;
-  margin-bottom: 2px;
+  margin-bottom: 1px;
   font-weight: bold;
+  padding-right: 24px;
+  padding-left: 24px;
 }
 
 .admin-booking-request-desc-div {
@@ -242,30 +319,57 @@
 }
 
 .admin-booking-dept-name {
-    font-size: 0.95rem;
+    font-size: 0.88rem;
     color: #ffffff;
     font-weight: 500;
+    text-align: center;
+    padding: 0 8px;
 }
 
 .admin-booking-event-name {
-    font-size: 0.85rem;
+    font-size: 0.78rem;
     color: #adb5bd;
     font-style: italic;
     font-family: 'Inter';
+    text-align: center;
+    padding: 0 8px;
+}
+
+.admin-booking-request-meta {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 90%;
+}
+
+.admin-booking-request-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #f1f5f9;
+    font-size: 0.76rem;
+    font-family: 'Inter', sans-serif;
+    word-break: break-word;
+}
+
+.admin-booking-request-meta-row .MuiSvgIcon-root {
+    color: #9edfff !important;
+    font-size: 1rem;
 }
 
 .admin-booking-datetime-range {
     margin-top: 8px;
     text-align: center;
     background: rgba(0,0,0,0.2);
-    padding: 5px 10px;
+    padding: 4px 8px;
     border-radius: 8px;
     width: 85%;
 }
 
 .admin-booking-datetime-range p {
     margin: 0;
-    font-size: 0.8rem;
+    font-size: 0.74rem;
     color: #e0e0e0;
     font-family: 'Inter', sans-serif;
 }
@@ -278,8 +382,8 @@
 .btn-admin-booking-request-accept,
 .btn-admin-booking-request-reject {
   border-radius: 0.8rem !important;
-  font-size: 0.85rem !important;
-  padding: 6px 0 !important;
+  font-size: 0.78rem !important;
+  padding: 5px 0 !important;
 }
 
 .MuiButton-root.btn-admin-booking-request-accept,
@@ -295,6 +399,7 @@
   .admin-booking-title-div { margin-bottom: 1rem; }
   .filter-buttons-container { gap: 8px; margin-bottom: 2rem; }
   .filter-btn { padding: 8px 16px; font-size: 0.8rem; }
+  .bulk-actions-container { width: 96%; }
   .btn-admin-booking-request-accept, .btn-admin-booking-request-reject { font-size: 0.9rem !important; }
 }
 
@@ -310,4 +415,12 @@
 }
 .admin-booking-body .MuiSvgIcon-root {
   color: #ffffff !important;
+}
+
+.admin-booking-body .admin-booking-request-meta-row .MuiSvgIcon-root {
+  color: #9edfff !important;
+}
+
+.admin-booking-body .admin-booking-select-checkbox .MuiSvgIcon-root {
+  color: inherit !important;
 }

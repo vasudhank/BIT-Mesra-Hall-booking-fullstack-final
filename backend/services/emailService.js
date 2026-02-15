@@ -54,6 +54,10 @@ exports.sendRegistrationRequestToAdmin = async ({ adminEmails, requestData, appr
               <td style="padding:6px 0;font-size:13px;color:#64748b;font-weight:600;">EMAIL</td>
               <td style="padding:6px 0;font-size:15px;color:#0f172a;font-weight:600;">${requestData.email}</td>
             </tr>
+            <tr>
+              <td style="padding:6px 0;font-size:13px;color:#64748b;font-weight:600;">PHONE</td>
+              <td style="padding:6px 0;font-size:15px;color:#0f172a;font-weight:600;">${requestData.phone || '-'}</td>
+            </tr>
           </table>
         </div>
 

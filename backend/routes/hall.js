@@ -40,7 +40,9 @@ router.post('/create_hall', async (req, res) => {
 // Getting all the Halls (computes status at read-time)
 router.get('/view_halls', async (req, res) => {
   try {
-    const halls = await Hall.find().lean();
+    const halls = await Hall.find()
+      .populate({ path: 'bookings.department', select: 'head department email' })
+      .lean();
     const now = new Date();
 
     const hallsWithStatus = halls.map(h => {

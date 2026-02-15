@@ -36,6 +36,14 @@ function bookingRangeText(start, end) {
   return `${s.toLocaleDateString()} ${formatTime(s)} — ${e.toLocaleDateString()} ${formatTime(e)}`;
 }
 
+function bookingRequesterName(booking) {
+  const department = booking?.department;
+  if (department && typeof department === 'object') {
+    return department.head || department.department || department.email || '';
+  }
+  return '';
+}
+
 function colorFromString(str) {
   if (!str) return '#888';
   let hash = 0;
@@ -421,6 +429,11 @@ export default function Schedule() {
                               <Typography variant="body2" color="text.secondary">
                                 {bookingRangeText(b.startDateTime, b.endDateTime)}
                               </Typography>
+                              {bookingRequesterName(b) && (
+                                <Typography variant="caption" color="text.secondary">
+                                  Requested by: {bookingRequesterName(b)}
+                                </Typography>
+                              )}
                             </Box>
                           ))
                         )}
@@ -537,6 +550,9 @@ export default function Schedule() {
                                 textOverflow: 'ellipsis'
                               }}>
                                 <strong style={{ fontSize: 12 }}>{b.event || 'Booked'}</strong>
+                                {bookingRequesterName(b) && (
+                                  <div style={{ fontSize: 10, opacity: 0.95, fontWeight: 'bold' }}>{bookingRequesterName(b)}</div>
+                                )}
                                 <div style={{ fontSize: 11 }}>{formatTime(b.startDateTime)} — {formatTime(b.endDateTime)}</div>
                               </Box>
                             );
@@ -556,16 +572,6 @@ export default function Schedule() {
       {viewMode === 'today' && (
         <Box sx={{ width: '100%' }}>
           {/* Header showing Selected Date */}
-          <Box sx={{ 
-            px: { xs: 2, md: 3 }, 
-            py: 1, 
-            bgcolor: 'var(--bg-default)', 
-            borderBottom: '1px solid var(--border-color)' 
-          }}>
-            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-              {dayjs(selectedDate).format('DD MMMM YYYY')}
-            </Typography>
-          </Box>
 
           <Box
             ref={weekHeaderRef}
@@ -703,6 +709,11 @@ export default function Schedule() {
                             <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'var(--text-primary)', fontSize: '0.85rem' }}>
                               {b.event || 'Booked'}
                             </Typography>
+                            {bookingRequesterName(b) && (
+                              <Typography variant="caption" sx={{ color: 'var(--text-primary)', fontSize: '0.72rem', opacity: 0.95, fontWeight: 'bold'}}>
+                                {bookingRequesterName(b)}
+                              </Typography>
+                            )}
                          </Box>
                        );
                     })}

@@ -146,6 +146,9 @@ export default function Appbar({
               onClose={handleCloseUserMenu}
             >
               <MenuItem onClick={handleCloseUserMenu} sx={{ color: 'black' }}><Link to="/"><Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>HOME</Typography></Link></MenuItem>
+              <MenuItem onClick={() => { handleCloseUserMenu(); navigate('/admin/contacts'); }} sx={{ color: 'black' }}>
+                <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>CONTACTS</Typography>
+              </MenuItem>
               <MenuItem onClick={handleCloseUserMenu} sx={{ color: 'black' }}><Typography textAlign="center" className="dropdown-text" onClick={logout} sx={{ color: 'black' }}>LOGOUT</Typography></MenuItem>
             </Menu>
           </Box>
@@ -235,6 +238,9 @@ export default function Appbar({
                   <Divider sx={{ my: 1 }} />
                   <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/'); }}>
                     <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>HOME</Typography>
+                  </MenuItem>
+                  <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/admin/contacts'); }}>
+                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>CONTACTS</Typography>
                   </MenuItem>
                   <MenuItem onClick={() => { handleCloseNavMenu(); logout(); }}>
                     <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#d32f2f' }}>LOGOUT</Typography>

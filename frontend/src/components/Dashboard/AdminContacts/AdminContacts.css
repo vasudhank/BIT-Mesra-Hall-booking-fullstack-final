@@ -1,0 +1,230 @@
+@font-face {
+  font-family: 'RecklessNeue';
+  src: url('../../../assets/fonts/RecklessCollectionVF-TRIAL.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+.admin-contacts-body {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding-top: 78px;
+  padding-left: 56px;
+  padding-right: 56px;
+  padding-bottom: 36px;
+  overflow-y: auto;
+  background:
+    radial-gradient(40% 35% at 8% 12%, rgba(45, 212, 191, 0.12), transparent 70%),
+    radial-gradient(45% 40% at 92% 88%, rgba(59, 130, 246, 0.14), transparent 72%),
+    linear-gradient(243.81deg, #25354f 0.9%, #1b2033 100%);
+}
+
+.admin-contacts-title-wrap {
+  text-align: center;
+  margin-top: 1.2rem;
+  margin-bottom: 1.2rem;
+}
+
+.admin-contacts-title {
+  font-family: 'RecklessNeue';
+  color: #ffffff;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.admin-contacts-subtitle {
+  margin: 0.35rem 0 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.94rem;
+  color: #c7d2fe;
+}
+
+.admin-contacts-card {
+  border-radius: 20px !important;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(180deg, rgba(52, 69, 107, 0.82), rgba(43, 56, 87, 0.8)) !important;
+  box-shadow: 0 20px 42px rgba(0, 0, 0, 0.25) !important;
+  overflow: hidden;
+}
+
+.admin-contacts-head {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1.2fr;
+  gap: 16px;
+  padding: 1rem 1.2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #bfdbfe;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.admin-contacts-list {
+  max-height: calc(100vh - 240px);
+  overflow-y: auto;
+}
+
+.admin-contacts-row {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1.2fr;
+  gap: 16px;
+  align-items: center;
+  padding: 0.9rem 1.2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-contacts-row:last-child {
+  border-bottom: none;
+}
+
+.admin-contacts-cell {
+  min-width: 0;
+}
+
+.admin-contacts-name {
+  color: #ffffff;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-contacts-value-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admin-contacts-value-text {
+  color: #e5e7eb !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 0.9rem !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-contacts-edit-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-contacts-edit-input {
+  flex: 1;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.09);
+  color: #ffffff !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 0.88rem !important;
+  padding: 5px 10px;
+}
+
+.admin-contacts-edit-input input::placeholder {
+  color: #cbd5e1;
+  opacity: 1;
+}
+
+.admin-contacts-edit-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.admin-contacts-action-btn {
+  border-radius: 10px !important;
+  border: 1px solid rgba(255, 255, 255, 0.24) !important;
+  color: #ffffff !important;
+}
+
+.admin-contacts-action-btn.edit {
+  background: rgba(59, 130, 246, 0.14) !important;
+}
+
+.admin-contacts-action-btn.save {
+  background: rgba(34, 197, 94, 0.2) !important;
+}
+
+.admin-contacts-action-btn.cancel {
+  background: rgba(239, 68, 68, 0.18) !important;
+}
+
+.admin-contacts-action-btn:hover {
+  transform: translateY(-1px);
+}
+
+.admin-contacts-empty {
+  padding: 1.25rem;
+  text-align: center;
+  color: #dbeafe;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
+}
+
+@media only screen and (max-width: 900px) {
+  .admin-contacts-body {
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 120px;
+  }
+
+  .admin-contacts-list {
+    max-height: none;
+  }
+
+  .admin-contacts-head {
+    display: none;
+  }
+
+  .admin-contacts-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 0.95rem;
+  }
+
+  .admin-contacts-cell {
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    border-radius: 12px;
+    padding: 0.7rem;
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .admin-contacts-name::before {
+    content: "Name";
+    display: block;
+    margin-bottom: 6px;
+    color: #bfdbfe;
+    font-size: 0.72rem;
+    letter-spacing: 0.07em;
+    font-weight: 700;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .admin-contacts-row .admin-contacts-cell:nth-child(2)::before,
+  .admin-contacts-row .admin-contacts-cell:nth-child(3)::before {
+    display: block;
+    margin-bottom: 6px;
+    color: #bfdbfe;
+    font-size: 0.72rem;
+    letter-spacing: 0.07em;
+    font-weight: 700;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .admin-contacts-row .admin-contacts-cell:nth-child(2)::before {
+    content: "Phone Number";
+  }
+
+  .admin-contacts-row .admin-contacts-cell:nth-child(3)::before {
+    content: "Email Address";
+  }
+}

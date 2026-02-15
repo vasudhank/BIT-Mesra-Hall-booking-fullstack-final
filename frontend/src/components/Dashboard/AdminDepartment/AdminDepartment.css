@@ -71,10 +71,45 @@
   border-radius: 1rem !important;
   box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.3) !important;
   transition: transform 0.2s ease-in-out;
+  position: relative;
+  overflow: hidden;
 }
 
 .admin-department-card:hover {
   transform: translateY(-5px);
+}
+
+.admin-department-delete-anchor {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  display: inline-flex;
+}
+
+.admin-department-delete-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(10, 16, 28, 0.45) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(8px);
+  transition: all 0.2s ease-in-out !important;
+}
+
+.admin-department-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.2) !important;
+  color: #ff8a8a !important;
+  transform: translateY(-1px) scale(1.06);
+}
+
+.admin-department-delete-btn:disabled {
+  opacity: 0.45 !important;
+}
+
+.admin-department-body .admin-department-delete-btn .MuiSvgIcon-root {
+  color: inherit !important;
 }
 
 .admin-department-text{

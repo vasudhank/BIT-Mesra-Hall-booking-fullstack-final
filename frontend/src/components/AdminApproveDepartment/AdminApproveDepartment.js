@@ -2,12 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../api/axiosInstance';
 import {
-    Container, Grid, Card, CardContent, Typography, FormControl, 
+    Container, Card, CardContent, Typography, FormControl, 
     Input, Button, Backdrop, CircularProgress, Alert
 } from '@mui/material';
 import Person2Icon from '@mui/icons-material/Person2';
 import EmailIcon from '@mui/icons-material/Email';
 import SchoolIcon from '@mui/icons-material/School';
+import LocalPhoneOutlinedIcon from '@mui/icons-material/LocalPhoneOutlined';
 import KeyIcon from '@mui/icons-material/Key';
 import InputAdornment from '@mui/material/InputAdornment';
 
@@ -46,6 +47,7 @@ export default function AdminApproveDepartment() {
             password: password,
             department: requestData.department,
             head: requestData.head,
+            phone: requestData.phone,
             actionToken: token // Pass token to authorize without login
         };
 
@@ -114,6 +116,10 @@ export default function AdminApproveDepartment() {
                             <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center' }}>
                                 <EmailIcon sx={{ mr: 1, fontSize: 20, color: '#666' }} />
                                 {requestData.email}
+                            </Typography>
+                            <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                                <LocalPhoneOutlinedIcon sx={{ mr: 1, fontSize: 20, color: '#666' }} />
+                                {requestData.phone || '-'}
                             </Typography>
                         </div>
 

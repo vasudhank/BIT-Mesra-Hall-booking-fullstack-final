@@ -8,8 +8,11 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
 import { CardActionArea } from '@mui/material';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
 import Person2Icon from '@mui/icons-material/Person2';
 import EmailIcon from '@mui/icons-material/Email';
+import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import Backdrop from '@mui/material/Backdrop';
 import CircularProgress from '@mui/material/CircularProgress';
 import api from '../../../api/axiosInstance';
@@ -18,7 +21,7 @@ import Box from '@mui/material/Box';
 import FormControl from '@mui/material/FormControl';
 import Input from '@mui/material/Input';
 import { createDepartmentApi } from "../../../api/createdepartmentapi";
-
+import { deleteDepartmentApi } from "../../../api/deletedepartmentapi";
 
 export default function AdminDepartment() {
 
@@ -32,6 +35,7 @@ export default function AdminDepartment() {
   const [password, setpassword] = useState('');
   const [department, setdepartment] = useState("");
   const [head, sethead] = useState('');
+  const [deletingIds, setDeletingIds] = useState([]);
   
   // Search State
   const [search, setSearch] = useState("");
@@ -79,6 +83,24 @@ export default function AdminDepartment() {
 
   const createDepartment = () => {
     setmodal(true);
+  };
+
+  const handleDeleteDepartment = async (id, departmentName) => {
+    if (!id) return;
+    const confirmed = window.confirm(`Are you sure you want to delete ${departmentName}? This cannot be undone.`);
+    if (!confirmed) return;
+
+    setDeletingIds((prev) => [...prev, id]);
+    try {
+      await deleteDepartmentApi(id);
+      setlist((prev) => prev.filter((dept) => dept._id !== id));
+      setFilteredList((prev) => prev.filter((dept) => dept._id !== id));
+    } catch (err) {
+      console.error("Failed to delete department:", err);
+      window.alert("Failed to delete faculty. Please try again.");
+    } finally {
+      setDeletingIds((prev) => prev.filter((deptId) => deptId !== id));
+    }
   };
 
   const handleClose = () => {
@@ -211,12 +233,12 @@ export default function AdminDepartment() {
           {/* 2. FIXED Create Button Container */}
           <Box 
             className="fixed-create-btn-container"
-            sx={{ 
+            sx={{
               position: 'sticky', 
               top: 0, /* Stick to the top of the scrolling body (which starts after padding-top) */
               zIndex: 10,
               backgroundColor: 'transparent', 
-              pt: 1, 
+              pt: 1,
               pb: 1,
               display: 'flex',
               justifyContent: isMobile ? 'center' : 'flex-end'
@@ -241,9 +263,21 @@ export default function AdminDepartment() {
             <Grid container spacing={4} justifyContent={'center'}>
               {filteredList.map((data, index) => (
                 <Grid item xs={12} sm={10} md={6} lg={4} key={data._id || index}>
-                  <Card sx={{ height: '100%' }} className='admin-department-card'>
+                  <Card sx={{ height: '100%', position: 'relative' }} className='admin-department-card'>
+                    <Tooltip title="Delete faculty" placement="left" arrow>
+                      <span className='admin-department-delete-anchor'>
+                        <IconButton
+                          className='admin-department-delete-btn'
+                          onClick={() => handleDeleteDepartment(data._id, data.department)}
+                          aria-label={`Delete ${data.department}`}
+                          disabled={deletingIds.includes(data._id)}
+                        >
+                          <DeleteOutlineRoundedIcon fontSize='small' />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
                     <CardActionArea>
-                      <CardContent>
+                      <CardContent sx={{ pt: 4 }}>
                         <Typography gutterBottom variant="h5" className='admin-department-text' component="div" sx={{ mb: 2 }}>
                           {data.department}
                         </Typography>

@@ -2,7 +2,10 @@ const express = require('express');
 const router = express.Router();
 const Department = require('../models/department');
 const Department_Requests = require('../models/department_requests');
+const Booking_Requests = require('../models/booking_requests');
+const Hall = require('../models/hall');
 const Admin = require('../models/admin'); 
+const Contact = require('../models/Contact');
 const { hashSync, compareSync } = require('bcrypt');
 const crypto = require('crypto'); 
 const emailService = require('../services/emailService');
@@ -47,9 +50,48 @@ router.get('/department/by_email', async (req, res) => {
 });
 
 router.get('/show_departments',(req,res)=>{
-  Department.find({},{ _id: 0 , password:0 })
+  Department.find({},{ password:0 })
     .then((departments) => res.send({ departments }))
     .catch((error) => res.status(500).send({ error }));
+});
+
+// Delete an existing department (admin only)
+router.delete('/delete_department/:id', async (req, res) => {
+  if (!(req.isAuthenticated && req.isAuthenticated() && req.user.type === 'Admin')) {
+    return res.status(403).json({ msg: 'You are not authorized to delete departments' });
+  }
+
+  try {
+    const { id } = req.params;
+    const deletedDepartment = await Department.findByIdAndDelete(id);
+
+    if (!deletedDepartment) {
+      return res.status(404).json({ msg: 'Department not found' });
+    }
+
+    await Promise.all([
+      Booking_Requests.deleteMany({ department: deletedDepartment._id }),
+      Hall.updateMany(
+        {},
+        {
+          $pull: { bookings: { department: deletedDepartment._id } },
+          $set: { department: null }
+        }
+      )
+    ]);
+
+    return res.status(200).json({
+      msg: 'Department deleted successfully',
+      department: {
+        _id: deletedDepartment._id,
+        email: deletedDepartment.email,
+        department: deletedDepartment.department
+      }
+    });
+  } catch (error) {
+    console.error('delete_department error:', error);
+    return res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // ==========================================
@@ -57,7 +99,16 @@ router.get('/show_departments',(req,res)=>{
 // ==========================================
 router.post('/request_department', async (req, res) => {
     try {
-        const { email, department, head } = req.body;
+        const { email, department, head, phone } = req.body;
+        const normalizedPhone = String(phone || '').trim();
+
+        if (!email || !department || !head || !normalizedPhone) {
+            return res.status(400).json({ error: 'Email, department, faculty name and phone number are required' });
+        }
+
+        if (!/^\d{10,15}$/.test(normalizedPhone)) {
+            return res.status(400).json({ error: 'Phone number must contain 10 to 15 digits' });
+        }
         
         // Generate Token for Email Actions
         const actionToken = crypto.randomBytes(32).toString('hex');
@@ -65,6 +116,7 @@ router.post('/request_department', async (req, res) => {
 
         const newRequest = new Department_Requests({ 
             email, 
+            phone: normalizedPhone,
             department, 
             head,
             actionToken,
@@ -89,7 +141,7 @@ router.post('/request_department', async (req, res) => {
         if(adminEmails) {
             emailService.sendRegistrationRequestToAdmin({
                 adminEmails,
-                requestData: { email, department, head },
+                requestData: { email, phone: normalizedPhone, department, head },
                 approveUrl,
                 rejectUrl
             }).catch(err => console.error("Admin Alert Email Failed", err));
@@ -125,6 +177,7 @@ router.post('/verify_action_token', async (req, res) => {
             success: true, 
             request: {
                 email: requestDoc.email,
+                phone: requestDoc.phone,
                 department: requestDoc.department,
                 head: requestDoc.head
             }
@@ -239,6 +292,57 @@ router.post('/change_password', async (req, res) => {
   }
 });
 
+// Update phone for authenticated department and keep contact list in sync
+router.post('/update_phone', async (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).send({ success: false, message: 'Not authenticated' });
+  }
+
+  const email = req.user && req.user.email;
+  const normalizedPhone = String(req.body?.phone || '').trim();
+
+  if (!email) {
+    return res.status(400).send({ success: false, message: 'No email in session' });
+  }
+
+  if (!/^\d{10,15}$/.test(normalizedPhone)) {
+    return res.status(400).send({ success: false, message: 'Phone number must contain 10 to 15 digits' });
+  }
+
+  try {
+    const department = await Department.findOneAndUpdate(
+      { email },
+      { $set: { phone: normalizedPhone } },
+      { new: true }
+    );
+
+    if (!department) {
+      return res.status(404).send({ success: false, message: 'Department not found' });
+    }
+
+    await Contact.findOneAndUpdate(
+      { email: department.email },
+      {
+        $set: {
+          name: department.head,
+          number: normalizedPhone,
+          email: department.email
+        }
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    return res.send({
+      success: true,
+      message: 'Phone number updated successfully',
+      phone: normalizedPhone
+    });
+  } catch (err) {
+    console.error('update phone error:', err);
+    return res.status(500).send({ success: false, message: 'Server error' });
+  }
+});
+
 // ==========================================
 // 5. CREATE / APPROVE DEPARTMENT (Admin Action or Token Action)
 // ==========================================
@@ -267,10 +371,14 @@ router.post('/create', async (req, res) => {
       return res.status(403).json({ msg: 'You are not authorized' });
     }
 
-    const { email, password, department, head } = req.body;
+    const { email, password, department, head, phone } = req.body;
+    const resolvedPhone = String(phone || requestDoc?.phone || '').trim();
 
     if (!email || !password || !department || !head) {
       return res.status(400).json({ msg: 'All fields are required' });
+    }
+    if (resolvedPhone && !/^\d{10,15}$/.test(resolvedPhone)) {
+      return res.status(400).json({ msg: 'Phone number must contain 10 to 15 digits' });
     }
 
     const exists = await Department.findOne({ email });
@@ -287,11 +395,26 @@ router.post('/create', async (req, res) => {
       password: hashSync(password, 10),
       department,
       head,
+      phone: resolvedPhone,
       setupToken,
       setupTokenExpiry
     });
 
     await newDepartment.save();
+
+    if (resolvedPhone) {
+      await Contact.findOneAndUpdate(
+        { email },
+        {
+          $set: {
+            name: head,
+            number: resolvedPhone,
+            email
+          }
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+    }
 
     // Remove the request from Department_Requests since it's now approved
     await Department_Requests.findOneAndDelete({ email });
@@ -316,7 +439,7 @@ router.post('/create', async (req, res) => {
 
     return res.status(201).json({
       msg: 'Department created successfully & Email sent',
-      department: { email, department, head }
+      department: { email, phone: resolvedPhone, department, head }
     });
 
   } catch (err) {
@@ -335,7 +458,7 @@ router.post('/verify_setup_token', async (req, res) => {
             setupTokenExpiry: { $gt: Date.now() }
         });
         if (!dept) return res.status(400).json({ success: false, message: 'Invalid or expired setup link.' });
-        return res.json({ success: true, department: { email: dept.email, department: dept.department, head: dept.head } });
+        return res.json({ success: true, department: { email: dept.email, phone: dept.phone, department: dept.department, head: dept.head } });
     } catch(err) { return res.status(500).json({success: false, message: "Server error"}); }
 });
 

@@ -5,14 +5,21 @@ import Modal from '@mui/material/Modal';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
+import Checkbox from '@mui/material/Checkbox';
 import CloseIcon from '@mui/icons-material/Close';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import Person2Icon from '@mui/icons-material/Person2';
+import EmailIcon from '@mui/icons-material/Email';
 import "./AdminBooking.css";
 import { changeBookingRequestApi } from "../../../api/changebookingrequestapi";
 
 export default function AdminBookingCard(props) {
   const [descModal, setDescModal] = useState(false);
   const id = props.data._id;
+  const departmentData = props.data.department || {};
+  const departmentName = departmentData.department || "Unknown Department";
+  const requesterName = departmentData.head || "Name not available";
+  const requesterEmail = departmentData.email || "Email not available";
 
   const formatDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -20,7 +27,7 @@ export default function AdminBookingCard(props) {
     try {
       await changeBookingRequestApi({
         decision: "Yes", id, name: props.data.hall,
-        department: props.data.department.department, event: props.data.event
+        department: departmentName, event: props.data.event
       });
       props.getrequest();
     } catch (err) { console.log(err); }
@@ -35,11 +42,32 @@ export default function AdminBookingCard(props) {
 
   return (
     <div className='request-div-admin'>
+      <div className='admin-booking-card-select'>
+        <Checkbox
+          checked={Boolean(props.isSelected)}
+          onChange={() => props.onToggleSelect && props.onToggleSelect(id)}
+          className='admin-booking-select-checkbox'
+          size='small'
+          inputProps={{ 'aria-label': `Select booking request for ${props.data.hall}` }}
+        />
+      </div>
+
       <h2 className='admin-booking-request-title'>{props.data.hall}</h2>
 
       <div className='admin-booking-request-desc-div'>
-        <span className='admin-booking-dept-name'>{props.data.department.department}</span>
+        <span className='admin-booking-dept-name'>{departmentName}</span>
         <span className='admin-booking-event-name'>"{props.data.event}"</span>
+
+        <div className='admin-booking-request-meta'>
+          <div className='admin-booking-request-meta-row'>
+            <Person2Icon fontSize="small" />
+            <span>{requesterName}</span>
+          </div>
+          <div className='admin-booking-request-meta-row'>
+            <EmailIcon fontSize="small" />
+            <span>{requesterEmail}</span>
+          </div>
+        </div>
         
         {/* Date and Time Range Display */}
         <div className='admin-booking-datetime-range'>

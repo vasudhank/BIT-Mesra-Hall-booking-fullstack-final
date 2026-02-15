@@ -19,39 +19,75 @@ import OpenInFullIcon from '@mui/icons-material/OpenInFull'; // New icon for imm
 // Import the API call
 import { getContactsApi } from "../../api/contactApi";
 import AIChatWidget from "../AI/AIChatWidget";
+import { playElevenLabsSpeech, stopElevenLabsPlayback } from "../../utils/elevenLabsTts";
 
-// --- SUB-COMPONENT: FLIP DIGIT ---
-const FlipDigit = ({ digit }) => {
-  const [currentDigit, setCurrentDigit] = useState(digit);
-  const [previousDigit, setPreviousDigit] = useState(digit);
-  const [isFlipping, setIsFlipping] = useState(false);
-  const digitRef = useRef(null);
+// --- SUB-COMPONENT: FLIP UNIT (2-DIGIT) ---
+const FOLD_PHASE_MS = 250;
+const UNFOLD_PHASE_MS = 340;
+
+const FlipDigit = ({ value }) => {
+  const normalized = String(value ?? "00").padStart(2, "0");
+  const [currentDigit, setCurrentDigit] = useState(normalized);
+  const [previousDigit, setPreviousDigit] = useState(normalized);
+  const [phase, setPhase] = useState("idle"); // idle | fold | unfold
+  const [animTick, setAnimTick] = useState(0);
+  const timersRef = useRef([]);
+
+  const clearTimers = () => {
+    timersRef.current.forEach((id) => clearTimeout(id));
+    timersRef.current = [];
+  };
 
   useEffect(() => {
-    if (digit !== currentDigit) {
+    if (normalized !== currentDigit) {
+      clearTimers();
       setPreviousDigit(currentDigit);
-      setCurrentDigit(digit);
+      setCurrentDigit(normalized);
+      setAnimTick((t) => t + 1);
+      setPhase("fold");
 
-      setIsFlipping(false);
-      void digitRef.current.offsetWidth;
-      setIsFlipping(true);
+      const toUnfold = setTimeout(() => {
+        setPhase("unfold");
+      }, FOLD_PHASE_MS);
 
-      const timeout = setTimeout(() => {
-        setIsFlipping(false);
-      }, 600);
+      const toIdle = setTimeout(() => {
+        setPhase("idle");
+      }, FOLD_PHASE_MS + UNFOLD_PHASE_MS);
 
-      return () => clearTimeout(timeout);
+      timersRef.current = [toUnfold, toIdle];
     }
-  }, [digit, currentDigit]);
+  }, [normalized, currentDigit]);
+
+  useEffect(() => {
+    return () => {
+      clearTimers();
+    };
+  }, []);
+
+  const upperStaticDigit = phase === "fold" ? "" : currentDigit;
+  const lowerStaticDigit = phase === "idle" ? currentDigit : phase === "fold" ? previousDigit : "";
+  const isAnimating = phase !== "idle";
 
   return (
-    <div ref={digitRef} className={`flip-digit ${isFlipping ? "flip" : ""}`}>
-      <div className="card__top">{currentDigit}</div>
-      <div className="card__bottom" data-value={currentDigit}></div>
-
-      <div className="card__back" data-value={previousDigit}>
-        <div className="card__bottom" data-value={currentDigit}></div>
+    <div className={`flip-digit ${isAnimating ? "animating" : ""}`}>
+      <div className="fd-upperCard">
+        <span>{upperStaticDigit}</span>
       </div>
+      <div className="fd-lowerCard">
+        <span>{lowerStaticDigit}</span>
+      </div>
+
+      {phase === "fold" && (
+        <div className="fd-flipCard fold" key={`fold-${animTick}`}>
+          <span>{previousDigit}</span>
+        </div>
+      )}
+
+      {phase === "unfold" && (
+        <div className="fd-flipCard unfold" key={`unfold-${animTick}`}>
+          <span>{currentDigit}</span>
+        </div>
+      )}
     </div>
   );
 };
@@ -59,16 +95,13 @@ const FlipDigit = ({ digit }) => {
 
 // --- SUB-COMPONENT: CLOCK CARD CONTAINER ---
 const ClockCard = ({ value, label, children, extraClass = "" }) => {
-  const strVal = value.toString().padStart(2, "0");
-  const digit1 = strVal.charAt(0);
-  const digit2 = strVal.charAt(1);
+  const strVal = String(value ?? "00").padStart(2, "0");
 
   return (
     <div className={`flip-card-container ${extraClass}`}>
       {children}
       <div className="flip-card-inner">
-        <FlipDigit digit={digit1} />
-        <FlipDigit digit={digit2} />
+        <FlipDigit value={strVal} />
       </div>
     </div>
   );
@@ -171,17 +204,25 @@ export default function HomeUpper({ lightMode, toggleTheme }) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  useEffect(() => () => {
+    stopElevenLabsPlayback();
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  }, []);
+
   // --- Handlers ---
   const handleWishClick = async (e) => {
     e.stopPropagation();
     setShowWishModal(true);
-    if (contacts.length === 0) {
-      setLoadingContacts(true);
+    setLoadingContacts(true);
+    try {
       const res = await getContactsApi();
       if (res && res.data && res.data.contacts) {
         setContacts(res.data.contacts);
         setFilteredContacts(res.data.contacts);
       }
+    } finally {
       setLoadingContacts(false);
     }
   };
@@ -268,6 +309,9 @@ export default function HomeUpper({ lightMode, toggleTheme }) {
 
   /* ================= DATE & TIME LOGIC ================= */
   useEffect(() => {
+    let alignTimeoutId = null;
+    let intervalId = null;
+
     const updateTime = () => {
       const ist = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
       
@@ -305,9 +349,18 @@ export default function HomeUpper({ lightMode, toggleTheme }) {
         mobileDateTimeStr: mobileStr
       });
     };
+
     updateTime();
-    const i = setInterval(updateTime, 1000);
-    return () => clearInterval(i);
+    const msToNextSecond = 1000 - (Date.now() % 1000);
+    alignTimeoutId = setTimeout(() => {
+      updateTime();
+      intervalId = setInterval(updateTime, 1000);
+    }, msToNextSecond);
+
+    return () => {
+      if (alignTimeoutId) clearTimeout(alignTimeoutId);
+      if (intervalId) clearInterval(intervalId);
+    };
   }, []);
 
   /* ================= VIDEO HANDLERS ================= */
@@ -575,31 +628,18 @@ export default function HomeUpper({ lightMode, toggleTheme }) {
               <div className="header-right">
                 <button 
                   className="immersive-btn-icon" 
-                  onClick={() => {
-                    // --- 🔥 1. CUSTOM DEEP DIVE VOICE LOGIC ---
-                    if ('speechSynthesis' in window) {
-                      window.speechSynthesis.cancel(); // Stop current speech
-                      const u = new SpeechSynthesisUtterance("Deep diving in Immersive Mode");
-                      
-                      // Attempt to find a high-quality female voice
-                      const voices = window.speechSynthesis.getVoices();
-                      const deepVoice = voices.find(v => 
-                         
-                        v.name.includes("Heera") || 
-                        v.name.includes("Samantha")
-                      );
-                      
-                      if (deepVoice) u.voice = deepVoice;
-                      
-                      // "Immersive" Settings: Slower rate, slightly lower pitch
-                      u.rate = 0.9; 
-                      u.pitch = 0.1;
-                      u.volume = 1.0;
-                      
-                      window.speechSynthesis.speak(u);
+                  onClick={async () => {
+                    const played = await playElevenLabsSpeech({
+                      text: "Deep diving in immersive mode",
+                      mode: "immersive_intro"
+                    });
+
+                    if (!played && 'speechSynthesis' in window) {
+                      const utterance = new SpeechSynthesisUtterance("Deep diving in immersive mode");
+                      window.speechSynthesis.cancel();
+                      window.speechSynthesis.speak(utterance);
                     }
 
-                    // 2. Animation & Navigation
                     setShowDeepDiveAnim(true);
                     setTimeout(() => {
                       navigate("/ai");
@@ -618,9 +658,9 @@ export default function HomeUpper({ lightMode, toggleTheme }) {
             </div>
 
             {/* Content: The Chat Widget */}
-            <div className="gemini-card-body">
-               <AIChatWidget />
-            </div>
+             <div className="gemini-card-body">
+               <AIChatWidget showHeaderBrand={false} />
+             </div>
 
           </div>
         </div>
@@ -895,3 +935,4 @@ export default function HomeUpper({ lightMode, toggleTheme }) {
     </>
   );
 }
+

@@ -8,7 +8,7 @@ const MongoStore = require('connect-mongo');
 const db = require('./config/mongoose');
 const passport = require('./config/passport');
 
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 /* =====================================================
    BASIC CONFIG
@@ -73,6 +73,7 @@ app.use(passport.session());
 
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/ai', require('./routes/aiExecute'));
+app.use('/api/voice', require('./routes/voice'));
 /* =====================================================
    API ROUTES
 ===================================================== */

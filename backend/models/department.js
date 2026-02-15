@@ -17,6 +17,10 @@ const departmentSchema = new mongoose.Schema({
         type: String,
         required: String
     },
+    phone: {
+        type: String,
+        default: ''
+    },
 
     // Password Reset fields
     resetToken: { type: String, default: null },

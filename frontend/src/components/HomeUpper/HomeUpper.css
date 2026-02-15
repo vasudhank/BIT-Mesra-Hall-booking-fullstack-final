@@ -195,7 +195,7 @@ body.dark-mode .nav-link-item a.active {
   position: relative;
   box-shadow: 0 8px 25px rgba(0,0,0,0.4);
   /* Text Styles inherited by digits */
-  font-family: 'RecklessNeue', sans-serif;
+  font-family: 'Droid Sans Mono', 'Roboto Mono', monospace;
   font-weight: 700;
   font-size: 5.8rem;
   line-height: 1;
@@ -212,138 +212,169 @@ body.dark-mode .nav-link-item a.active {
 
 /* Inner flex to hold digits */
 .flip-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
   display: flex;
-  gap: 2px; /* Small gap between digits */
+  align-items: center;
+  justify-content: center;
 }
 
 /* =========================================================
    ===== 4. SINGLE FLIP DIGIT (The Reference Logic) =====
    ========================================================= */
-/* Each digit is an inline-block */
 .flip-digit {
-  display: inline-block;
   position: relative;
-  width: 0.7em; /* Relative to font-size */
-  height: 1em;  /* Relative to font-size */
-  perspective: 400px; /* Essential for 3D */
-}
-
-/* Shared styles for Top/Bottom/Back faces */
-.card__top,
-.card__bottom,
-.card__back::before,
-.card__back::after {
   display: block;
-  height: 0.5em; /* Half height */
-  color: inherit;
-  background: inherit; /* Inherit from container */
-  padding: 0;
-  border-radius: 6px 6px 0 0; /* Top radius */
-  backface-visibility: hidden;
+  width: 100%;
+  height: 1em;
+  perspective-origin: 50% 50%;
+  perspective: 320px;
   transform-style: preserve-3d;
-  width: 100%;
-  transform: translateZ(0);
-  overflow: hidden;
-  text-align: center;
-  line-height: 1em; /* Line height double the container height to center text */
 }
 
-/* Top Half Static */
-.card__top {
-  border-bottom: 1px solid rgba(0,0,0,0.2); /* Split line */
-}
-
-/* Bottom Half Static (Absolute) */
-.card__bottom {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  border-radius: 0 0 6px 6px; /* Bottom radius */
-  pointer-events: none;
-  line-height: 0; /* Show top part of text (offset logic handled below) */
+.fd-upperCard,
+.fd-lowerCard {
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
-}
-
-/* Bottom Half Text Adjustment */
-.card__bottom::after {
-  content: attr(data-value);
-  display: block;
-  transform: translateY(-50%); /* Move text up to show bottom half */
-}
-
-/* The Flapper (Back) */
-.card__back {
   position: absolute;
-  top: 0;
-  height: 100%;
+  justify-content: center;
   left: 0;
   width: 100%;
-  pointer-events: none;
-  z-index: 10;
+  height: 50%;
+  overflow: hidden;
+  border: none;
+  color: inherit;
+  background: inherit;
+  z-index: 1;
 }
 
-/* The Back's Front Face (Top of Old Digit) */
-.card__back::before {
-  content: attr(data-value); /* Previous value */
-  position: relative;
-  z-index: -1;
-  border-bottom: 1px solid rgba(0,0,0,0.2);
+.fd-upperCard span,
+.fd-lowerCard span,
+.fd-flipCard span {
+  display: block;
+  font-size: inherit;
+  font-family: inherit;
+  font-weight: inherit;
+  color: inherit;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
 }
 
-/* The Back's Back Face (Bottom of New Digit) */
-/* Actually, the reference uses a nested .card__bottom inside .card__back for the bottom flap */
-.card__back .card__bottom {
-  z-index: 10;
-  /* Initially hidden by rotation */
+.fd-upperCard {
+  top: 0;
+  align-items: flex-end;
+  border-bottom: 0.5px solid rgba(15, 23, 42, 0.18);
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
 }
 
-/* --- ANIMATION LOGIC --- */
-
-/* 1. Animate Top Leaf Down */
-/* --- ANIMATION LOGIC (REFERENCE MATCH) --- */
-
-.flip .card__back::before {
-  animation: flipTop 0.3s cubic-bezier(.37,.01,.94,.35);
-  animation-fill-mode: both;
-  transform-origin: center bottom;
+.fd-upperCard span {
+  transform: translateY(50%);
 }
 
-.flip .card__back .card__bottom {
-  transform-origin: center top;
-  animation-fill-mode: both;
-  animation: flipBottom 0.6s cubic-bezier(.15,.45,.28,1);
+.fd-lowerCard {
+  top: 50%;
+  align-items: flex-start;
+  border-top: 0.5px solid rgba(15, 23, 42, 0.18);
+  border-bottom-left-radius: 6px;
+  border-bottom-right-radius: 6px;
 }
 
-@keyframes flipTop {
+.fd-lowerCard span {
+  transform: translateY(-50%);
+}
+
+.fd-flipCard {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  overflow: hidden;
+  backface-visibility: hidden;
+  color: inherit;
+  background: inherit;
+  border: none;
+  will-change: transform;
+}
+
+.fd-flipCard.unfold {
+  top: 50%;
+  align-items: flex-start;
+  transform-origin: 50% 0%;
+  transform: rotateX(90deg);
+  border-top: 0.5px solid rgba(15, 23, 42, 0.18);
+  border-bottom-left-radius: 6px;
+  border-bottom-right-radius: 6px;
+  z-index: 5;
+}
+
+.fd-flipCard.unfold span {
+  transform: translateY(-50%);
+}
+
+.fd-flipCard.fold {
+  top: 0;
+  align-items: flex-end;
+  transform-origin: 50% 100%;
+  transform: rotateX(0deg);
+  border-bottom: 0.5px solid rgba(15, 23, 42, 0.18);
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+  z-index: 6;
+}
+
+.fd-flipCard.fold span {
+  transform: translateY(50%);
+}
+
+.fd-flipCard.fold {
+  animation: fdFold 0.25s cubic-bezier(0.455, 0.03, 0.515, 0.955) forwards;
+  transform-style: preserve-3d;
+}
+
+.fd-flipCard.unfold {
+  animation: fdUnfold 0.34s cubic-bezier(0.455, 0.03, 0.515, 0.955) forwards;
+  transform-style: preserve-3d;
+}
+
+@keyframes fdFold {
   0% {
     transform: rotateX(0deg);
-    z-index: 2;
-  }
-  0%, 99% {
-    opacity: 0.99;
   }
   100% {
     transform: rotateX(-90deg);
-    opacity: 0;
   }
 }
 
-@keyframes flipBottom {
-  0%, 50% {
-    z-index: -1;
+@keyframes fdUnfold {
+  0% {
     transform: rotateX(90deg);
-    opacity: 0;
-  }
-  51% {
-    opacity: 0.99;
   }
   100% {
-    opacity: 0.99;
     transform: rotateX(0deg);
-    z-index: 5;
   }
+}
+
+body.dark-mode .fd-upperCard {
+  border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+
+body.dark-mode .fd-lowerCard {
+  border-top-color: rgba(255, 255, 255, 0.2);
+}
+
+body.dark-mode .fd-flipCard.fold {
+  border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+
+body.dark-mode .fd-flipCard.unfold {
+  border-top-color: rgba(255, 255, 255, 0.2);
 }
 
 /* =========================================================
@@ -464,14 +495,14 @@ body.dark-mode .nav-date { color: #fff; }
 body.dark-mode .flip-card-container {
   background: #000000;
   color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: none;
 }
 
 /* --- LIGHT MODE BASE (Applies to Zero-Scroll) --- */
 body:not(.dark-mode) .flip-card-container {
   background: #e6e9ec;
   color: #000000;
-  border: 1px solid rgba(0,0,0,0.1);
+  border: none;
   box-shadow: 0 10px 40px rgba(0,0,0,0.15);
 }
 body:not(.dark-mode) .card-seconds-corner { color: #334155; }
@@ -1030,30 +1061,17 @@ body.dark-mode .c-email {
   display: flex;
   flex-direction: column;
   overflow: hidden; /* Clips the inner content */
-  animation: popup 0.3s ease-out;
+  animation: geminiBorderFlow 6s ease-in-out infinite;
   box-shadow: 0 20px 50px rgba(0,0,0,0.3);
   padding: 5px; /* Space for the gradient border */
-  background: transparent;
+  background: linear-gradient(120deg, #4285f4 0%, #9b72cb 33%, #d96570 66%, #4285f4 100%);
+  background-size: 240% 240%;
+  background-position: 0% 50%;
 }
 
 /* The Running Gradient Animation Background */
 .gemini-modal-card::before {
-  content: "";
-  position: absolute;
-  top: -100%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: conic-gradient(
-    from 0deg, 
-    transparent 0deg, 
-    #4285f4 90deg, 
-    #9b72cb 180deg, 
-    #d96570 270deg, 
-    transparent 360deg
-  );
-  animation: borderRotate 4s linear infinite;
-  z-index: -1;
+  display: none;
 }
 
 /* The Actual Content Container (Clean Background) */
@@ -1070,16 +1088,22 @@ body.dark-mode .c-email {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(0,0,0,0.06);
+  flex-shrink: 0;
 }
 
 .gemini-card-body {
   flex: 1;
+  min-height: 0;
   border-bottom-left-radius: 17px;
   border-bottom-right-radius: 17px;
   /* background: #ffffff; Already set above */
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+.gemini-card-body .gemini-chat-shell {
+  min-height: 0;
 }
 
 /* Dark Mode Overrides for Content */
@@ -1088,7 +1112,7 @@ body.dark-mode .gemini-card-body {
   background: #131314;
 }
 body.dark-mode .gemini-card-header {
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  border-bottom: none;
 }
 
 /* Header Elements */
@@ -1150,6 +1174,12 @@ body.dark-mode .close-btn-icon { color: #94a3b8; }
 body.dark-mode .close-btn-icon:hover { color: #ffffff; }
 
 /* Animations */
+@keyframes geminiBorderFlow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
 @keyframes borderRotate {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

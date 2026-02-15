@@ -1,13 +1,33 @@
 import React, { useEffect, useState } from "react";
 import {
-  Container, Grid, Card, CardContent, Typography, FormControl, Input, Button,
-  InputAdornment, Snackbar, Alert, Box, Divider, Avatar, Tooltip, IconButton,
-  Menu, MenuItem
+  Container,
+  Grid,
+  Card,
+  CardContent,
+  Typography,
+  FormControl,
+  Input,
+  Button,
+  InputAdornment,
+  Snackbar,
+  Alert,
+  Box,
+  Divider,
+  Avatar,
+  Tooltip,
+  IconButton,
+  Menu,
+  MenuItem,
+  CircularProgress
 } from "@mui/material";
 import HttpsIcon from '@mui/icons-material/Https';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import BusinessIcon from '@mui/icons-material/Business';
 import PersonIcon from '@mui/icons-material/Person';
+import LocalPhoneOutlinedIcon from '@mui/icons-material/LocalPhoneOutlined';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import SaveRoundedIcon from '@mui/icons-material/SaveRounded';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import Visibility from '@mui/icons-material/Visibility';
@@ -15,14 +35,13 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import api from '../../../api/axiosInstance';
 import { Link, useNavigate, useLocation } from "react-router-dom";
 
-// password checks
 function checkPasswordStrength(pwd) {
   const checks = {
     length: pwd.length >= 8,
     lower: /[a-z]/.test(pwd),
     upper: /[A-Z]/.test(pwd),
     digit: /[0-9]/.test(pwd),
-    special: /[!@#\$%\^&\*\(\)\-_=\+\[\]\{\};:'",.<>\/\\\?`~]/.test(pwd)
+    special: /[!@#$%^&*()_+=[\]{};:'",.<>/?`~\\-]/.test(pwd)
   };
   const passed = Object.values(checks).every(Boolean);
   return { checks, passed };
@@ -32,25 +51,25 @@ export default function DepartmentAccount() {
   const [email, setEmail] = useState("");
   const [deptName, setDeptName] = useState("");
   const [hodName, setHodName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [phoneDraft, setPhoneDraft] = useState("");
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
+  const [phoneSaving, setPhoneSaving] = useState(false);
 
   const [currentPwd, setCurrentPwd] = useState("");
   const [newPwd, setNewPwd] = useState("");
   const [confirmPwd, setConfirmPwd] = useState("");
   const [isAuth, setIsAuth] = useState(false);
 
-  // === SETUP MODE STATE (New Feature) ===
   const [setupToken, setSetupToken] = useState(null);
   const [isSetupMode, setIsSetupMode] = useState(false);
 
-  // readOnly flag to reduce browser autofill for current password
   const [curReadOnly, setCurReadOnly] = useState(true);
 
-  // password visibility states (eye icons)
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  // user menu (top-right)
   const [anchorElUser, setAnchorElUser] = useState(null);
 
   const [successOpen, setSuccessOpen] = useState(false);
@@ -61,48 +80,35 @@ export default function DepartmentAccount() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // password strength state (computed)
   const pwdState = checkPasswordStrength(newPwd);
 
-  // Helper to extract query params
-  function useQuery() {
-    return new URLSearchParams(location.search);
-  }
-  const query = useQuery();
-
   useEffect(() => {
-    const tokenFromUrl = query.get("token");
+    const tokenFromUrl = new URLSearchParams(location.search).get("token");
+
+    const hydrateProfile = (department) => {
+      setEmail(department?.email || "");
+      setDeptName(department?.department || "");
+      setHodName(department?.head || "");
+      setPhone(department?.phone || "");
+      setPhoneDraft(department?.phone || "");
+    };
 
     if (tokenFromUrl) {
-      // 1. First, try to verify if this is a "Setup Token" (New Account)
       api.post("/department/verify_setup_token", { token: tokenFromUrl })
         .then((res) => {
           if (res.data && res.data.success) {
-            // === It is a valid Setup Token ===
             setSetupToken(tokenFromUrl);
             setIsSetupMode(true);
-            
-            const d = res.data.department;
-            setEmail(d.email);
-            setDeptName(d.department);
-            setHodName(d.head);
-            // Allow them to see the form
-            setIsAuth(true); 
+            hydrateProfile(res.data.department);
+            setIsAuth(true);
           }
         })
         .catch(() => {
-          // 2. If Setup verification fails, Fallback to your existing "Auto Login" logic
           api.post("/department/auto_login", { token: tokenFromUrl }, { withCredentials: true })
             .then((r) => {
               if (r.data && r.data.success && r.data.department) {
-                // === It is a valid Auto-Login Token ===
-                const d = r.data.department;
-                setEmail(d.email || "");
-                setDeptName(d.department || "");
-                setHodName(d.head || "");
+                hydrateProfile(r.data.department);
                 setIsAuth(true);
-                
-                // Clean URL
                 const newUrl = window.location.pathname;
                 window.history.replaceState({}, document.title, newUrl);
               } else {
@@ -118,24 +124,20 @@ export default function DepartmentAccount() {
               setIsAuth(false);
             });
         });
-
     } else {
-      // 3. No token? Check for standard session auth (/me)
       (async () => {
         try {
           const res = await api.get("/department/me", { withCredentials: true });
           if (res.data && res.data.success && res.data.department) {
-            const d = res.data.department;
-            setEmail(d.email || "");
-            setDeptName(d.department || "");
-            setHodName(d.head || "");
+            hydrateProfile(res.data.department);
             setIsAuth(true);
           }
         } catch (err) {
-          // Not logged in
-          setEmail('');
-          setDeptName('');
-          setHodName('');
+          setEmail("");
+          setDeptName("");
+          setHodName("");
+          setPhone("");
+          setPhoneDraft("");
           setIsAuth(false);
         }
       })();
@@ -145,17 +147,18 @@ export default function DepartmentAccount() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validation: Current Password is required ONLY if NOT in Setup Mode
     if ((!isSetupMode && !currentPwd) || !newPwd || !confirmPwd) {
       setErrMsg("Please fill all fields");
       setErrorOpen(true);
       return;
     }
+
     if (newPwd !== confirmPwd) {
       setErrMsg("New password and confirm password do not match");
       setErrorOpen(true);
       return;
     }
+
     if (!pwdState.passed) {
       setErrMsg("New password does not meet the minimum requirements");
       setErrorOpen(true);
@@ -164,25 +167,22 @@ export default function DepartmentAccount() {
 
     try {
       if (isSetupMode) {
-        // === CASE 1: NEW ACCOUNT SETUP ===
         const res = await api.post("/department/complete_setup", {
-            token: setupToken,
-            newPassword: newPwd
+          token: setupToken,
+          newPassword: newPwd
         });
-        
+
         if (res.data.success) {
-            setSuccessMsg("Account secured! Redirecting to login...");
-            setSuccessOpen(true);
-            // Redirect after delay
-            setTimeout(() => {
-                navigate("/department_login");
-            }, 2000);
+          setSuccessMsg("Account secured! Redirecting to login...");
+          setSuccessOpen(true);
+          setTimeout(() => {
+            navigate("/department_login");
+          }, 2000);
         }
       } else {
-        // === CASE 2: STANDARD PASSWORD CHANGE ===
         const payload = { currentPassword: currentPwd, newPassword: newPwd };
         const res = await api.post("/department/change_password", payload, { withCredentials: true });
-        
+
         if (res.data && res.data.success) {
           setSuccessMsg("Password changed successfully");
           setSuccessOpen(true);
@@ -190,7 +190,6 @@ export default function DepartmentAccount() {
           setNewPwd("");
           setConfirmPwd("");
           setCurReadOnly(true);
-          // hide all passwords after success
           setShowCurrent(false);
           setShowNew(false);
           setShowConfirm(false);
@@ -200,10 +199,7 @@ export default function DepartmentAccount() {
         }
       }
     } catch (err) {
-      console.error("Change password error:", err);
       const status = err.response?.status;
-      
-      // Handle auth error (only relevant for standard change, not setup)
       if (status === 401 && !isSetupMode) {
         setErrMsg("Please login before changing password");
         setErrorOpen(true);
@@ -215,16 +211,70 @@ export default function DepartmentAccount() {
     }
   };
 
-  // password rules list for UI (ordered)
+  const canEditPhone = isAuth && !isSetupMode;
+
+  const startPhoneEdit = () => {
+    if (!canEditPhone) return;
+    setPhoneDraft(phone || "");
+    setIsEditingPhone(true);
+  };
+
+  const cancelPhoneEdit = () => {
+    setPhoneDraft(phone || "");
+    setIsEditingPhone(false);
+  };
+
+  const savePhone = async () => {
+    if (!canEditPhone) return;
+    const normalizedPhone = phoneDraft.replace(/\D/g, "").slice(0, 15);
+
+    if (!/^\d{10,15}$/.test(normalizedPhone)) {
+      setErrMsg("Phone number must contain 10 to 15 digits");
+      setErrorOpen(true);
+      return;
+    }
+
+    setPhoneSaving(true);
+    try {
+      const res = await api.post(
+        "/department/update_phone",
+        { phone: normalizedPhone },
+        { withCredentials: true }
+      );
+
+      if (res.data?.success) {
+        const updatedPhone = res.data.phone || normalizedPhone;
+        setPhone(updatedPhone);
+        setPhoneDraft(updatedPhone);
+        setIsEditingPhone(false);
+        setSuccessMsg("Phone number updated successfully");
+        setSuccessOpen(true);
+      } else {
+        setErrMsg(res.data?.message || "Failed to update phone number");
+        setErrorOpen(true);
+      }
+    } catch (err) {
+      if (err.response?.status === 401) {
+        setErrMsg("Please login before updating phone number");
+        setErrorOpen(true);
+        navigate("/department_login");
+        return;
+      }
+      setErrMsg(err.response?.data?.message || "Failed to update phone number");
+      setErrorOpen(true);
+    } finally {
+      setPhoneSaving(false);
+    }
+  };
+
   const passwordRules = [
     { key: 'length', text: 'At least 8 characters' },
-    { key: 'lower', text: 'Lowercase letter (a–z)' },
-    { key: 'upper', text: 'Uppercase letter (A–Z)' },
-    { key: 'digit', text: 'Number (0–9)' },
+    { key: 'lower', text: 'Lowercase letter (a-z)' },
+    { key: 'upper', text: 'Uppercase letter (A-Z)' },
+    { key: 'digit', text: 'Number (0-9)' },
     { key: 'special', text: 'Special character (!@#$%^&*)' },
   ];
 
-  // user menu handlers
   const handleOpenUserMenu = (event) => setAnchorElUser(event.currentTarget);
   const handleCloseUserMenu = () => setAnchorElUser(null);
 
@@ -241,7 +291,6 @@ export default function DepartmentAccount() {
 
   return (
     <>
-      {/* Top-right avatar/menu (Hidden during Setup Mode to prevent navigation) */}
       {!isSetupMode && (
         <Box sx={{ position: 'fixed', top: 8, right: 12, zIndex: 1400 }}>
           <Tooltip title="Open settings">
@@ -285,30 +334,37 @@ export default function DepartmentAccount() {
         </Box>
       )}
 
-      <Container sx={{ mt: 8 }}> {/* pushed down so menu/avatar doesn't overlap content */}
+      <Container sx={{ mt: 8 }}>
         <Grid container justifyContent="center">
           <Grid item xs={11} sm={8} md={6} lg={5}>
-            <Card>
-              <CardContent>
-                <Typography variant="h5" sx={{ mb: 2 }}>
+            <Card
+              sx={{
+                borderRadius: 3,
+                border: '1px solid rgba(148, 163, 184, 0.2)',
+                boxShadow: '0 18px 40px rgba(15, 23, 42, 0.08)',
+                background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)'
+              }}
+            >
+              <CardContent sx={{ p: { xs: 2.4, sm: 3 } }}>
+                <Typography variant="h5" sx={{ mb: 2, fontWeight: 700 }}>
                   {isSetupMode ? "Secure Your Account" : "Account"}
                 </Typography>
 
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2.2 }}>
                   <AccountCircleIcon sx={{ fontSize: 40, mr: 1, color: isSetupMode ? '#1976d2' : 'inherit' }} />
                   <Box>
-                    <Typography variant="subtitle1">{email || "—"}</Typography>
+                    <Typography variant="subtitle1">{email || "-"}</Typography>
                     <Typography variant="caption" color="text.secondary">Logged-in email</Typography>
                   </Box>
                 </Box>
 
                 <Divider sx={{ my: 2 }} />
 
-                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                <Box sx={{ display: 'flex', gap: 2, mb: 2.2, flexWrap: 'wrap' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <BusinessIcon />
                     <Box>
-                      <Typography variant="body2">{deptName || '—'}</Typography>
+                      <Typography variant="body2">{deptName || '-'}</Typography>
                       <Typography variant="caption" color="text.secondary">Department</Typography>
                     </Box>
                   </Box>
@@ -316,10 +372,105 @@ export default function DepartmentAccount() {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <PersonIcon />
                     <Box>
-                      <Typography variant="body2">{hodName || '—'}</Typography>
+                      <Typography variant="body2">{hodName || '-'}</Typography>
                       <Typography variant="caption" color="text.secondary">Faculty Name</Typography>
                     </Box>
                   </Box>
+                </Box>
+
+                <Box
+                  sx={{
+                    p: 2,
+                    borderRadius: 2.5,
+                    border: '1px solid rgba(148, 163, 184, 0.28)',
+                    background: 'linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.95))',
+                    mb: 2
+                  }}
+                >
+                  <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary', fontWeight: 600 }}>
+                    Phone Number
+                  </Typography>
+
+                  <FormControl fullWidth>
+                    <Input
+                      disableUnderline
+                      type="tel"
+                      placeholder="Mobile number"
+                      value={isEditingPhone ? phoneDraft : (phone || "")}
+                      onChange={(e) => setPhoneDraft(e.target.value.replace(/\D/g, '').slice(0, 15))}
+                      inputProps={{
+                        maxLength: 15,
+                        pattern: "[0-9]{10,15}",
+                        readOnly: !isEditingPhone
+                      }}
+                      startAdornment={
+                        <InputAdornment position="start">
+                          <LocalPhoneOutlinedIcon sx={{ color: '#334155' }} />
+                        </InputAdornment>
+                      }
+                      endAdornment={
+                        !isEditingPhone && canEditPhone ? (
+                          <InputAdornment position="end">
+                            <Tooltip title="Edit phone number" arrow>
+                              <IconButton
+                                size="small"
+                                onClick={startPhoneEdit}
+                                aria-label="Edit phone number"
+                                sx={{
+                                  border: '1px solid rgba(37, 99, 235, 0.25)',
+                                  color: '#2563eb',
+                                  backgroundColor: 'rgba(37, 99, 235, 0.06)'
+                                }}
+                              >
+                                <EditOutlinedIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </InputAdornment>
+                        ) : null
+                      }
+                      sx={{
+                        border: '1px solid rgba(148, 163, 184, 0.35)',
+                        borderRadius: 2,
+                        backgroundColor: '#ffffff',
+                        px: 1,
+                        py: 0.9
+                      }}
+                    />
+                  </FormControl>
+
+                  {isEditingPhone ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 1.4 }}>
+                      <Button
+                        type="button"
+                        variant="outlined"
+                        size="small"
+                        onClick={cancelPhoneEdit}
+                        startIcon={<CloseRoundedIcon fontSize="small" />}
+                        sx={{ textTransform: 'none', borderRadius: 1.8 }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="contained"
+                        size="small"
+                        onClick={savePhone}
+                        disabled={phoneSaving}
+                        startIcon={phoneSaving ? null : <SaveRoundedIcon fontSize="small" />}
+                        sx={{ textTransform: 'none', borderRadius: 1.8 }}
+                      >
+                        {phoneSaving ? <CircularProgress size={16} color="inherit" /> : "Save"}
+                      </Button>
+                    </Box>
+                  ) : (
+                    <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
+                      {canEditPhone
+                        ? "Use the pencil icon to edit your contact number."
+                        : (isSetupMode
+                          ? "Phone editing is available after login."
+                          : "Login to edit phone number.")}
+                    </Typography>
+                  )}
                 </Box>
 
                 <Divider sx={{ my: 2 }} />
@@ -338,39 +489,38 @@ export default function DepartmentAccount() {
                   <form onSubmit={handleSubmit} autoComplete="off" noValidate>
                     <input type="hidden" name="fakeusernameremembered" />
 
-                    {/* Show Current Password Field ONLY if NOT in Setup Mode */}
                     {!isSetupMode && (
-                        <FormControl fullWidth sx={{ mb: 2 }}>
+                      <FormControl fullWidth sx={{ mb: 2 }}>
                         <Input
-                            name="cur_pass_field"
-                            disableUnderline
-                            placeholder="Current password"
-                            type={showCurrent ? "text" : "password"}
-                            value={currentPwd}
-                            onChange={(e) => setCurrentPwd(e.target.value)}
-                            startAdornment={<InputAdornment position="start"><HttpsIcon /></InputAdornment>}
-                            endAdornment={
+                          name="cur_pass_field"
+                          disableUnderline
+                          placeholder="Current password"
+                          type={showCurrent ? "text" : "password"}
+                          value={currentPwd}
+                          onChange={(e) => setCurrentPwd(e.target.value)}
+                          startAdornment={<InputAdornment position="start"><HttpsIcon /></InputAdornment>}
+                          endAdornment={
                             <InputAdornment position="end">
-                                <IconButton
+                              <IconButton
                                 aria-label="toggle current password visibility"
-                                onClick={() => setShowCurrent(s => !s)}
+                                onClick={() => setShowCurrent((s) => !s)}
                                 edge="end"
                                 size="small"
-                                >
+                              >
                                 {showCurrent ? <VisibilityOff /> : <Visibility />}
-                                </IconButton>
+                              </IconButton>
                             </InputAdornment>
-                            }
-                            inputProps={{ autoComplete: "off" }}
-                            sx={{ padding: "1rem" }}
-                            required
-                            readOnly={curReadOnly}
-                            onFocus={() => {
+                          }
+                          inputProps={{ autoComplete: "off" }}
+                          sx={{ padding: "1rem" }}
+                          required
+                          readOnly={curReadOnly}
+                          onFocus={() => {
                             setCurReadOnly(false);
-                            setCurrentPwd('');
-                            }}
+                            setCurrentPwd("");
+                          }}
                         />
-                        </FormControl>
+                      </FormControl>
                     )}
 
                     <FormControl fullWidth sx={{ mb: 1 }}>
@@ -386,7 +536,7 @@ export default function DepartmentAccount() {
                           <InputAdornment position="end">
                             <IconButton
                               aria-label="toggle new password visibility"
-                              onClick={() => setShowNew(s => !s)}
+                              onClick={() => setShowNew((s) => !s)}
                               edge="end"
                               size="small"
                             >
@@ -403,7 +553,7 @@ export default function DepartmentAccount() {
                     <Box sx={{ mb: 2 }}>
                       <Typography variant="body2" sx={{ mb: 1 }}>Password requirements:</Typography>
                       <Box component="ul" sx={{ pl: 0, m: 0 }}>
-                        {passwordRules.map(rule => {
+                        {passwordRules.map((rule) => {
                           const ok = pwdState.checks[rule.key];
                           return (
                             <Box key={rule.key} component="li" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.6, listStyle: 'none' }}>
@@ -432,7 +582,7 @@ export default function DepartmentAccount() {
                           <InputAdornment position="end">
                             <IconButton
                               aria-label="toggle confirm password visibility"
-                              onClick={() => setShowConfirm(s => !s)}
+                              onClick={() => setShowConfirm((s) => !s)}
                               edge="end"
                               size="small"
                             >
@@ -447,7 +597,7 @@ export default function DepartmentAccount() {
                     </FormControl>
 
                     <Button fullWidth type="submit" variant="contained" sx={{ py: 1 }}>
-                        {isSetupMode ? "SECURE ACCOUNT & LOGIN" : "Change password"}
+                      {isSetupMode ? "SECURE ACCOUNT & LOGIN" : "Change password"}
                     </Button>
                   </form>
                 )}

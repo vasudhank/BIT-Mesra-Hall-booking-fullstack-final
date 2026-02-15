@@ -39,7 +39,7 @@ router.get('/show_booking_requests', async (req, res) => {
 
     const requests = await Booking_Requests
       .find({ status: 'PENDING' })   // only pending requests
-      .populate('department')
+      .populate({ path: 'department', select: 'department head email' })
       .sort({ createdAt: -1 });
 
     return res.status(200).json({ booking_requests: requests });
