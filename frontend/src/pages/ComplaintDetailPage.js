@@ -103,6 +103,7 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
   const { id } = useParams();
   const issueCardRef = useRef(null);
   const addSolutionCardRef = useRef(null);
+  const answersStripRef = useRef(null);
   const [complaint, setComplaint] = useState(null);
   const [loading, setLoading] = useState(false);
   const [sort, setSort] = useState('DATE_DESC');
@@ -120,7 +121,9 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 960px)').matches : false
   );
   const [isAddSolutionCompact, setIsAddSolutionCompact] = useState(false);
+  const [isAnswersStripAtTop, setIsAnswersStripAtTop] = useState(false);
   const [isAnswersStripCollapsed, setIsAnswersStripCollapsed] = useState(false);
+  const [isQuestionPopupOpen, setIsQuestionPopupOpen] = useState(false);
 
   const viewerId = useMemo(() => getViewerId(), []);
   const [solutionReactionMap, setSolutionReactionMap] = useState(() => readReactionStore('complaintSolutionReactions'));
@@ -197,30 +200,35 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
   }, []);
 
   useEffect(() => {
-    if (!isMobile || !addSolutionCardRef.current) {
+    if (!isMobile) {
       setIsAddSolutionCompact(false);
+      setIsAnswersStripAtTop(false);
       return;
     }
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsAddSolutionCompact(entry.intersectionRatio < 0.2);
-      },
-      {
-        threshold: [0, 0.2, 0.5, 1],
-        rootMargin: '-64px 0px 0px 0px'
-      }
-    );
+    const updateScrollState = () => {
+      const addRect = addSolutionCardRef.current?.getBoundingClientRect();
+      const stripRect = answersStripRef.current?.getBoundingClientRect();
+      const addPastViewport = Boolean(addRect && addRect.bottom <= 0);
+      const stripAtTop = Boolean(stripRect && stripRect.top <= 0);
+      setIsAddSolutionCompact(addPastViewport);
+      setIsAnswersStripAtTop(stripAtTop);
+    };
 
-    observer.observe(addSolutionCardRef.current);
-    return () => observer.disconnect();
+    updateScrollState();
+    window.addEventListener('scroll', updateScrollState, { passive: true });
+    window.addEventListener('resize', updateScrollState);
+    return () => {
+      window.removeEventListener('scroll', updateScrollState);
+      window.removeEventListener('resize', updateScrollState);
+    };
   }, [id, isMobile]);
 
   useEffect(() => {
-    if (!isMobile || !isAddSolutionCompact) {
+    if (!isMobile || !isAddSolutionCompact || !isAnswersStripAtTop) {
       setIsAnswersStripCollapsed(false);
     }
-  }, [isMobile, isAddSolutionCompact]);
+  }, [isMobile, isAddSolutionCompact, isAnswersStripAtTop]);
 
   const filteredSolutions = useMemo(() => {
     if (!complaint) return [];
@@ -414,9 +422,8 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
 
   const listPath =
     mode === 'developer' ? '/developer/complaints' : mode === 'admin' ? '/admin/complaints' : '/complaints';
-  const showCompactAnswerControls = isMobile && isAddSolutionCompact;
+  const showCompactAnswerControls = isMobile && isAddSolutionCompact && isAnswersStripAtTop;
   const isAnswersStripCollapsedOnMobile = showCompactAnswerControls && isAnswersStripCollapsed;
-  const scrollToIssueCard = () => issueCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const scrollToAddSolutionCard = () =>
     addSolutionCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
@@ -519,6 +526,7 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
 
         <section className="thread-solutions-card">
           <div
+            ref={answersStripRef}
             className={`thread-solutions-strip ${showCompactAnswerControls ? 'mobile-compact' : ''} ${
               isAnswersStripCollapsedOnMobile ? 'strip-collapsed-mobile' : ''
             }`}
@@ -528,15 +536,19 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
                 <div className={`thread-solutions-title-row ${showCompactAnswerControls ? 'compact-mode' : ''}`}>
                   {showCompactAnswerControls && (
                     <Link className="thread-header-icon-btn" to={listPath} aria-label="Back to complaints list">
-                      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="19" y1="12" x2="5" y2="12"></line>
-                        <polyline points="12 19 5 12 12 5"></polyline>
+                      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                        <path d="M11,17a1,1,0,0,1-.71-1.71L13.59,12,10.29,8.71a1,1,0,0,1,1.41-1.41l4,4a1,1,0,0,1,0,1.41l-4,4A1,1,0,0,1,11,17Z"></path>
+                        <path d="M15 13H5a1 1 0 0 1 0-2H15a1 1 0 0 1 0 2zM19 20a1 1 0 0 1-1-1V5a1 1 0 0 1 2 0V19A1 1 0 0 1 19 20z"></path>
                       </svg>
                     </Link>
                   )}
                   <h2>Solutions ({filteredSolutions.length})</h2>
                   {showCompactAnswerControls && (
-                    <button type="button" className="thread-header-action-btn" onClick={scrollToIssueCard}>
+                    <button
+                      type="button"
+                      className="thread-header-action-btn"
+                      onClick={() => setIsQuestionPopupOpen(true)}
+                    >
                       View Question
                     </button>
                   )}
@@ -547,11 +559,6 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
                     showCompactAnswerControls ? 'mobile-compact-controls' : ''
                   }`}
                 >
-                  {showCompactAnswerControls && (
-                    <button type="button" className="thread-inline-add-btn" onClick={scrollToAddSolutionCard}>
-                      Add a Solution
-                    </button>
-                  )}
                   <select value={sort} onChange={(e) => setSort(e.target.value)}>
                     {SORT_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -559,6 +566,11 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
                       </option>
                     ))}
                   </select>
+                  {showCompactAnswerControls && (
+                    <button type="button" className="thread-inline-add-btn" onClick={scrollToAddSolutionCard}>
+                      Add a Solution
+                    </button>
+                  )}
                   <div className="thread-solutions-search">
                     <SearchIcon className="search-icon" fontSize="small" />
                     <input
@@ -746,6 +758,17 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
           </div>
         </section>
       </div>
+      {isQuestionPopupOpen && (
+        <div className="thread-question-modal-backdrop" onClick={() => setIsQuestionPopupOpen(false)}>
+          <div className="thread-question-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>{complaint.title}</h3>
+            <p>{pickFirstText(complaint, ['message', 'description', 'issue', 'body'])}</p>
+            <button type="button" className="thread-question-modal-close" onClick={() => setIsQuestionPopupOpen(false)}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

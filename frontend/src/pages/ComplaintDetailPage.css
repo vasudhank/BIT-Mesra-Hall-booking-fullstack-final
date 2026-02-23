@@ -374,6 +374,14 @@
   transform: translateY(-1px);
 }
 
+.thread-header-icon-btn svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  transform: rotate(180deg);
+}
+
 .thread-header-action-btn {
   min-height: 34px;
   border: 1px solid var(--support-border-strong);
@@ -490,9 +498,61 @@
 .thread-strip-toggle--floating {
   position: fixed;
   left: 50%;
-  top: 10px;
+  top: 0;
   transform: translateX(-50%);
   z-index: 1000;
+}
+
+.thread-question-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: color-mix(in srgb, #000 48%, transparent);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.thread-question-modal {
+  width: min(92vw, 460px);
+  max-height: min(72vh, 540px);
+  overflow: auto;
+  border: 1px solid var(--support-border-strong);
+  border-radius: 14px;
+  background: var(--support-surface);
+  box-shadow: var(--support-shadow-md);
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.thread-question-modal h3 {
+  margin: 0;
+  font-size: 1.04rem;
+  color: var(--support-text);
+}
+
+.thread-question-modal p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--support-text-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.thread-question-modal-close {
+  justify-self: end;
+  min-height: 34px;
+  border: 1px solid var(--support-border-strong);
+  border-radius: 9px;
+  background: var(--support-surface-strong);
+  color: var(--support-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 11px;
+  cursor: pointer;
 }
 
 .thread-solutions-list {
@@ -804,5 +864,33 @@
   .thread-icon-btn {
     font-size: 0.76rem;
     padding: 6px 9px;
+  }
+}
+
+@media (max-width: 960px) {
+  .thread-solutions-strip.mobile-compact {
+    position: sticky;
+    top: 0;
+    z-index: 28;
+  }
+
+  .thread-solutions-controls.mobile-compact-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+  }
+
+  .thread-solutions-controls.mobile-compact-controls select,
+  .thread-solutions-controls.mobile-compact-controls .thread-inline-add-btn {
+    height: 40px;
+    min-height: 40px;
+  }
+
+  .thread-solutions-controls.mobile-compact-controls .thread-solutions-search {
+    grid-column: 1 / -1;
+  }
+
+  .thread-strip-toggle--floating {
+    top: 0;
+    transform: translate(-50%, -50%);
   }
 }
