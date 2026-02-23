@@ -171,6 +171,8 @@ export default function HomeUpper({
   // === MODAL STATES ===
   const [showWishModal, setShowWishModal] = useState(false);
   const [showAIModal, setShowAIModal] = useState(false);
+  const [aiPopupSidebarHidden, setAiPopupSidebarHidden] = useState(false);
+  const [aiPopupRestoreSignal, setAiPopupRestoreSignal] = useState(0);
   const [showDateModal, setShowDateModal] = useState(false);
   const [clickedDate, setClickedDate] = useState(null);
     
@@ -259,7 +261,13 @@ export default function HomeUpper({
 
   const handleAIClick = (e) => {
     e.stopPropagation();
+    setAiPopupSidebarHidden(false);
+    setAiPopupRestoreSignal(0);
     setShowAIModal(true);
+  };
+
+  const handlePopupSidebarRestore = () => {
+    setAiPopupRestoreSignal((prev) => prev + 1);
   };
 
   const handleDateClick = (day) => {
@@ -271,6 +279,8 @@ export default function HomeUpper({
   const closeModals = () => {
     setShowWishModal(false);
     setShowAIModal(false);
+    setAiPopupSidebarHidden(false);
+    setAiPopupRestoreSignal(0);
     setShowDateModal(false);
     setSearchText("");
     setFilteredContacts(contacts);
@@ -629,6 +639,22 @@ export default function HomeUpper({
             {/* Header: Title + Immersive + Close */}
             <div className="gemini-card-header">
               <div className="header-left">
+                {aiPopupSidebarHidden && (
+                  <button
+                    type="button"
+                    className="gemini-header-sidebar-restore-btn"
+                    onClick={handlePopupSidebarRestore}
+                    aria-label="Show collapsed sidebar"
+                    title="Show collapsed sidebar"
+                  >
+                    <span className="ai-sidebar-collapse-icon right" aria-hidden="true">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="collapse-right">
+                        <path d="M11,17a1,1,0,0,1-.71-1.71L13.59,12,10.29,8.71a1,1,0,0,1,1.41-1.41l4,4a1,1,0,0,1,0,1.41l-4,4A1,1,0,0,1,11,17Z"></path>
+                        <path d="M15 13H5a1 1 0 0 1 0-2H15a1 1 0 0 1 0 2zM19 20a1 1 0 0 1-1-1V5a1 1 0 0 1 2 0V19A1 1 0 0 1 19 20z"></path>
+                      </svg>
+                    </span>
+                  </button>
+                )}
                 <AutoAwesomeIcon className="header-sparkle" />
                 <span className="header-title">AI Assistant</span>
               </div>
@@ -667,7 +693,11 @@ export default function HomeUpper({
 
             {/* Content: The Chat Widget */}
              <div className="gemini-card-body">
-               <AIChatWidget showHeaderBrand={false} />
+               <AIChatWidget
+                 showHeaderBrand={false}
+                 onSidebarHiddenChange={setAiPopupSidebarHidden}
+                 externalRestoreSignal={aiPopupRestoreSignal}
+               />
              </div>
 
           </div>

@@ -526,28 +526,36 @@ export default function Schedule() {
                       <Box key={row.id + col.date} sx={{
                         borderRight: '1px solid var(--border-color)',
                         borderBottom: '1px solid var(--border-color)',
-                        p: 1,
+                        p: 0,
                         minHeight: 70,
                         minWidth: isMobile ? 140 : 180,
-                        bgcolor: bookings.length ? 'var(--bg-default)' : 'var(--bg-paper)'
+                        bgcolor: bookings.length ? 'var(--bg-default)' : 'var(--bg-paper)',
+                        display: 'flex',
+                        flexDirection: 'column'
                       }}>
                         {bookings.length === 0 ? (
                           <Typography variant="body2" color="text.secondary">—</Typography>
                         ) : (
-                          bookings.map(b => {
+                          bookings.map((b, idx) => {
                             const color = colorFromString(b._id ? b._id.toString() : (b.event || b.startDateTime));
                             return (
                               <Box key={b._id || `${b.startDateTime}-${b.endDateTime}`} sx={{
-                                mb: 1,
-                                p: 0.5,
-                                borderRadius: 1,
-                                bgcolor: color,
-                                color: '#fff',
-                                boxShadow: '0 1px 2px rgba(0,0,0,0.12)',
+                                flex: 1,
+                                minHeight: 70 / Math.max(bookings.length, 1),
+                                p: '6px 8px',
+                                borderRadius: 0,
+                                bgcolor: `${color}33`,
+                                borderLeft: `4px solid ${color}`,
+                                color: 'var(--text-primary)',
+                                boxShadow: 'none',
                                 fontSize: 12,
                                 overflow: 'hidden',
                                 whiteSpace: 'nowrap',
-                                textOverflow: 'ellipsis'
+                                textOverflow: 'ellipsis',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'center',
+                                borderBottom: idx < bookings.length - 1 ? '1px solid var(--border-color)' : 'none'
                               }}>
                                 <strong style={{ fontSize: 12 }}>{b.event || 'Booked'}</strong>
                                 {bookingRequesterName(b) && (
@@ -687,13 +695,13 @@ export default function Schedule() {
                            key={b._id || `${b.startDateTime}`}
                            sx={{
                              position: 'absolute',
-                             top: 4,
-                             bottom: 4,
+                             top: 0,
+                             bottom: 0,
                              left: pos.left,
                              width: pos.width,
                              backgroundColor: `${baseColor}44`, // Low opacity background (hex + 44)
                              borderLeft: `4px solid ${baseColor}`,
-                             borderRadius: 1,
+                             borderRadius: 0,
                              padding: '2px 6px',
                              overflow: 'visible', // <--- FIXED: Changed from 'hidden' to 'visible'
                              whiteSpace: 'nowrap',

@@ -1167,7 +1167,7 @@ body.dark-mode .c-email {
 }
 
 /* Dark Mode Overrides for Content */
-body.dark-mode .gemini-card-header, 
+body.dark-mode .gemini-card-header,
 body.dark-mode .gemini-card-body {
   background: #131314;
 }
@@ -1180,6 +1180,38 @@ body.dark-mode .gemini-card-header {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.gemini-header-sidebar-restore-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  border: 1px solid rgba(66, 133, 244, 0.24);
+  background: rgba(66, 133, 244, 0.1);
+  color: #3b69d1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.gemini-header-sidebar-restore-btn:hover {
+  background: rgba(66, 133, 244, 0.18);
+  border-color: rgba(66, 133, 244, 0.42);
+  transform: translateY(-1px);
+}
+
+.gemini-header-sidebar-restore-btn:focus-visible {
+  outline: 2px solid rgba(66, 133, 244, 0.42);
+  outline-offset: 2px;
+}
+
+body.dark-mode .gemini-header-sidebar-restore-btn {
+  background: rgba(106, 165, 255, 0.16);
+  border-color: rgba(106, 165, 255, 0.34);
+  color: #a9c5ff;
 }
 
 .header-sparkle {

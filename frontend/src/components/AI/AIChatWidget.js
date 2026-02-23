@@ -206,7 +206,24 @@ const renderHighlightedText = (text, query) => {
   return nodes.length ? nodes : source;
 };
 
-export default function AIChatWidget({ immersive = false, showHeaderBrand = true }) {
+const SidebarCollapseArrowIcon = ({ direction = "right" }) => (
+  <span
+    className={`ai-sidebar-collapse-icon ${direction === "left" ? "left" : "right"}`.trim()}
+    aria-hidden="true"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="collapse-right">
+      <path d="M11,17a1,1,0,0,1-.71-1.71L13.59,12,10.29,8.71a1,1,0,0,1,1.41-1.41l4,4a1,1,0,0,1,0,1.41l-4,4A1,1,0,0,1,11,17Z"></path>
+      <path d="M15 13H5a1 1 0 0 1 0-2H15a1 1 0 0 1 0 2zM19 20a1 1 0 0 1-1-1V5a1 1 0 0 1 2 0V19A1 1 0 0 1 19 20z"></path>
+    </svg>
+  </span>
+);
+
+export default function AIChatWidget({
+  immersive = false,
+  showHeaderBrand = true,
+  onSidebarHiddenChange = null,
+  externalRestoreSignal = 0
+}) {
   const navigate = useNavigate();
   const [input, setInput] = useState("");
   const [threads, setThreads] = useState([]);
@@ -218,6 +235,7 @@ export default function AIChatWidget({ immersive = false, showHeaderBrand = true
 
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(Boolean(immersive));
+  const [sidebarHidden, setSidebarHidden] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(null);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [isCompactLayout, setIsCompactLayout] = useState(() =>
@@ -325,6 +343,23 @@ export default function AIChatWidget({ immersive = false, showHeaderBrand = true
     if (!sidebarOpen) stopSidebarResize();
   }, [sidebarOpen, stopSidebarResize]);
 
+  useEffect(() => {
+    if (sidebarHidden) stopSidebarResize();
+  }, [sidebarHidden, stopSidebarResize]);
+
+  useEffect(() => {
+    if (typeof onSidebarHiddenChange === "function") {
+      onSidebarHiddenChange(sidebarHidden);
+    }
+  }, [onSidebarHiddenChange, sidebarHidden]);
+
+  useEffect(() => {
+    if (!externalRestoreSignal) return;
+    if (!sidebarHidden) return;
+    setSidebarHidden(false);
+    setSidebarOpen(false);
+  }, [externalRestoreSignal, sidebarHidden]);
+
   useEffect(() => () => stopSidebarResize(), [stopSidebarResize]);
 
   useEffect(() => {
@@ -372,9 +407,9 @@ export default function AIChatWidget({ immersive = false, showHeaderBrand = true
 
   const messages = useMemo(() => activeThread?.messages || [], [activeThread]);
   const sidebarInlineStyle = useMemo(() => {
-    if (!sidebarOpen || isCompactLayout || !sidebarWidth) return undefined;
+    if (sidebarHidden || !sidebarOpen || isCompactLayout || !sidebarWidth) return undefined;
     return { "--gemini-sidebar-open-width": `${sidebarWidth}px` };
-  }, [isCompactLayout, sidebarOpen, sidebarWidth]);
+  }, [isCompactLayout, sidebarHidden, sidebarOpen, sidebarWidth]);
 
   const [welcomeHeadlineText, welcomeSubtitleText] = useMemo(() => {
     const parts = String(animatedWelcomeText || "").split("\n");
@@ -1148,6 +1183,15 @@ export default function AIChatWidget({ immersive = false, showHeaderBrand = true
     );
   }
 
+  const hideSidebarCompletely = () => {
+    setSidebarOpen(false);
+    setSidebarHidden(true);
+    setShowSettings(false);
+  };
+  const restoreCollapsedSidebar = () => {
+    setSidebarHidden(false);
+    setSidebarOpen(false);
+  };
   const showImmersiveLiveButton = Boolean(immersive);
   const showInputLiveButton = !showImmersiveLiveButton;
 
@@ -1155,7 +1199,7 @@ export default function AIChatWidget({ immersive = false, showHeaderBrand = true
     <div ref={chatShellRef} className={`gemini-chat-shell ${immersive ? "immersive-shell" : ""}`}>
       <aside
         ref={sidebarRef}
-        className={`gemini-sidebar ${sidebarOpen ? "open" : "collapsed"} ${isResizingSidebar ? "resizing" : ""}`.trim()}
+        className={`gemini-sidebar ${sidebarHidden ? "hidden" : sidebarOpen ? "open" : "collapsed"} ${isResizingSidebar ? "resizing" : ""}`.trim()}
         style={sidebarInlineStyle}
       >
         <div className="sidebar-top-row">
@@ -1277,6 +1321,15 @@ export default function AIChatWidget({ immersive = false, showHeaderBrand = true
             </div>
           ) : (
             <div className="sidebar-bottom-icons">
+              <Tooltip title="Hide sidebar completely">
+                <IconButton
+                  size="small"
+                  className="sidebar-hide-icon-btn"
+                  onClick={hideSidebarCompletely}
+                >
+                  <SidebarCollapseArrowIcon direction="left" />
+                </IconButton>
+              </Tooltip>
               <Tooltip title="Voice settings">
                 <IconButton
                   size="small"
@@ -1310,6 +1363,18 @@ export default function AIChatWidget({ immersive = false, showHeaderBrand = true
       <div className={`gemini-chat-root ${immersive ? "immersive-container" : ""}`}>
         <div className="gemini-header">
           <div className="gemini-header-left">
+            {sidebarHidden && showHeaderBrand && (
+              <Tooltip title="Show collapsed sidebar">
+                <button
+                  type="button"
+                  className="header-sidebar-restore-btn"
+                  onClick={restoreCollapsedSidebar}
+                  aria-label="Show collapsed sidebar"
+                >
+                  <SidebarCollapseArrowIcon direction="right" />
+                </button>
+              </Tooltip>
+            )}
             {showHeaderBrand && (
               <span className="gemini-popup-brand">
                 <AutoAwesomeIcon className="gemini-popup-sparkle" />
