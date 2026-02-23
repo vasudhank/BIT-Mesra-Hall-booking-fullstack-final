@@ -103,6 +103,7 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
   const { id } = useParams();
   const issueCardRef = useRef(null);
   const addSolutionCardRef = useRef(null);
+  const answersStripRef = useRef(null);
   const lastScrollYRef = useRef(0);
   const [complaint, setComplaint] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -217,10 +218,12 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
       const currentY = window.scrollY || window.pageYOffset || 0;
       const isScrollingDown = currentY >= lastScrollYRef.current;
       lastScrollYRef.current = currentY;
+      const stripHeight = answersStripRef.current?.offsetHeight || 0;
+      const triggerLine = Math.max(64, Math.min(stripHeight, 220));
 
       setIsAddSolutionCompact((prev) => {
-        if (!prev && isScrollingDown && rect.bottom <= 64) return true;
-        if (prev && !isScrollingDown && rect.bottom > 0) return false;
+        if (!prev && isScrollingDown && rect.bottom <= triggerLine) return true;
+        if (prev && !isScrollingDown && rect.bottom > triggerLine + 8) return false;
         return prev;
       });
       ticking = false;
@@ -545,6 +548,7 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
 
         <section className="thread-solutions-card">
           <div
+            ref={answersStripRef}
             className={`thread-solutions-strip ${showCompactAnswerControls ? 'mobile-compact' : ''} ${
               isAnswersStripCollapsedOnMobile ? 'strip-collapsed-mobile' : ''
             }`}
