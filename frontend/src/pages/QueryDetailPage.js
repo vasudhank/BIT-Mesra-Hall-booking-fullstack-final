@@ -196,24 +196,25 @@ export default function QueryDetailPage({ mode = 'public' }) {
   }, []);
 
   useEffect(() => {
-    if (!isMobile) {
+    if (!isMobile || !addSolutionCardRef.current) {
       setIsAddSolutionCompact(false);
       return;
     }
 
-    const updateCompactState = () => {
-      const rect = addSolutionCardRef.current?.getBoundingClientRect();
-      const pastViewport = Boolean(rect && rect.bottom <= 0);
-      setIsAddSolutionCompact(pastViewport);
-    };
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // Match /queries strip behavior, but only when card is past viewport upward.
+        const compact = entry.intersectionRatio < 0.2 && entry.boundingClientRect.top < 0;
+        setIsAddSolutionCompact(compact);
+      },
+      {
+        threshold: [0, 0.2, 0.5, 1],
+        rootMargin: '-64px 0px 0px 0px'
+      }
+    );
 
-    updateCompactState();
-    window.addEventListener('scroll', updateCompactState, { passive: true });
-    window.addEventListener('resize', updateCompactState);
-    return () => {
-      window.removeEventListener('scroll', updateCompactState);
-      window.removeEventListener('resize', updateCompactState);
-    };
+    observer.observe(addSolutionCardRef.current);
+    return () => observer.disconnect();
   }, [id, isMobile]);
 
   useEffect(() => {
