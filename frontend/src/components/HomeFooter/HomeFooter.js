@@ -10,6 +10,10 @@ export default function HomeFooter() {
         <div className="footer-links">
           <Link to="/about" className="footer-link">About Us</Link>
           <Link to="/faqs" className="footer-link">FAQs</Link>
+          <Link to="/queries" className="footer-link">Queries</Link>
+          <Link to="/complaints" className="footer-link">Complaints</Link>
+          <Link to="/feedback" className="footer-link">Feedback</Link>
+          <Link to="/developer/complaints" className="footer-link">Developer Portal</Link>
           <a 
             href="https://bitmesra.ac.in/" 
             target="_blank" 

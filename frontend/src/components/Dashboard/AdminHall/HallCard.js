@@ -9,6 +9,7 @@ import EventSeatIcon from '@mui/icons-material/EventSeat';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'; 
 import IconButton from '@mui/material/IconButton';
 import Box from '@mui/material/Box';
+import Checkbox from '@mui/material/Checkbox';
 import api from '../../../api/axiosInstance';
 import { clearHallApi } from '../../../api/clearhallapi'
 
@@ -60,10 +61,15 @@ function formatBookingRange(start, end) {
 }
 
 export default function HallCard(props) {
-  
+  const isSelected = Boolean(props.isSelected);
+
   // 1. Logic to VACATE the hall
   const handleVacate = async () => {
     try {
+      if (typeof props.onVacateHall === 'function') {
+        await props.onVacateHall(props.data);
+        return;
+      }
       const data = { name: props.data.name }
       await clearHallApi(data);
       // Refresh the list immediately to update status on this page and schedule
@@ -75,6 +81,15 @@ export default function HallCard(props) {
 
   // 2. Logic to DELETE the hall
   const handleDelete = async () => {
+    if (typeof props.onDeleteHall === 'function') {
+      try {
+        await props.onDeleteHall(props.data);
+      } catch (err) {
+        console.error("Failed to delete hall", err);
+      }
+      return;
+    }
+
     if(!window.confirm(`Are you sure you want to delete ${props.data.name}? This cannot be undone.`)) return;
 
     try {
@@ -100,6 +115,16 @@ export default function HallCard(props) {
   return (
     <>
       <Card sx={{ width: '100%', position: 'relative' }} className='hall-admin-card' >
+        
+        <Box className="hall-select-anchor">
+          <Checkbox
+            size="small"
+            checked={isSelected}
+            onChange={() => props.onToggleSelect && props.onToggleSelect(props.data._id)}
+            className="hall-select-checkbox"
+            inputProps={{ 'aria-label': `Select ${props.data.name}` }}
+          />
+        </Box>
         
         {/* DELETE BUTTON - Top Right */}
         <IconButton 

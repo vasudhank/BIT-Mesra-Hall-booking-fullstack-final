@@ -1,41 +1,143 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import HomeUpper from '../components/HomeUpper/HomeUpper';
 import HomeFooter from '../components/HomeFooter/HomeFooter';
+import { listFaqs } from '../api/faqApi';
+import './FAQ.css';
 
-export default function FAQ() {
-  const faqs = [
-    {
-      q: "How does the system prevent booking conflicts?",
-      a: "The system provides a real-time schedule where rows represent halls and columns represent dates/slots. Faculty can see availability before requesting, and administrators are alerted to overlapping requests instantly."
-    },
-    {
-      q: "How will I know if my booking is approved?",
-      a: "Once the administrator makes a decision, you will receive an automated notification via both Email and SMS."
-    },
-    {
-      q: "What is AI Mode?",
-      a: "AI Mode is an intelligent assistant that allows you to book halls using voice commands, provides step-by-step navigation, and answers questions about the system in natural language."
-    },
-    {
-      q: "Can I contact other department heads directly?",
-      a: "Yes, the platform includes a direct contact directory with phone numbers and email addresses of faculty members and administrators for instant communication."
+export default function FAQ({ lightMode, toggleTheme }) {
+  const sectionTopRef = useRef(null);
+  const [faqs, setFaqs] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [openFaqId, setOpenFaqId] = useState(null); // Added for accordion UI
+  const [mobileHeaderExpanded, setMobileHeaderExpanded] = useState(false);
+
+  const loadFaqs = async () => {
+    setLoading(true);
+    try {
+      const res = await listFaqs();
+      setFaqs(Array.isArray(res.faqs) ? res.faqs.filter((x) => x.active) : []);
+    } catch (err) {
+      console.error('Failed to load FAQs', err);
+      setFaqs([]);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  useEffect(() => {
+    loadFaqs();
+  }, []);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, []);
+
+  useEffect(() => {
+    const evaluate = () => {
+      if (!sectionTopRef.current || window.innerWidth > 1364) {
+        setMobileHeaderExpanded(false);
+        return;
+      }
+      const sectionTop = sectionTopRef.current.getBoundingClientRect().top;
+      setMobileHeaderExpanded(sectionTop <= 0);
+    };
+
+    evaluate();
+    window.addEventListener('scroll', evaluate, { passive: true });
+    window.addEventListener('resize', evaluate);
+
+    return () => {
+      window.removeEventListener('scroll', evaluate);
+      window.removeEventListener('resize', evaluate);
+    };
+  }, []);
+
+  const toggleFaq = (id) => {
+    setOpenFaqId(openFaqId === id ? null : id);
+  };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <HomeUpper />
-      <div style={{ flex: 1, padding: '60px 20px', maxWidth: '800px', margin: '0 auto' }}>
-        <h1 style={{ fontSize: '2.5rem', marginBottom: '40px', textAlign: 'center' }}>Frequently Asked Questions</h1>
-        <div className="faq-list">
-          {faqs.map((faq, index) => (
-            <div key={index} style={{ marginBottom: '30px', padding: '20px', borderRadius: '8px', backgroundColor: 'rgba(128,128,128,0.05)', border: '1px solid var(--border-color)' }}>
-              <h3 style={{ color: 'var(--text-primary)', marginBottom: '10px' }}>{faq.q}</h3>
-              <p style={{ color: 'var(--text-secondary)', lineHeight: '1.6' }}>{faq.a}</p>
+    <div className="faq-page">
+      <HomeUpper
+        lightMode={lightMode}
+        toggleTheme={toggleTheme}
+        mobileHeaderExpanded={mobileHeaderExpanded}
+      />
+      <div ref={sectionTopRef} />
+      
+      <div className="faq-container">
+        <div className="faq-header-wrapper">
+          <h1 className="faq-title">Frequently Asked Questions</h1>
+          <p className="faq-subtitle">Trusted answers for common BIT Booking workflows.</p>
+        </div>
+
+        <div className="faq-layout">
+          <section className="faq-main">
+            {loading ? (
+              <div className="faq-empty">
+                <div className="faq-spinner"></div>
+                <p>Loading answers...</p>
+              </div>
+            ) : faqs.length === 0 ? (
+              <div className="faq-empty">
+                <p>No FAQs available yet.</p>
+              </div>
+            ) : (
+              <div className="faq-list">
+                {faqs.map((faq) => {
+                  const isOpen = openFaqId === faq._id;
+                  return (
+                    <article 
+                      className={`faq-item ${isOpen ? 'open' : ''}`} 
+                      key={faq._id}
+                      onClick={() => toggleFaq(faq._id)}
+                    >
+                      <div className="faq-item-header">
+                        <h3>{faq.question}</h3>
+                        <span className="faq-chevron">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                          </svg>
+                        </span>
+                      </div>
+                      
+                      <div className="faq-item-content">
+                        <div className="faq-item-inner">
+                          <p>{faq.answer}</p>
+                          {faq.isAIGenerated && (
+                            <span className="faq-ai-tag">
+                              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
+                              AI Generated
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <aside className="faq-side">
+            <div className="faq-help-card">
+              <div className="faq-help-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              </div>
+              <h2>Need something else?</h2>
+              <p>If your answer is not listed here, use our live channels:</p>
+              
+              <div className="faq-help-links">
+                <Link to="/queries" className="faq-link-btn">Ask in Queries</Link>
+                <Link to="/complaints" className="faq-link-btn">Raise Complaint</Link>
+                <Link to="/feedback" className="faq-link-btn">Share Feedback</Link>
+              </div>
             </div>
-          ))}
+          </aside>
         </div>
       </div>
+      
       <HomeFooter />
     </div>
   );

@@ -249,19 +249,95 @@ exports.sendBookingApprovalMail = async ({ adminEmail, booking, approveUrl, reje
 };
 
 /* =========================================================
+   4B. ADMIN: AUTO-BOOKED REQUEST (VACATE / LEAVE)
+   ========================================================= */
+exports.sendBookingAutoBookedMail = async ({ adminEmail, booking, vacateUrl, leaveUrl }) => {
+  const html = `
+  <div style="background:#f3f4f6;padding:30px;font-family:Inter,Arial;">
+    <div style="max-width:600px;margin:auto;background:#ffffff;
+      border-radius:14px;box-shadow:0 12px 30px rgba(0,0,0,0.12);
+      overflow:hidden;">
+
+      <div style="background:linear-gradient(135deg,#0ea5e9,#0369a1);
+        padding:22px;color:#fff;">
+        <h2 style="margin:0;">Hall Auto-Booked (No Conflict)</h2>
+        <p style="margin:6px 0 0;font-size:14px;opacity:.9;">
+          You can keep it or vacate it
+        </p>
+      </div>
+
+      <div style="padding:26px;color:#111827;">
+        <p><b>Hall:</b> ${booking.hall}</p>
+        <p><b>Event:</b> ${booking.event}</p>
+        <p><b>Time:</b><br/>
+          ${formatDateTime(booking.startDateTime)} –<br/>
+          ${formatDateTime(booking.endDateTime)}
+        </p>
+
+        <div style="margin:28px 0;text-align:center;">
+          <a href="${vacateUrl}"
+            style="background:#ef4444;color:#fff;
+            padding:12px 22px;border-radius:10px;
+            text-decoration:none;font-weight:600;margin-right:10px;">
+            🧹 Vacate
+          </a>
+
+          <a href="${leaveUrl}"
+            style="background:#16a34a;color:#fff;
+            padding:12px 22px;border-radius:10px;
+            text-decoration:none;font-weight:600;">
+            ✅ Leave
+          </a>
+        </div>
+
+        <p style="font-size:13px;color:#6b7280;">
+          Leave = remove this card from dashboard and keep hall booked.
+        </p>
+      </div>
+
+      <div style="background:#f9fafb;padding:14px;
+        text-align:center;font-size:12px;color:#6b7280;">
+        Seminar Hall Booking System
+      </div>
+    </div>
+  </div>
+  `;
+
+  await transporter.sendMail({
+    to: adminEmail,
+    subject: '📌 Hall Auto-Booked: Vacate or Leave',
+    html
+  });
+};
+
+/* =========================================================
    5. DEPARTMENT: BOOKING DECISION NOTICE (EXISTING)
    ========================================================= */
 exports.sendDecisionToDepartment = async ({ email, booking, decision }) => {
-  const isApproved = decision === 'APPROVED';
+  const isApproved = decision === 'APPROVED' || decision === 'AUTO_BOOKED';
+  const isVacated = decision === 'VACATED';
+  const headerLabel = isApproved
+    ? (decision === 'AUTO_BOOKED' ? 'Booking AUTO-BOOKED' : 'Booking APPROVED')
+    : isVacated
+      ? 'Booking VACATED'
+      : 'Booking REJECTED';
+  const headerColor = isApproved ? '#16a34a' : isVacated ? '#d97706' : '#dc2626';
+  const bodyText = isApproved
+    ? (decision === 'AUTO_BOOKED'
+      ? '✅ Your booking had no conflict and was auto-booked.'
+      : '✅ Your booking has been successfully approved.')
+    : isVacated
+      ? '⚠️ Your already booked hall was vacated by admin. Please raise a new request if required.'
+      : '❌ Your booking request has been rejected.';
 
   const html = `
   <div style="background:#f3f4f6;padding:30px;font-family:Inter,Arial;">
     <div style="max-width:560px;margin:auto;background:#ffffff;
       border-radius:14px;box-shadow:0 10px 25px rgba(0,0,0,0.12);">
 
-      <div style="background:${isApproved ? '#16a34a' : '#dc2626'};
+      <div style="background:${headerColor};
         padding:22px;color:#fff;">
-        <h2 style="margin:0;">Booking ${decision}</h2>
+        <h2 style="margin:0;">${headerLabel}</h2>
       </div>
 
       <div style="padding:26px;color:#111827;">
@@ -273,11 +349,7 @@ exports.sendDecisionToDepartment = async ({ email, booking, decision }) => {
         </p>
 
         <p style="margin-top:20px;">
-          ${
-            isApproved
-              ? '✅ Your booking has been successfully approved.'
-              : '❌ Your booking request has been rejected.'
-          }
+          ${bodyText}
         </p>
       </div>
 
@@ -291,7 +363,7 @@ exports.sendDecisionToDepartment = async ({ email, booking, decision }) => {
 
   await transporter.sendMail({
     to: email,
-    subject: `Hall Booking ${decision}`,
+    subject: `Hall Booking ${headerLabel}`,
     html
   });
 };

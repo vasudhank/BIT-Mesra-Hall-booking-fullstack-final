@@ -67,11 +67,14 @@ ${rejectUrl}`;
 };
 
 /* =========================================================
-   2. SMS TO DEPARTMENT (HALL BOOKING DECISION) - EXISTING
+   1B. SMS TO ADMIN (AUTO-BOOKED: VACATE / LEAVE)
    ========================================================= */
-exports.sendDecisionSMSDepartment = async ({ booking, decision }) => {
+exports.sendBookingAutoBookedSMS = async ({ booking, token }) => {
+  const vacateUrl = `${process.env.PUBLIC_BASE_URL}/api/approval/vacate/${token}`;
+  const leaveUrl = `${process.env.PUBLIC_BASE_URL}/api/approval/leave/${token}`;
+
   const message =
-`Hall Booking ${decision} (#${shortId(booking._id)})
+`Hall Auto-Booked (No Conflict)
 
 Hall: ${booking.hall}
 Event: ${booking.event}
@@ -81,7 +84,45 @@ ${formatDateTime(booking.startDateTime)}
 to
 ${formatDateTime(booking.endDateTime)}
 
-Status: ${decision}`;
+Vacate:
+${vacateUrl}
+
+Leave:
+${leaveUrl}`;
+
+  await sendSMS(message, TEST_PHONE);
+};
+
+/* =========================================================
+   2. SMS TO DEPARTMENT (HALL BOOKING DECISION) - EXISTING
+   ========================================================= */
+exports.sendDecisionSMSDepartment = async ({ booking, decision }) => {
+  const decisionLabel =
+    decision === 'AUTO_BOOKED'
+      ? 'AUTO-BOOKED'
+      : decision === 'VACATED'
+        ? 'VACATED'
+        : decision;
+
+  const decisionHint =
+    decision === 'AUTO_BOOKED'
+      ? 'Status: Auto-booked without admin approval'
+      : decision === 'VACATED'
+        ? 'Status: Booking was vacated by admin'
+        : `Status: ${decisionLabel}`;
+
+  const message =
+`Hall Booking ${decisionLabel} (#${shortId(booking._id)})
+
+Hall: ${booking.hall}
+Event: ${booking.event}
+
+Time:
+${formatDateTime(booking.startDateTime)}
+to
+${formatDateTime(booking.endDateTime)}
+
+${decisionHint}`;
 
   await sendSMS(message, TEST_PHONE);
 };

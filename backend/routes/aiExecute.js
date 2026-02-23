@@ -7,11 +7,13 @@ const { generateApprovalToken, getTokenExpiry } = require('../utils/token');
 
 const {
   sendBookingApprovalMail,
+  sendBookingAutoBookedMail,
   sendDecisionToDepartment
 } = require('../services/emailService');
 
 const {
   sendBookingApprovalSMS,
+  sendBookingAutoBookedSMS,
   sendDecisionSMSDepartment
 } = require('../services/smsService');
 
@@ -238,6 +240,8 @@ router.post('/execute', async (req, res) => {
       }
 
       let successCount = 0;
+      let autoBookedCount = 0;
+      let pendingApprovalCount = 0;
       const failMessages = [];
 
       for (const requestItem of requests) {
@@ -273,26 +277,16 @@ router.post('/execute', async (req, res) => {
             continue;
           }
 
-          const hallExists = await Hall.findOne({ name: hall });
-          if (!hallExists) {
+          const hallDoc = await Hall.findOne({ name: hall });
+          if (!hallDoc) {
             failMessages.push(`Hall not found: ${hall}.`);
             continue;
           }
 
-          const existingOverlap = await Hall.findOne({
-            name: hall,
-            bookings: {
-              $elemMatch: {
-                startDateTime: { $lt: endDateTime },
-                endDateTime: { $gt: startDateTime }
-              }
-            }
-          });
-
-          if (existingOverlap) {
-            failMessages.push(`${hall} is already occupied for that time range.`);
-            continue;
-          }
+          const overlappingBookings = (hallDoc.bookings || []).filter((booking) =>
+            overlaps(startDateTime, endDateTime, booking.startDateTime, booking.endDateTime)
+          );
+          const hasConflict = overlappingBookings.length > 0;
 
           const approvalToken = generateApprovalToken();
           const tokenExpiry = getTokenExpiry(15);
@@ -312,29 +306,94 @@ router.post('/execute', async (req, res) => {
             endDate: date,
             approvalToken,
             tokenExpiry,
-            status: 'PENDING'
+            status: hasConflict ? 'PENDING' : 'AUTO_BOOKED'
           });
 
           const saved = await newRequest.save();
           const baseUrl = `${process.env.PUBLIC_BASE_URL}/api/approval`;
 
-          safeExecute(
-            () => sendBookingApprovalMail({
-              adminEmail: process.env.EMAIL,
-              booking: saved,
-              approveUrl: `${baseUrl}/approve/${approvalToken}`,
-              rejectUrl: `${baseUrl}/reject/${approvalToken}`
-            }),
-            'ADMIN EMAIL'
-          );
+          if (hasConflict) {
+            const overlappingRequestIds = overlappingBookings
+              .map((booking) => booking.bookingRequest)
+              .filter(Boolean);
 
-          safeExecute(
-            () => sendBookingApprovalSMS({
-              booking: saved,
-              token: approvalToken
-            }),
-            'ADMIN SMS'
-          );
+            if (overlappingRequestIds.length > 0) {
+              await Booking_Requests.updateMany(
+                {
+                  _id: { $in: overlappingRequestIds },
+                  status: { $in: ['APPROVED', 'LEFT'] }
+                },
+                { $set: { status: 'AUTO_BOOKED' } }
+              );
+            }
+
+            safeExecute(
+              () => sendBookingApprovalMail({
+                adminEmail: process.env.EMAIL,
+                booking: saved,
+                approveUrl: `${baseUrl}/approve/${approvalToken}`,
+                rejectUrl: `${baseUrl}/reject/${approvalToken}`
+              }),
+              'ADMIN EMAIL'
+            );
+
+            safeExecute(
+              () => sendBookingApprovalSMS({
+                booking: saved,
+                token: approvalToken
+              }),
+              'ADMIN SMS'
+            );
+
+            pendingApprovalCount += 1;
+          } else {
+            hallDoc.bookings.push({
+              bookingRequest: saved._id,
+              department: user.id,
+              event,
+              startDateTime,
+              endDateTime
+            });
+            hallDoc.status = hallDoc.isFilledAt(new Date()) ? 'Filled' : 'Not Filled';
+            await hallDoc.save();
+
+            safeExecute(
+              () => sendBookingAutoBookedMail({
+                adminEmail: process.env.EMAIL,
+                booking: saved,
+                vacateUrl: `${baseUrl}/vacate/${approvalToken}`,
+                leaveUrl: `${baseUrl}/leave/${approvalToken}`
+              }),
+              'ADMIN EMAIL'
+            );
+
+            safeExecute(
+              () => sendBookingAutoBookedSMS({
+                booking: saved,
+                token: approvalToken
+              }),
+              'ADMIN SMS'
+            );
+
+            safeExecute(
+              () => sendDecisionToDepartment({
+                email: user.email,
+                booking: saved,
+                decision: 'AUTO_BOOKED'
+              }),
+              'DEPARTMENT EMAIL'
+            );
+
+            safeExecute(
+              () => sendDecisionSMSDepartment({
+                booking: saved,
+                decision: 'AUTO_BOOKED'
+              }),
+              'DEPARTMENT SMS'
+            );
+
+            autoBookedCount += 1;
+          }
 
           successCount += 1;
         } catch (err) {
@@ -350,7 +409,7 @@ router.post('/execute', async (req, res) => {
       const suffix = failMessages.length > 0 ? ` ${failMessages.join(' ')}` : '';
       return res.json({
         status: 'DONE',
-        message: `Created ${successCount} booking request(s).${suffix}`
+        message: `Created ${successCount} booking request(s). Auto-booked: ${autoBookedCount}, pending admin approval: ${pendingApprovalCount}.${suffix}`
       });
     }
 

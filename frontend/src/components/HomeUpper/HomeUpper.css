@@ -604,6 +604,16 @@ body.dark-mode .clock-scrolled .clock-separator {
   display: none;
 }
 
+.mobile-toggle-fixed.mobile-toggle-in-header {
+  --toggle-w: 46px;
+  --toggle-h: 24px;
+  --toggle-icon-size: 10px;
+  top: 6px;
+  left: 14px;
+  transform: none;
+  z-index: 120;
+}
+
 @media (max-width: 1364px) {
   .mobile-toggle-fixed { display: flex; animation: fadeIn 0.5s ease; }
 }
@@ -936,6 +946,18 @@ body.dark-mode .mobile-menu-toggle {
   animation: fadeIn 0.5s ease;
 }
 
+.mobile-datetime-bar.mobile-datetime-bar--expanded {
+  left: 0;
+  width: 100%;
+  padding: 6px 10px 6px 88px;
+  justify-content: flex-start;
+  box-sizing: border-box;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 110;
+}
+
 /* Theme Colors for Date-Time Bar */
 body:not(.dark-mode) .mobile-datetime-bar {
   background-color: #ffffff;
@@ -945,6 +967,14 @@ body:not(.dark-mode) .mobile-datetime-bar {
 body.dark-mode .mobile-datetime-bar {
   background-color: #000000;
   color: #ffffff;
+}
+
+body:not(.dark-mode) .mobile-datetime-bar.mobile-datetime-bar--expanded {
+  background-color: #e6e9ec;
+}
+
+body.dark-mode .mobile-datetime-bar.mobile-datetime-bar--expanded {
+  background-color: #000000;
 }
 
 .mobile-wish-btn { position: absolute; top: 90px; left: 20px; background: rgba(255, 255, 255, 0.9); color: #333; border: none; border-radius: 30px; padding: 10px 18px; display: flex; align-items: center; gap: 8px; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.9rem; box-shadow: 0 4px 15px rgba(0,0,0,0.15); z-index: 9; cursor: pointer; display: none; }
@@ -979,9 +1009,14 @@ body.dark-mode .mobile-datetime-bar {
   .mobile-menu-toggle { display: flex; animation: fadeIn 0.5s ease; }
   .mobile-wish-btn { display: flex; animation: fadeIn 0.5s ease; }
   .mobile-ai-fab { display: flex; animation: popup 0.5s ease; }
-  .logo-img, .logo-img2 { width: 50px; }
-  .logo-container { left: 10px; }
-  .logo-container2 { right: 10px; }
+  .logo-img, .logo-img2 { width: 34px; }
+  .logo-container,
+  .logo-container2 {
+    top: 44px;
+    z-index: 88;
+  }
+  .logo-container { left: 14px; }
+  .logo-container2 { right: 14px; }
   .hero-content-mobile { padding: 1rem; justify-content: flex-start; background: transparent; }
   .hero-content h1 { padding-top: 20vh; text-align:left; font-size: 4.8rem; margin-bottom: 10px; text-shadow: 0 4px 10px rgba(0,0,0,0.6); }
   .hero-content h1 span { font-size:3.8rem; text-shadow: 0 4px 10px rgba(0,0,0,0.6); padding-top: 30vh; text-align:center; }
@@ -993,7 +1028,16 @@ body.dark-mode .mobile-datetime-bar {
   .c-num, .c-email { font-size: 0.9rem; color: #64748b; }
   .popup-card, .popup-card-wide { width: 95%; max-width: 95%; padding: 20px 15px; }
 }
-@media (max-width: 400px) { .hero-content h1 { font-size: 2.8rem; } .mobile-wish-btn { top: 80px; font-size: 0.8rem; padding: 8px 14px; } .mobile-menu-toggle { top: 80px; width: 40px; height: 40px; } }
+@media (max-width: 400px) {
+  .hero-content h1 { font-size: 2.8rem; }
+  .mobile-wish-btn { top: 80px; font-size: 0.8rem; padding: 8px 14px; }
+  .mobile-menu-toggle { top: 80px; width: 40px; height: 40px; }
+  .logo-container,
+  .logo-container2 {
+    top: 40px;
+  }
+  .logo-img, .logo-img2 { width: 30px; }
+}
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 /* =========================================================

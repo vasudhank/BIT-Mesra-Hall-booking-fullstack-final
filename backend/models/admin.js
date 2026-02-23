@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 
 const adminSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        default: 'Admin'
+    },
     email:{
         type:String,
         required:true
@@ -15,9 +19,17 @@ const adminSchema = new mongoose.Schema({
     default: 'Admin',
     immutable: true
   },
+    phone: {
+      type: String,
+      default: ''
+    },
   
     otp: String,
-    otpExpiry: Date
+    otpExpiry: Date,
+    pendingEmail: {
+      type: String,
+      default: null
+    }
 
 });
 

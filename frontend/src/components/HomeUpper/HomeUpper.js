@@ -130,7 +130,11 @@ const ThemeButton = ({ className, lightMode, toggleTheme }) => (
 );
 
 
-export default function HomeUpper({ lightMode, toggleTheme }) {
+export default function HomeUpper({
+  lightMode = true,
+  toggleTheme = () => {},
+  mobileHeaderExpanded = false
+}) {
   const auth = useSelector((state) => state.user);
   const location = useLocation();
   const navigate = useNavigate();
@@ -488,7 +492,7 @@ export default function HomeUpper({ lightMode, toggleTheme }) {
 
       {/* 3. Mobile Date Time Bar (Fixed Top) */}
       {isMobile && (
-        <div className="mobile-datetime-bar">
+        <div className={`mobile-datetime-bar ${mobileHeaderExpanded ? 'mobile-datetime-bar--expanded' : ''}`}>
           {timeData.mobileDateTimeStr}
         </div>
       )}
@@ -504,7 +508,7 @@ export default function HomeUpper({ lightMode, toggleTheme }) {
       {/* 5. Mobile Theme Toggle (Fixed Center) */}
       {isMobile && (
         <ThemeButton 
-          className="mobile-toggle-fixed" 
+          className={`mobile-toggle-fixed ${mobileHeaderExpanded ? 'mobile-toggle-in-header' : ''}`} 
           lightMode={lightMode} 
           toggleTheme={toggleTheme} 
         />

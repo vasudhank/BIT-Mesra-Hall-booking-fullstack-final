@@ -10,6 +10,9 @@
   --appbar-height: 64px;
   --content-gap: 4px;
   --section-top-gap: 8px;
+  --admin-hall-strip-top: calc(var(--appbar-height) + 8px);
+  --admin-hall-strip-bg: #21304a;
+  --admin-hall-strip-space: 84px;
 }
 
 .admin-hall-body {
@@ -31,6 +34,10 @@
   padding-right: 70px;
   padding-bottom: 40px;
   overflow-y: auto;
+}
+
+.admin-hall-body.admin-hall-appbar-hidden {
+  padding-top: 12px;
 }
 
 /* Force MUI Cards inside this page to use the custom blue variable */
@@ -58,9 +65,164 @@
   justify-content: center;
 }
 
+.btn-admin-hall-create {
+  background: #8d6850 !important;
+  border-radius: 1rem !important;
+  font-family: 'RecklessNeue' !important;
+  color: white !important;
+  font-size: 0.95rem !important;
+  text-transform: none !important;
+  padding: 8px 20px !important;
+  white-space: nowrap;
+}
+
 .modal .btn-admin-hall {
   width: 100% !important;
   margin-top: 1.5rem !important;
+}
+
+.admin-hall-controls-strip {
+  position: fixed;
+  left: 0px;
+  right: 0px;
+  top: var(--admin-hall-strip-top);
+  width: auto;
+  z-index: 35;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  box-sizing: border-box;
+  padding: 10px 12px 8px 12px;
+  background: var(--admin-hall-strip-bg);
+  border-radius: 12px;
+}
+
+.admin-hall-body.admin-hall-appbar-hidden .admin-hall-controls-strip {
+  top: 8px;
+}
+
+.admin-hall-controls-anchor {
+  position: relative;
+}
+
+.admin-hall-controls-spacer {
+  height: var(--admin-hall-strip-space);
+}
+
+.admin-hall-controls-left,
+.admin-hall-controls-right {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-hall-select-inline {
+  display: inline-flex;
+  align-items: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
+  color: #f3f5ff;
+  border-radius: 999px;
+  padding: 3px 10px 3px 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.admin-hall-bulk-btn {
+  text-transform: none !important;
+  border-radius: 999px !important;
+  color: #fff !important;
+  font-size: 0.78rem !important;
+  padding: 7px 14px !important;
+  min-width: fit-content !important;
+  border: 1px solid transparent !important;
+}
+
+.admin-hall-bulk-btn.bulk-vacate {
+  background: rgba(34, 197, 94, 0.18) !important;
+  border-color: rgba(34, 197, 94, 0.45) !important;
+}
+
+.admin-hall-bulk-btn.bulk-vacate-all {
+  background: rgba(14, 165, 233, 0.18) !important;
+  border-color: rgba(14, 165, 233, 0.45) !important;
+}
+
+.admin-hall-bulk-btn.bulk-delete {
+  background: rgba(239, 68, 68, 0.18) !important;
+  border-color: rgba(239, 68, 68, 0.45) !important;
+}
+
+.admin-hall-sort-control {
+  min-width: 210px;
+}
+
+.admin-hall-sort-control .MuiOutlinedInput-root {
+  border-radius: 999px !important;
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.admin-hall-sort-control .MuiSelect-select {
+  font-size: 0.9rem;
+  font-family: 'Inter', sans-serif;
+}
+
+.admin-hall-viewport-btn {
+  text-transform: none !important;
+  border-radius: 999px !important;
+  color: #fff !important;
+  font-size: 0.76rem !important;
+  padding: 7px 13px !important;
+  min-width: fit-content !important;
+  border: 1px solid rgba(255, 255, 255, 0.24) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.admin-hall-viewport-btn.admin-hall-collapse-btn {
+  border-color: rgba(147, 197, 253, 0.45) !important;
+  background: rgba(147, 197, 253, 0.15) !important;
+}
+
+.admin-hall-strip-toggle-btn {
+  position: fixed;
+  left: 10px;
+  margin-top: 5px;
+  z-index: 40;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 12px;
+  background: rgba(12, 20, 36, 0.94);
+  color: #cfe4ff;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+}
+
+.admin-hall-strip-toggle-icon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+}
+
+.admin-hall-strip-toggle-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+.admin-hall-strip-toggle-btn:hover {
+  background: rgba(26, 37, 63, 0.98);
+  transform: translateY(-1px);
 }
 
 /* --- CARD BUTTON STYLES --- */
@@ -122,6 +284,21 @@
   box-shadow: 0px 0px 34px rgba(0, 0, 0, 0.25) !important;
 }
 
+.hall-select-anchor {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  z-index: 10;
+}
+
+.hall-select-checkbox {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.hall-select-checkbox.Mui-checked {
+  color: #00d4ff !important;
+}
+
 .hall-card-text {
   font-family: 'RecklessNeue' !important;
   color: white !important;
@@ -176,11 +353,19 @@
 
 /* ================= MOBILE RESPONSIVENESS ================= */
 @media only screen and (max-width: 768px) {
+  :root {
+    --admin-hall-strip-space: 290px;
+  }
+
   .admin-hall-body {
     padding-left: 10px;
     padding-right: 10px;
     padding-bottom: 80px;
     padding-top: 120px !important;
+  }
+
+  .admin-hall-body.admin-hall-appbar-hidden {
+    padding-top: 8px !important;
   }
 
   .btn-admin-hall {
@@ -193,6 +378,71 @@
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
     text-transform: none !important;
     font-weight: 600 !important;
+  }
+
+  .admin-hall-controls-strip {
+    left: 10px;
+    right: 10px;
+    top: calc(var(--appbar-height) + 4px);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .admin-hall-controls-left,
+  .admin-hall-controls-right {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .admin-hall-controls-right {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .admin-hall-controls-right .admin-hall-viewport-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .admin-hall-sort-control {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0 !important;
+  }
+
+  .admin-hall-sort-control .MuiOutlinedInput-root {
+    width: 100%;
+  }
+
+  .admin-hall-sort-control .MuiSelect-select {
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .btn-admin-hall-create {
+    grid-column: 1 / -1;
+    width: 100% !important;
+    margin-left: 0 !important;
+    justify-content: center !important;
+    font-size: 0.85rem !important;
+    padding: 8px 14px !important;
+  }
+
+  .admin-hall-strip-toggle-btn {
+    left: 0px;
+    width: 30px;
+    height: 30px;
+    font-size: 0.75rem;
+    border-radius: 10px;
+  }
+
+  .admin-hall-body.admin-hall-appbar-hidden .admin-hall-controls-strip {
+    top: 6px;
   }
 }
 
@@ -210,4 +460,9 @@
 
 .admin-hall-body .MuiSvgIcon-root {
   color: #ffffff !important;
+}
+
+.admin-hall-body .hall-select-checkbox .MuiSvgIcon-root,
+.admin-hall-body .admin-hall-select-inline .MuiSvgIcon-root {
+  color: inherit !important;
 }

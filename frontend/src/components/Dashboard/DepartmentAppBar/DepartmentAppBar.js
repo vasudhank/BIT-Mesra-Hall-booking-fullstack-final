@@ -22,7 +22,11 @@ export default function DepartmentAppBar({
   showSearch = false,
   searchValue = "",
   onSearchChange,
-  onSearchSubmit
+  onSearchSubmit,
+  showSort = false,
+  sortValue = "",
+  onSortChange,
+  sortOptions = []
 }) {
 
   const navigate = useNavigate();
@@ -85,6 +89,28 @@ export default function DepartmentAppBar({
 
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
 
+              {showSort && (
+                <TextField
+                  select
+                  size="small"
+                  value={sortValue}
+                  onChange={(e) => onSortChange && onSortChange(e.target.value)}
+                  sx={{
+                    minWidth: 185,
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '24px',
+                      background: 'rgba(255,255,255,0.9)'
+                    }
+                  }}
+                >
+                  {sortOptions.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
+
               {/* 🔍 SEARCH BOX */}
               {showSearch && (
                 <TextField
@@ -143,6 +169,33 @@ export default function DepartmentAppBar({
 
             {/* ROW 2: SEARCH + USER ICON */}
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, width: '100%' }}>
+              {showSort && (
+                <TextField
+                  select
+                  size="small"
+                  value={sortValue}
+                  onChange={(e) => onSortChange && onSortChange(e.target.value)}
+                  sx={{
+                    minWidth: 140,
+                    maxWidth: 150,
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '20px',
+                      background: 'rgba(255,255,255,0.95)',
+                      height: '40px'
+                    },
+                    '& .MuiSelect-select': {
+                      fontSize: '0.8rem',
+                      py: 1
+                    }
+                  }}
+                >
+                  {sortOptions.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
               
               {/* Search Box (Takes mostly all width) */}
               {showSearch ? (
@@ -201,6 +254,15 @@ export default function DepartmentAppBar({
                <Link to="/department/account" style={{ textDecoration: 'none', color: 'inherit' }}> 
                  <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}> ACCOUNTS </Typography> 
                </Link> 
+            </MenuItem>
+            <MenuItem onClick={() => { setAnchorElUser(null); navigate('/department/complaints'); }}>
+              <Typography className="dropdown-text">COMPLAINTS</Typography>
+            </MenuItem>
+            <MenuItem onClick={() => { setAnchorElUser(null); navigate('/department/queries'); }}>
+              <Typography className="dropdown-text">QUERIES</Typography>
+            </MenuItem>
+            <MenuItem onClick={() => { setAnchorElUser(null); navigate('/department/feedback'); }}>
+              <Typography className="dropdown-text">FEEDBACK</Typography>
             </MenuItem>
             <MenuItem onClick={() => setAnchorElUser(null)}>
               <Typography className="dropdown-text" onClick={logout}>

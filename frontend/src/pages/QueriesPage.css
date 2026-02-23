@@ -1,0 +1,43 @@
+@import './supportTheme.css';
+
+.queries-page {
+  --support-accent: #4f46e5;
+  --support-accent-strong: #4338ca;
+  --support-accent-soft: color-mix(in srgb, #4f46e5 18%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  .queries-page {
+    --support-accent: #8b83ff;
+    --support-accent-strong: #a59fff;
+    --support-accent-soft: color-mix(in srgb, #8b83ff 24%, transparent);
+  }
+}
+
+.queries-page .support-page,
+.queries-page.support-page {
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--support-accent) 18%, transparent) 0%, transparent 44%),
+    radial-gradient(circle at 100% 8%, color-mix(in srgb, var(--support-info) 12%, transparent) 0%, transparent 46%),
+    linear-gradient(180deg, var(--support-bg-elev) 0%, var(--support-bg) 100%);
+}
+
+.queries-page .support-thread-card {
+  border-left: 3px solid color-mix(in srgb, var(--support-accent) 30%, transparent);
+}
+
+.queries-page .support-primary-btn {
+  background: var(--support-accent);
+}
+
+.queries-page .support-primary-btn:hover:not(:disabled) {
+  background: var(--support-accent-strong);
+}
+
+.queries-page .support-secondary-btn:hover {
+  border-color: var(--support-accent);
+}
+
+.queries-page .support-filter-btn.active {
+  color: var(--support-accent-strong);
+}

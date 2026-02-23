@@ -16,6 +16,8 @@ import { changeBookingRequestApi } from "../../../api/changebookingrequestapi";
 export default function AdminBookingCard(props) {
   const [descModal, setDescModal] = useState(false);
   const id = props.data._id;
+  const requestStatus = props.data.status;
+  const isAutoBooked = requestStatus === 'AUTO_BOOKED';
   const departmentData = props.data.department || {};
   const departmentName = departmentData.department || "Unknown Department";
   const requesterName = departmentData.head || "Name not available";
@@ -23,22 +25,19 @@ export default function AdminBookingCard(props) {
 
   const formatDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
-  const acceptRequest = async () => {
+  const runDecision = async (decisionValue) => {
     try {
-      await changeBookingRequestApi({
-        decision: "Yes", id, name: props.data.hall,
-        department: departmentName, event: props.data.event
-      });
+      await changeBookingRequestApi({ decision: decisionValue, id });
       props.getrequest();
     } catch (err) { console.log(err); }
   };
 
-  const cancelRequest = async () => {
-    try {
-      await changeBookingRequestApi({ decision: "No", id });
-      props.getrequest();
-    } catch (err) { console.log(err); }
-  };
+  const primaryDecision = isAutoBooked ? 'Vacate' : 'Yes';
+  const secondaryDecision = isAutoBooked ? 'Leave' : 'No';
+  const primaryLabel = isAutoBooked ? 'VACATE' : 'ACCEPT';
+  const secondaryLabel = isAutoBooked ? 'LEAVE' : 'REJECT';
+  const primaryClass = isAutoBooked ? 'btn-admin-booking-request-reject' : 'btn-admin-booking-request-accept';
+  const secondaryClass = isAutoBooked ? 'btn-admin-booking-request-accept' : 'btn-admin-booking-request-reject';
 
   return (
     <div className='request-div-admin'>
@@ -53,6 +52,9 @@ export default function AdminBookingCard(props) {
       </div>
 
       <h2 className='admin-booking-request-title'>{props.data.hall}</h2>
+      {isAutoBooked && (
+        <div className='admin-booking-auto-booked-badge'>AUTO-BOOKED</div>
+      )}
 
       <div className='admin-booking-request-desc-div'>
         <span className='admin-booking-dept-name'>{departmentName}</span>
@@ -78,21 +80,21 @@ export default function AdminBookingCard(props) {
         <Button 
             startIcon={<InfoOutlinedIcon />}
             onClick={() => setDescModal(true)}
-            sx={{ color: '#00d4ff', fontSize: '0.75rem', mt: 1, textTransform: 'none' }}
+            sx={{ color: '#00d4ff', fontSize: '0.76rem', mt: 0.6, textTransform: 'none', minHeight: '26px' }}
         >
             View Description
         </Button>
       </div>
 
-      <Grid container spacing={1} justifyContent={'center'} sx={{ px: 2, pb: 2 }}>
+      <Grid container spacing={1} justifyContent={'center'} sx={{ px: 1.25, pb: 1.25 }}>
         <Grid item xs={6}>
-          <Button size="small" className='btn-admin-booking-request-accept' onClick={acceptRequest} fullWidth>
-            ACCEPT
+          <Button size="small" className={primaryClass} onClick={() => runDecision(primaryDecision)} fullWidth>
+            {primaryLabel}
           </Button>
         </Grid>
         <Grid item xs={6}>
-          <Button size="small" className='btn-admin-booking-request-reject' onClick={cancelRequest} fullWidth>
-            REJECT
+          <Button size="small" className={secondaryClass} onClick={() => runDecision(secondaryDecision)} fullWidth>
+            {secondaryLabel}
           </Button>
         </Grid>
       </Grid>

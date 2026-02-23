@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Appbar from '../AppBar/AppBar';
 import "./AdminBooking.css";
 import Grid from '@mui/material/Grid';
@@ -10,17 +10,25 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
+import Checkbox from '@mui/material/Checkbox';
 import api from '../../../api/axiosInstance';
 import { changeBookingRequestApi } from '../../../api/changebookingrequestapi';
-import { Container, useMediaQuery, useTheme } from '@mui/material';
+import { Container, useMediaQuery, useTheme, FormControl, Select, MenuItem } from '@mui/material';
 
 export default function AdminBooking() {
 
+  const pageRootRef = useRef(null);
   const [bookingRequests, setBookingRequests] = useState([]); 
   const [filteredRequests, setFilteredRequests] = useState([]); 
   const [open, setOpen] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedRequestIds, setSelectedRequestIds] = useState([]);
+  const [sortMode, setSortMode] = useState('TIME_ASC');
+  const [showAppbar, setShowAppbar] = useState(true);
+  const [showBulkStrip, setShowBulkStrip] = useState(true);
+  const [showConflictStrip, setShowConflictStrip] = useState(true);
+  const [showHeaderTitle, setShowHeaderTitle] = useState(true);
+  const [showViewportStrip, setShowViewportStrip] = useState(true);
 
   // --- VIEW STATE MANAGEMENT ---
   const [viewMode, setViewMode] = useState('ALL'); 
@@ -43,6 +51,53 @@ export default function AdminBooking() {
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const viewportToolsRef = useRef(null);
+  const bulkStripRef = useRef(null);
+  const bulkAnchorRef = useRef(null);
+  const [appbarHeight, setAppbarHeight] = useState(64);
+  const [viewportStripHeight, setViewportStripHeight] = useState(0);
+  const [bulkStripHeight, setBulkStripHeight] = useState(0);
+  const [pinBulkStrip, setPinBulkStrip] = useState(false);
+
+  const sortRequests = (requests, mode) => {
+    const cloned = [...requests];
+    return cloned.sort((a, b) => {
+      const hallA = String(a.hall || '');
+      const hallB = String(b.hall || '');
+      const facultyA = String(a.department?.department || a.department?.head || '');
+      const facultyB = String(b.department?.department || b.department?.head || '');
+      const timeA = new Date(a.startDateTime).getTime() || 0;
+      const timeB = new Date(b.startDateTime).getTime() || 0;
+
+      if (mode === 'HALL_ASC') {
+        return hallA.localeCompare(hallB, undefined, { numeric: true, sensitivity: 'base' }) || timeA - timeB;
+      }
+      if (mode === 'HALL_DESC') {
+        return hallB.localeCompare(hallA, undefined, { numeric: true, sensitivity: 'base' }) || timeA - timeB;
+      }
+      if (mode === 'FACULTY_ASC') {
+        return facultyA.localeCompare(facultyB, undefined, { numeric: true, sensitivity: 'base' }) ||
+          hallA.localeCompare(hallB, undefined, { numeric: true, sensitivity: 'base' }) ||
+          timeA - timeB;
+      }
+      if (mode === 'TIME_DESC') return timeB - timeA;
+      return timeA - timeB;
+    });
+  };
+
+  const applySearchAndSort = (requests, searchTerm, mode) => {
+    const term = String(searchTerm || '').trim().toLowerCase();
+    const searched = !term
+      ? [...requests]
+      : requests.filter(req =>
+          (req.hall || "").toLowerCase().includes(term) ||
+          (req.department?.department || "").toLowerCase().includes(term) ||
+          (req.department?.head || "").toLowerCase().includes(term) ||
+          (req.department?.email || "").toLowerCase().includes(term) ||
+          (req.event || "").toLowerCase().includes(term)
+        );
+    return sortRequests(searched, mode);
+  };
 
   // --- 1. DATA FETCHING ---
   const get_booking_requests = async () => {
@@ -53,7 +108,7 @@ export default function AdminBooking() {
       });
       const data = response.data.booking_requests || [];
       setBookingRequests(data);
-      setFilteredRequests(data); 
+      setFilteredRequests(applySearchAndSort(data, search, sortMode));
       processCategorization(data); 
       setOpen(false);
     } catch (err) {
@@ -70,6 +125,38 @@ export default function AdminBooking() {
     const validIds = new Set(bookingRequests.map((req) => req._id));
     setSelectedRequestIds((prev) => prev.filter((id) => validIds.has(id)));
   }, [bookingRequests]);
+
+  useEffect(() => {
+    setFilteredRequests(applySearchAndSort(bookingRequests, search, sortMode));
+  }, [bookingRequests, search, sortMode]);
+
+  useEffect(() => {
+    if (!showAppbar) return;
+
+    const measureAppbar = () => {
+      const appbar = document.querySelector('.appbar');
+      if (appbar) {
+        setAppbarHeight(Math.round(appbar.getBoundingClientRect().height));
+      }
+    };
+
+    const rafId = requestAnimationFrame(measureAppbar);
+    window.addEventListener('resize', measureAppbar);
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', measureAppbar);
+    };
+  }, [showAppbar, isMobile]);
+
+  useEffect(() => {
+    const measureViewportStrip = () => {
+      setViewportStripHeight(viewportToolsRef.current?.offsetHeight || 0);
+    };
+
+    measureViewportStrip();
+    window.addEventListener('resize', measureViewportStrip);
+    return () => window.removeEventListener('resize', measureViewportStrip);
+  }, [showViewportStrip, showAppbar, isMobile, sortMode]);
 
   // --- 2. ROBUST CONFLICT LOGIC ---
   const processCategorization = (requests) => {
@@ -188,14 +275,14 @@ export default function AdminBooking() {
     setActiveCategory(category);
     if (category === 'ALL') {
       setViewMode('ALL');
-      setFilteredRequests(bookingRequests);
+      setFilteredRequests(applySearchAndSort(bookingRequests, search, sortMode));
     } else {
       setViewMode('HALL_LIST');
     }
   };
 
   const handleHallClick = (hallName, requests) => {
-    setSelectedHallGroup({ name: hallName, requests: requests });
+    setSelectedHallGroup({ name: hallName, requests: sortRequests(requests, sortMode) });
     setViewMode('REQUEST_LIST');
   };
 
@@ -213,23 +300,11 @@ export default function AdminBooking() {
   const onSearchChange = (e) => {
     const val = e.target.value;
     setSearch(val);
-    if (val.trim() === "") setFilteredRequests(bookingRequests);
+    if (val.trim() === "") setFilteredRequests(applySearchAndSort(bookingRequests, "", sortMode));
   };
 
   const onSearchSubmit = () => {
-    if (!search.trim()) {
-      setFilteredRequests(bookingRequests);
-      return;
-    }
-    const q = search.toLowerCase();
-    const filtered = bookingRequests.filter(req => 
-      (req.hall || "").toLowerCase().includes(q) ||
-      (req.department?.department || "").toLowerCase().includes(q) ||
-      (req.department?.head || "").toLowerCase().includes(q) ||
-      (req.department?.email || "").toLowerCase().includes(q) ||
-      (req.event || "").toLowerCase().includes(q)
-    );
-    setFilteredRequests(filtered);
+    setFilteredRequests(applySearchAndSort(bookingRequests, search, sortMode));
     setViewMode('ALL'); 
     setActiveCategory('ALL');
   };
@@ -242,9 +317,9 @@ export default function AdminBooking() {
   };
 
   const getVisibleRequests = () => {
-    if (viewMode === 'ALL') return filteredRequests;
-    if (viewMode === 'REQUEST_LIST') return selectedHallGroup?.requests || [];
-    if (viewMode === 'HALL_LIST') return Object.values(getMapForActiveCategory()).flat();
+    if (viewMode === 'ALL') return sortRequests(filteredRequests, sortMode);
+    if (viewMode === 'REQUEST_LIST') return sortRequests(selectedHallGroup?.requests || [], sortMode);
+    if (viewMode === 'HALL_LIST') return sortRequests(Object.values(getMapForActiveCategory()).flat(), sortMode);
     return [];
   };
 
@@ -266,7 +341,13 @@ export default function AdminBooking() {
     });
   };
 
-  const runBulkDecision = async (requests, decision, label) => {
+  const mapDecisionForRequest = (request, actionType) => {
+    const isAutoBooked = request.status === 'AUTO_BOOKED';
+    if (actionType === 'PRIMARY') return isAutoBooked ? 'Vacate' : 'Yes';
+    return isAutoBooked ? 'Leave' : 'No';
+  };
+
+  const runBulkDecision = async (requests, actionType, label) => {
     if (!requests.length) return;
 
     const confirmMsg = `Are you sure you want to ${label} (${requests.length} request${requests.length > 1 ? 's' : ''})?`;
@@ -275,13 +356,8 @@ export default function AdminBooking() {
     setOpen(true);
     try {
       const operations = requests.map((req) => {
-        const payload = { decision, id: req._id };
-        if (decision === 'Yes') {
-          payload.name = req.hall;
-          payload.department = req.department?.department || '';
-          payload.event = req.event;
-        }
-        return changeBookingRequestApi(payload);
+        const decision = mapDecisionForRequest(req, actionType);
+        return changeBookingRequestApi({ decision, id: req._id });
       });
 
       const results = await Promise.allSettled(operations);
@@ -307,97 +383,162 @@ export default function AdminBooking() {
   const selectedVisibleRequests = visibleRequests.filter((req) => selectedRequestIds.includes(req._id));
   const selectedVisibleCount = selectedVisibleRequests.length;
   const allVisibleSelected = visibleIds.length > 0 && selectedVisibleCount === visibleIds.length;
-  const canAcceptAllVisible = (activeCategory === 'DATE' || activeCategory === 'SAFE') && visibleRequests.length > 0;
+  const viewportStripTop = showAppbar ? appbarHeight + (isMobile ? 8 : 0) : 8;
+  const contentTopOffset = viewportStripTop + (showViewportStrip ? viewportStripHeight + 8 : 0);
+  const bulkStickyTop = viewportStripTop + (showViewportStrip ? viewportStripHeight : 0);
+  const showBulkActionsStrip = showBulkStrip || (showConflictStrip && viewMode !== 'REQUEST_LIST');
 
-  // --- RENDER HELPERS ---
-  const renderCategoryButtons = () => (
-    <div className='filter-buttons-container'>
-      <button 
-        className={`filter-btn ${activeCategory === 'ALL' ? 'active' : ''}`}
-        onClick={() => handleFilterClick('ALL')}
-      >
-        All Requests
-      </button>
+  useEffect(() => {
+    if (!showBulkActionsStrip) {
+      setBulkStripHeight(0);
+      return;
+    }
 
-      <button 
-        className={`filter-btn conflict-time ${activeCategory === 'TIME' ? 'active' : ''}`}
-        onClick={() => handleFilterClick('TIME')}
-      >
-        Time Conflicts
-        {counts.time > 0 && <span className="filter-btn-badge">{counts.time}</span>}
-      </button>
+    const el = bulkStripRef.current;
+    if (!el) return;
 
-      <button 
-        className={`filter-btn conflict-date ${activeCategory === 'DATE' ? 'active' : ''}`}
-        onClick={() => handleFilterClick('DATE')}
-      >
-        Date Overlaps
-        {counts.date > 0 && <span className="filter-btn-badge">{counts.date}</span>}
-      </button>
+    const updateHeight = () => setBulkStripHeight(el.offsetHeight || 0);
+    updateHeight();
 
-      <button 
-        className={`filter-btn no-conflict ${activeCategory === 'SAFE' ? 'active' : ''}`}
-        onClick={() => handleFilterClick('SAFE')}
-      >
-        No Overlaps
-        {counts.safe > 0 && <span className="filter-btn-badge">{counts.safe}</span>}
-      </button>
-    </div>
-  );
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateHeight) : null;
+    if (observer) observer.observe(el);
+    window.addEventListener('resize', updateHeight);
+
+    return () => {
+      if (observer) observer.disconnect();
+      window.removeEventListener('resize', updateHeight);
+    };
+  }, [showBulkActionsStrip, showBulkStrip, showConflictStrip, viewMode, selectedVisibleCount, counts.time, counts.date, counts.safe]);
+
+  useEffect(() => {
+    if (!showBulkActionsStrip) {
+      setPinBulkStrip(false);
+      return;
+    }
+
+    const updatePinState = () => {
+      const anchor = bulkAnchorRef.current;
+      if (!anchor) return;
+      const anchorTop = anchor.getBoundingClientRect().top;
+      setPinBulkStrip(anchorTop <= bulkStickyTop);
+    };
+
+    const scrollHost = pageRootRef.current;
+    updatePinState();
+
+    // Listen on both window and page host because scroll context can vary across layouts.
+    window.addEventListener('scroll', updatePinState, { passive: true });
+    window.addEventListener('resize', updatePinState);
+    if (scrollHost) {
+      scrollHost.addEventListener('scroll', updatePinState, { passive: true });
+    }
+
+    let observer;
+    if (bulkAnchorRef.current && typeof IntersectionObserver !== 'undefined') {
+      observer = new IntersectionObserver(
+        (entries) => {
+          const entry = entries[0];
+          // When sentinel leaves the adjusted root, it has crossed the pin line.
+          setPinBulkStrip(!entry.isIntersecting);
+        },
+        {
+          root: null,
+          threshold: 0,
+          rootMargin: `-${bulkStickyTop}px 0px 0px 0px`
+        }
+      );
+      observer.observe(bulkAnchorRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('scroll', updatePinState);
+      window.removeEventListener('resize', updatePinState);
+      if (scrollHost) {
+        scrollHost.removeEventListener('scroll', updatePinState);
+      }
+      if (observer) observer.disconnect();
+    };
+  }, [showBulkActionsStrip, bulkStickyTop, showHeaderTitle, showViewportStrip, showAppbar, isMobile]);
 
   const renderBulkActionBar = () => (
-    <div className='bulk-actions-container'>
-      {viewMode !== 'HALL_LIST' && (
-        <button
-          className='bulk-btn bulk-btn-select'
-          onClick={() => toggleSelectAllVisible(visibleIds, allVisibleSelected)}
-          disabled={!visibleIds.length}
-        >
-          {allVisibleSelected ? 'Unselect Visible' : `Select Visible (${visibleIds.length})`}
-        </button>
+    <div
+      ref={bulkStripRef}
+      className={`bulk-actions-container${pinBulkStrip ? ' bulk-actions-fixed' : ''}`}
+      style={pinBulkStrip ? { top: `${bulkStickyTop}px` } : undefined}
+    >
+      {showBulkStrip && viewMode !== 'HALL_LIST' && (
+        <label className='bulk-select-all-inline' title='Select all visible requests'>
+          <Checkbox
+            size='small'
+            checked={allVisibleSelected}
+            onChange={() => toggleSelectAllVisible(visibleIds, allVisibleSelected)}
+            disabled={!visibleIds.length}
+            sx={{ color: 'rgba(255,255,255,0.82)', '&.Mui-checked': { color: '#00d4ff' } }}
+          />
+        </label>
       )}
 
-      {viewMode !== 'HALL_LIST' && (
+      {showBulkStrip && viewMode !== 'HALL_LIST' && (
         <>
           <button
             className='bulk-btn bulk-btn-accept'
-            onClick={() => runBulkDecision(selectedVisibleRequests, 'Yes', 'accept selected')}
+            onClick={() => runBulkDecision(selectedVisibleRequests, 'PRIMARY', 'accept/vacate selected')}
             disabled={!selectedVisibleCount}
           >
-            Accept Selected ({selectedVisibleCount})
+            Accept
           </button>
           <button
             className='bulk-btn bulk-btn-reject'
-            onClick={() => runBulkDecision(selectedVisibleRequests, 'No', 'reject selected')}
+            onClick={() => runBulkDecision(selectedVisibleRequests, 'SECONDARY', 'reject/leave selected')}
             disabled={!selectedVisibleCount}
           >
-            Reject Selected ({selectedVisibleCount})
+            Reject
           </button>
         </>
       )}
 
-      {canAcceptAllVisible && (
+      {showBulkStrip && showConflictStrip && viewMode !== 'REQUEST_LIST' && (
+        <div className='bulk-strip-gap' aria-hidden='true' />
+      )}
+
+      {showConflictStrip && viewMode !== 'REQUEST_LIST' && (
         <button
-          className='bulk-btn bulk-btn-accept-all'
-          onClick={() =>
-            runBulkDecision(
-              visibleRequests,
-              'Yes',
-              `accept all ${activeCategory === 'DATE' ? 'date-overlap' : 'no-overlap'}`
-            )
-          }
+          className={`filter-btn ${activeCategory === 'ALL' ? 'active' : ''}`}
+          onClick={() => handleFilterClick('ALL')}
         >
-          Accept All Visible ({visibleRequests.length})
+          All Requests
         </button>
       )}
 
-      <button
-        className='bulk-btn bulk-btn-reject-all'
-        onClick={() => runBulkDecision(visibleRequests, 'No', 'reject all visible')}
-        disabled={!visibleRequests.length}
-      >
-        Reject All Visible ({visibleRequests.length})
-      </button>
+      {showConflictStrip && viewMode !== 'REQUEST_LIST' && (
+        <button
+          className={`filter-btn conflict-time ${activeCategory === 'TIME' ? 'active' : ''}`}
+          onClick={() => handleFilterClick('TIME')}
+        >
+          Time Conflicts
+          {counts.time > 0 && <span className="filter-btn-badge">{counts.time}</span>}
+        </button>
+      )}
+
+      {showConflictStrip && viewMode !== 'REQUEST_LIST' && (
+        <button
+          className={`filter-btn conflict-date ${activeCategory === 'DATE' ? 'active' : ''}`}
+          onClick={() => handleFilterClick('DATE')}
+        >
+          Date Overlaps
+          {counts.date > 0 && <span className="filter-btn-badge">{counts.date}</span>}
+        </button>
+      )}
+
+      {showConflictStrip && viewMode !== 'REQUEST_LIST' && (
+        <button
+          className={`filter-btn no-conflict ${activeCategory === 'SAFE' ? 'active' : ''}`}
+          onClick={() => handleFilterClick('SAFE')}
+        >
+          No Overlaps
+          {counts.safe > 0 && <span className="filter-btn-badge">{counts.safe}</span>}
+        </button>
+      )}
     </div>
   );
 
@@ -407,38 +548,104 @@ export default function AdminBooking() {
         <CircularProgress color="inherit" />
       </Backdrop>
 
-      <div className='admin-booking-body'>
-        <Appbar showSearch={viewMode === 'ALL'} searchValue={search} onSearchChange={onSearchChange} onSearchSubmit={onSearchSubmit} />
+      <div ref={pageRootRef} className='admin-booking-body'>
+        {showAppbar && (
+          <Appbar
+            showSearch={viewMode === 'ALL'}
+            searchValue={search}
+            onSearchChange={onSearchChange}
+            onSearchSubmit={onSearchSubmit}
+            mobileStripToggleVisible={!showViewportStrip}
+            onMobileStripToggle={() => setShowViewportStrip(true)}
+          />
+        )}
 
-        <Container maxWidth="xl" sx={{ mt: isMobile ? 12 : 10 }}> 
-          
-          <Grid container justifyContent={'center'}>
-            <Grid item xs={12}>
-              <div className='admin-booking-title-div'>
-                <h2 className='admin-booking-title'>
-                  {viewMode === 'ALL' && "BOOKING REQUESTS"}
-                  {viewMode !== 'ALL' && (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-                      <ArrowBackIcon className="back-btn-icon" onClick={handleBack} />
-                      {activeCategory === 'TIME' && "CRITICAL CONFLICTS"}
-                      {activeCategory === 'DATE' && "DATE OVERLAPS"}
-                      {activeCategory === 'SAFE' && "DISTINCT BOOKINGS"}
-                    </div>
-                  )}
-                </h2>
+        <Container maxWidth="xl" sx={{ mt: 0, pt: `${contentTopOffset}px` }}> 
+          {showViewportStrip ? (
+            <div
+              ref={viewportToolsRef}
+              className='booking-viewport-tools'
+              style={{ top: viewportStripTop }}
+            >
+              <button className='viewport-tool-btn' onClick={() => setShowAppbar((v) => !v)}>
+                {showAppbar ? 'Hide Appbar' : 'Show Appbar'}
+              </button>
+              <button className='viewport-tool-btn' onClick={() => setShowBulkStrip((v) => !v)}>
+                {showBulkStrip ? 'Hide Select Strip' : 'Show Select Strip'}
+              </button>
+              <button className='viewport-tool-btn' onClick={() => setShowConflictStrip((v) => !v)}>
+                {showConflictStrip ? 'Hide Conflict Strip' : 'Show Conflict Strip'}
+              </button>
+              <button className='viewport-tool-btn' onClick={() => setShowHeaderTitle((v) => !v)}>
+                {showHeaderTitle ? 'Hide Title' : 'Show Title'}
+              </button>
+              <button className='viewport-tool-btn viewport-collapse-btn' onClick={() => setShowViewportStrip(false)}>
+                Collapse Strip
+              </button>
+
+              <div className='booking-sort-wrap'>
+                <span className='booking-sort-label'>Sort</span>
+                <FormControl size='small' className='booking-sort-control'>
+                  <Select value={sortMode} onChange={(e) => setSortMode(e.target.value)}>
+                    <MenuItem value='TIME_ASC'>Time (Earlier-Later)</MenuItem>
+                    <MenuItem value='TIME_DESC'>Time (Later-Earlier)</MenuItem>
+                    <MenuItem value='HALL_ASC'>Hall (A-Z)</MenuItem>
+                    <MenuItem value='HALL_DESC'>Hall (Z-A)</MenuItem>
+                    <MenuItem value='FACULTY_ASC'>Faculty Grouped</MenuItem>
+                  </Select>
+                </FormControl>
               </div>
+            </div>
+          ) : (
+            (!isMobile || !showAppbar || viewMode !== 'ALL') && (
+            <button
+              className='booking-tools-toggle-btn'
+              style={{ top: showAppbar ? appbarHeight + 12 : 10 }}
+              onClick={() => setShowViewportStrip(true)}
+              aria-label='Show booking options'
+              title='Show options'
+            >
+              <span className='booking-tools-toggle-icon' aria-hidden='true'>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="collapse-right">
+                  <path d="M11,17a1,1,0,0,1-.71-1.71L13.59,12,10.29,8.71a1,1,0,0,1,1.41-1.41l4,4a1,1,0,0,1,0,1.41l-4,4A1,1,0,0,1,11,17Z"></path>
+                  <path d="M15 13H5a1 1 0 0 1 0-2H15a1 1 0 0 1 0 2zM19 20a1 1 0 0 1-1-1V5a1 1 0 0 1 2 0V19A1 1 0 0 1 19 20z"></path>
+                </svg>
+              </span>
+            </button>
+            )
+          )}
+          
+          {showHeaderTitle && (
+            <Grid container justifyContent={'center'} className='admin-booking-header-grid'>
+              <Grid item xs={12}>
+                <div className='admin-booking-title-div'>
+                  <h2 className='admin-booking-title'>
+                    {viewMode === 'ALL' && "BOOKING REQUESTS"}
+                    {viewMode !== 'ALL' && (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                        <ArrowBackIcon className="back-btn-icon" onClick={handleBack} />
+                        {activeCategory === 'TIME' && "CRITICAL CONFLICTS"}
+                        {activeCategory === 'DATE' && "DATE OVERLAPS"}
+                        {activeCategory === 'SAFE' && "DISTINCT BOOKINGS"}
+                      </div>
+                    )}
+                  </h2>
+                </div>
+              </Grid>
             </Grid>
-          </Grid>
+          )}
 
-          {/* Filter Buttons */}
-          {viewMode !== 'REQUEST_LIST' && renderCategoryButtons()}
-          {renderBulkActionBar()}
+          {showBulkActionsStrip && <div ref={bulkAnchorRef} className='bulk-actions-anchor' />}
+          {showBulkActionsStrip && pinBulkStrip && (
+            <div className='bulk-actions-placeholder' style={{ height: `${bulkStripHeight}px` }} />
+          )}
+          {showBulkActionsStrip && renderBulkActionBar()}
 
           {/* --- VIEW 1: MAIN DASHBOARD (ALL) --- */}
           {viewMode === 'ALL' && (
-            <Grid container spacing={4} justifyContent={'center'}>
+            <Grid container spacing={2} justifyContent={'center'}>
               {filteredRequests.map((data) => (
-                <Grid item xs={11} sm={6} md={4} lg={3} key={data._id} display="flex" justifyContent="center">
+                <Grid item xs={12} sm={6} md={4} lg={3} key={data._id} display="flex" justifyContent="center">
                   <AdminBookingCard
                     data={data}
                     getrequest={get_booking_requests}
@@ -455,22 +662,24 @@ export default function AdminBooking() {
 
           {/* --- VIEW 2: HALL LIST --- */}
           {viewMode === 'HALL_LIST' && (
-            <Grid container spacing={4} justifyContent={'center'}>
+            <Grid container spacing={2} justifyContent={'center'}>
               {(() => {
                 const mapToUse = getMapForActiveCategory();
-                const hallKeys = Object.keys(mapToUse);
+                const hallKeys = Object.keys(mapToUse).sort((a, b) =>
+                  a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+                );
 
                 if (hallKeys.length === 0) return <h3 className="no-data-text">No Halls found in this category.</h3>;
 
                 return hallKeys.map(hall => (
-                  <Grid item xs={11} sm={6} md={4} lg={3} key={hall} display="flex" justifyContent="center">
+                  <Grid item xs={12} sm={6} md={4} lg={3} key={hall} display="flex" justifyContent="center">
                     <Card className='hall-group-card'>
                       <CardContent sx={{ textAlign: 'center' }}>
                         <Typography variant="h5" className='hall-card-title'>{hall}</Typography>
                         <Typography variant="body1" className='hall-card-count'>
                           {mapToUse[hall].length} Request{mapToUse[hall].length > 1 ? 's' : ''}
                         </Typography>
-                        <Button 
+                        <Button
                           variant="contained" 
                           className='hall-card-btn'
                           onClick={() => handleHallClick(hall, mapToUse[hall])}
@@ -489,9 +698,9 @@ export default function AdminBooking() {
           {viewMode === 'REQUEST_LIST' && selectedHallGroup && (
             <div className="request-list-container">
                <h3 className="sub-hall-title">Hall: {selectedHallGroup.name}</h3>
-               <Grid container spacing={4} justifyContent={'center'}>
-                  {selectedHallGroup.requests.map((data) => (
-                    <Grid item xs={11} sm={6} md={4} lg={3} key={data._id} display="flex" justifyContent="center">
+               <Grid container spacing={2} justifyContent={'center'}>
+                  {sortRequests(selectedHallGroup.requests, sortMode).map((data) => (
+                    <Grid item xs={12} sm={6} md={4} lg={3} key={data._id} display="flex" justifyContent="center">
                       <AdminBookingCard
                         data={data}
                         getrequest={get_booking_requests}

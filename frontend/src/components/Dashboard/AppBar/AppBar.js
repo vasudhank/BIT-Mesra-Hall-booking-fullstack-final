@@ -33,7 +33,9 @@ export default function Appbar({
   searchValue = "",
   onSearchChange,
   onSearchSubmit,
-  searchPlaceholder = "Search"
+  searchPlaceholder = "Search",
+  mobileStripToggleVisible = false,
+  onMobileStripToggle
 }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -149,6 +151,18 @@ export default function Appbar({
               <MenuItem onClick={() => { handleCloseUserMenu(); navigate('/admin/contacts'); }} sx={{ color: 'black' }}>
                 <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>CONTACTS</Typography>
               </MenuItem>
+              <MenuItem onClick={() => { handleCloseUserMenu(); navigate('/admin/complaints'); }} sx={{ color: 'black' }}>
+                <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>COMPLAINTS</Typography>
+              </MenuItem>
+              <MenuItem onClick={() => { handleCloseUserMenu(); navigate('/admin/queries'); }} sx={{ color: 'black' }}>
+                <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>QUERIES</Typography>
+              </MenuItem>
+              <MenuItem onClick={() => { handleCloseUserMenu(); navigate('/admin/feedback'); }} sx={{ color: 'black' }}>
+                <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>FEEDBACK</Typography>
+              </MenuItem>
+              <MenuItem onClick={() => { handleCloseUserMenu(); navigate('/admin/account'); }} sx={{ color: 'black' }}>
+                <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>ACCOUNTS</Typography>
+              </MenuItem>
               <MenuItem onClick={handleCloseUserMenu} sx={{ color: 'black' }}><Typography textAlign="center" className="dropdown-text" onClick={logout} sx={{ color: 'black' }}>LOGOUT</Typography></MenuItem>
             </Menu>
           </Box>
@@ -170,33 +184,54 @@ export default function Appbar({
 
             {/* ROW 2: Search Box + Hamburger (Horizontal) */}
             <Box sx={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-              
-              {/* Search Box */}
-              {showSearch ? (
-                <TextField
-                  value={searchValue}
-                  onChange={onSearchChange}
-                  onKeyDown={(e) => e.key === 'Enter' && onSearchSubmit()}
-                  placeholder={searchPlaceholder}
-                  size="small"
-                  fullWidth
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '24px',
-                      background: 'rgba(255,255,255,0.95)',
-                      fontSize: '0.9rem',
-                      height: '40px'
-                    }
-                  }}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton size="small" onClick={onSearchSubmit}><SearchIcon fontSize="small" /></IconButton>
-                      </InputAdornment>
-                    )
-                  }}
-                />
-              ) : <Box sx={{flexGrow:1}}/>}
+
+              <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, minWidth: 0, gap: 1 }}>
+                {showSearch && mobileStripToggleVisible && typeof onMobileStripToggle === 'function' && (
+                  <IconButton
+                    className="appbar-mobile-strip-toggle"
+                    onClick={onMobileStripToggle}
+                    aria-label="Show controls"
+                    title="Show controls"
+                    size="small"
+                  >
+                    <span className="appbar-mobile-strip-toggle-icon" aria-hidden="true">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="collapse-right">
+                        <path d="M11,17a1,1,0,0,1-.71-1.71L13.59,12,10.29,8.71a1,1,0,0,1,1.41-1.41l4,4a1,1,0,0,1,0,1.41l-4,4A1,1,0,0,1,11,17Z"></path>
+                        <path d="M15 13H5a1 1 0 0 1 0-2H15a1 1 0 0 1 0 2zM19 20a1 1 0 0 1-1-1V5a1 1 0 0 1 2 0V19A1 1 0 0 1 19 20z"></path>
+                      </svg>
+                    </span>
+                  </IconButton>
+                )}
+
+                {/* Search Box */}
+                {showSearch ? (
+                  <TextField
+                    value={searchValue}
+                    onChange={onSearchChange}
+                    onKeyDown={(e) => e.key === 'Enter' && onSearchSubmit()}
+                    placeholder={searchPlaceholder}
+                    size="small"
+                    fullWidth
+                    sx={{
+                      flex: 1,
+                      minWidth: 0,
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '24px',
+                        background: 'rgba(255,255,255,0.95)',
+                        fontSize: '0.9rem',
+                        height: '40px'
+                      }
+                    }}
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton size="small" onClick={onSearchSubmit}><SearchIcon fontSize="small" /></IconButton>
+                        </InputAdornment>
+                      )
+                    }}
+                  />
+                ) : <Box sx={{flexGrow:1}}/>}
+              </Box>
 
               {/* Hamburger Menu (Inside AppBar on Mobile) */}
               <Box>
@@ -241,6 +276,18 @@ export default function Appbar({
                   </MenuItem>
                   <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/admin/contacts'); }}>
                     <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>CONTACTS</Typography>
+                  </MenuItem>
+                  <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/admin/complaints'); }}>
+                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>COMPLAINTS</Typography>
+                  </MenuItem>
+                  <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/admin/queries'); }}>
+                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>QUERIES</Typography>
+                  </MenuItem>
+                  <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/admin/feedback'); }}>
+                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>FEEDBACK</Typography>
+                  </MenuItem>
+                  <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/admin/account'); }}>
+                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>ACCOUNTS</Typography>
                   </MenuItem>
                   <MenuItem onClick={() => { handleCloseNavMenu(); logout(); }}>
                     <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#d32f2f' }}>LOGOUT</Typography>

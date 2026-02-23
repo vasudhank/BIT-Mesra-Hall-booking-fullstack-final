@@ -1,20 +1,53 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import HomeUpper from '../components/HomeUpper/HomeUpper';
 import HomeFooter from '../components/HomeFooter/HomeFooter';
+import './About.css';
 
-export default function About() {
+export default function About({ lightMode, toggleTheme }) {
+  const sectionTopRef = useRef(null);
+  const [mobileHeaderExpanded, setMobileHeaderExpanded] = useState(false);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, []);
+
+  useEffect(() => {
+    const evaluate = () => {
+      if (!sectionTopRef.current || window.innerWidth > 1364) {
+        setMobileHeaderExpanded(false);
+        return;
+      }
+      const sectionTop = sectionTopRef.current.getBoundingClientRect().top;
+      setMobileHeaderExpanded(sectionTop <= 0);
+    };
+
+    evaluate();
+    window.addEventListener('scroll', evaluate, { passive: true });
+    window.addEventListener('resize', evaluate);
+
+    return () => {
+      window.removeEventListener('scroll', evaluate);
+      window.removeEventListener('resize', evaluate);
+    };
+  }, []);
+
   return (
-    <div style={{ 
+    <div className="about-page" style={{ 
       minHeight: '100vh', 
       display: 'flex', 
-      flexDirection: 'column',
-      backgroundColor: 'var(--bg-default)' 
+      flexDirection: 'column'
     }}>
       {/* Header Section */}
-      <HomeUpper />
+      <HomeUpper
+        lightMode={lightMode}
+        toggleTheme={toggleTheme}
+        mobileHeaderExpanded={mobileHeaderExpanded}
+      />
+      <div ref={sectionTopRef} />
 
       {/* Main Content Section */}
-      <div style={{ 
+      <div
+        style={{ 
         flex: 1, 
         padding: '80px 24px', 
         maxWidth: '1000px', 
@@ -29,7 +62,7 @@ export default function About() {
           borderLeft: '6px solid #b71c1c', // A professional accent line
           paddingLeft: '20px'
         }}>
-          About Us – BIT Mesra Institute Hall Booking System
+          About Us - BIT Mesra Institute Hall Booking System
         </h1>
 
         <div style={{ 
@@ -89,3 +122,4 @@ export default function About() {
     </div>
   );
 }
+

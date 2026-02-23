@@ -4,6 +4,7 @@ import "./AdminDepartment.css";
 import Grid from '@mui/material/Grid';
 import Button from '@mui/material/Button';
 import { Container, useMediaQuery, useTheme } from '@mui/material';
+import Checkbox from '@mui/material/Checkbox';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
@@ -36,11 +37,11 @@ export default function AdminDepartment() {
   const [department, setdepartment] = useState("");
   const [head, sethead] = useState('');
   const [deletingIds, setDeletingIds] = useState([]);
+  const [selectedDepartmentIds, setSelectedDepartmentIds] = useState([]);
+  const [showControlStrip, setShowControlStrip] = useState(true);
   
   // Search State
   const [search, setSearch] = useState("");
-
-  // Responsive Hooks
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -81,6 +82,11 @@ export default function AdminDepartment() {
     setOpen(false);
   };
 
+  useEffect(() => {
+    const validIds = new Set(list.map((dept) => dept._id));
+    setSelectedDepartmentIds((prev) => prev.filter((id) => validIds.has(id)));
+  }, [list]);
+
   const createDepartment = () => {
     setmodal(true);
   };
@@ -95,6 +101,7 @@ export default function AdminDepartment() {
       await deleteDepartmentApi(id);
       setlist((prev) => prev.filter((dept) => dept._id !== id));
       setFilteredList((prev) => prev.filter((dept) => dept._id !== id));
+      setSelectedDepartmentIds((prev) => prev.filter((deptId) => deptId !== id));
     } catch (err) {
       console.error("Failed to delete department:", err);
       window.alert("Failed to delete faculty. Please try again.");
@@ -140,6 +147,59 @@ export default function AdminDepartment() {
   useEffect(() => {
     get_departments();
   }, []);
+
+  const toggleDepartmentSelection = (id) => {
+    setSelectedDepartmentIds((prev) =>
+      prev.includes(id) ? prev.filter((deptId) => deptId !== id) : [...prev, id]
+    );
+  };
+
+  const allDepartmentIds = list.map((dept) => dept._id);
+  const allVisibleSelected =
+    allDepartmentIds.length > 0 &&
+    allDepartmentIds.every((id) => selectedDepartmentIds.includes(id));
+
+  const toggleSelectAllVisible = () => {
+    if (allVisibleSelected) {
+      setSelectedDepartmentIds([]);
+      return;
+    }
+    setSelectedDepartmentIds(allDepartmentIds);
+  };
+
+  const handleDeleteSelectedDepartments = async () => {
+    const targets = list.filter((dept) => selectedDepartmentIds.includes(dept._id));
+    if (!targets.length) return;
+
+    const confirmDelete = window.confirm(
+      `Delete ${targets.length} selected facult${targets.length > 1 ? 'ies' : 'y'}? This cannot be undone.`
+    );
+    if (!confirmDelete) return;
+
+    const targetIds = targets.map((dept) => dept._id);
+    setDeletingIds((prev) => Array.from(new Set([...prev, ...targetIds])));
+
+    try {
+      const results = await Promise.allSettled(targetIds.map((id) => deleteDepartmentApi(id)));
+      const successIds = targetIds.filter((_, idx) => results[idx].status === 'fulfilled');
+      const failedCount = targetIds.length - successIds.length;
+
+      if (successIds.length > 0) {
+        setlist((prev) => prev.filter((dept) => !successIds.includes(dept._id)));
+        setFilteredList((prev) => prev.filter((dept) => !successIds.includes(dept._id)));
+        setSelectedDepartmentIds((prev) => prev.filter((id) => !successIds.includes(id)));
+      }
+
+      if (failedCount > 0) {
+        window.alert(`${failedCount} delete request(s) failed. Please retry.`);
+      }
+    } catch (err) {
+      console.error('Bulk delete faculty failed:', err);
+      window.alert('Bulk delete failed. Please retry.');
+    } finally {
+      setDeletingIds((prev) => prev.filter((id) => !targetIds.includes(id)));
+    }
+  };
 
   return (
     <>
@@ -220,37 +280,83 @@ export default function AdminDepartment() {
       <div className='admin-department-body'>
         
         {/* 1. Appbar */}
-        <Appbar 
+        <Appbar
           showSearch={true}
           searchValue={search}
           onSearchChange={onSearchChange}
           onSearchSubmit={onSearchSubmit}
-          searchPlaceholder="Search departments..." 
+          searchPlaceholder="Search departments..."
+          mobileStripToggleVisible={!showControlStrip}
+          onMobileStripToggle={() => setShowControlStrip(true)}
         />
 
         <Container maxWidth="xl" sx={{ mt: 0 }}>
           
           {/* 2. FIXED Create Button Container */}
-          <Box 
-            className="fixed-create-btn-container"
-            sx={{
-              position: 'sticky', 
-              top: 0, /* Stick to the top of the scrolling body (which starts after padding-top) */
-              zIndex: 10,
-              backgroundColor: 'transparent', 
-              pt: 1,
-              pb: 1,
-              display: 'flex',
-              justifyContent: isMobile ? 'center' : 'flex-end'
-            }}
-          >
-            <Button size="medium" className='btn-admin-department' onClick={createDepartment}>
-              CREATE FACULTY
-            </Button>
-          </Box>
+          {showControlStrip ? (
+            <Box className="fixed-create-btn-container">
+              <Box className="admin-department-bulk-controls">
+                
+                  <Checkbox
+                    size="small"
+                    checked={allVisibleSelected}
+                    onChange={toggleSelectAllVisible}
+                    sx={{ color: 'white', '&.Mui-checked': { color: '#00d4ff' } }}
+                  />
+                <Tooltip
+                  title={selectedDepartmentIds.length
+                    ? `Delete Selected (${selectedDepartmentIds.length})`
+                    : 'Select faculties to delete'}
+                  arrow
+                >
+                  <span className='admin-department-bulk-delete-wrap'>
+                    <IconButton
+                      size="small"
+                      className="admin-department-bulk-delete-icon"
+                      onClick={handleDeleteSelectedDepartments}
+                      disabled={!selectedDepartmentIds.length}
+                      aria-label={`Delete selected faculties (${selectedDepartmentIds.length})`}
+                    >
+                      <DeleteOutlineRoundedIcon fontSize='small' />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              </Box>
+
+              <Box className="admin-department-strip-right">
+                <Button
+                  size="small"
+                  className="btn-admin-department-strip-collapse"
+                  onClick={() => setShowControlStrip(false)}
+                >
+                  Collapse Strip
+                </Button>
+
+                <Button size="medium" className='btn-admin-department' onClick={createDepartment}>
+                  CREATE FACULTY
+                </Button>
+              </Box>
+            </Box>
+          ) : (
+            !isMobile && (
+            <button
+              className='admin-department-strip-toggle-btn'
+              onClick={() => setShowControlStrip(true)}
+              aria-label='Show faculty controls'
+              title='Show controls'
+            >
+              <span className='admin-department-strip-toggle-icon' aria-hidden='true'>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="collapse-right">
+                  <path d="M11,17a1,1,0,0,1-.71-1.71L13.59,12,10.29,8.71a1,1,0,0,1,1.41-1.41l4,4a1,1,0,0,1,0,1.41l-4,4A1,1,0,0,1,11,17Z"></path>
+                  <path d="M15 13H5a1 1 0 0 1 0-2H15a1 1 0 0 1 0 2zM19 20a1 1 0 0 1-1-1V5a1 1 0 0 1 2 0V19A1 1 0 0 1 19 20z"></path>
+                </svg>
+              </span>
+            </button>
+            )
+          )}
 
           {/* 3. Title Below Fixed Button */}
-          <Grid container justifyContent={'center'} alignItems="center" sx={{ mb: 4 }}>
+          <Grid container justifyContent={'center'} alignItems="center" sx={{ mt: 0.5, mb: 2 }}>
             <Grid item xs={12}>
               <div className='admin-department-title-div'>
                 <h2 className='admin-department-title'>FACULTIES</h2>
@@ -264,6 +370,16 @@ export default function AdminDepartment() {
               {filteredList.map((data, index) => (
                 <Grid item xs={12} sm={10} md={6} lg={4} key={data._id || index}>
                   <Card sx={{ height: '100%', position: 'relative' }} className='admin-department-card'>
+                    <span className='admin-department-select-anchor'>
+                      <Checkbox
+                        size="small"
+                        className='admin-department-select-checkbox'
+                        checked={selectedDepartmentIds.includes(data._id)}
+                        onChange={() => toggleDepartmentSelection(data._id)}
+                        inputProps={{ 'aria-label': `Select ${data.department}` }}
+                      />
+                    </span>
+
                     <Tooltip title="Delete faculty" placement="left" arrow>
                       <span className='admin-department-delete-anchor'>
                         <IconButton

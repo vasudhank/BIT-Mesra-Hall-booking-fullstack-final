@@ -7,6 +7,7 @@ const path = require('path');
 
 const Admin = require('./models/admin');
 const Department = require('./models/department');
+const Developer = require('./models/developer');
 const Department_Requests = require('./models/department_requests');
 
 const passport = require('./config/passport');
@@ -14,6 +15,39 @@ const passport = require('./config/passport');
 const details = require('./routes/constants');
 
 require('dotenv').config({ path: path.join(__dirname, '.env') });
+
+const createTransporter = () =>
+  nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: {
+      user: process.env.EMAIL,
+      pass: process.env.EMAIL_APP_PASSWORD
+    }
+  });
+
+const sendOtpMail = async ({ to, subject, otp, intro = 'Use OTP below' }) => {
+  if (!process.env.EMAIL || !process.env.EMAIL_APP_PASSWORD) return;
+  const transporter = createTransporter();
+  await transporter.sendMail({
+    to,
+    subject,
+    html: `
+      <div style="font-family:Arial,sans-serif;padding:16px">
+        <h3 style="margin:0 0 12px">${subject}</h3>
+        <p>${intro}</p>
+        <div style="display:inline-block;padding:10px 16px;border:1px dashed #333;border-radius:8px;font-size:24px;letter-spacing:4px;font-weight:700">${otp}</div>
+        <p style="margin-top:12px">OTP valid for 10 minutes.</p>
+      </div>
+    `
+  });
+};
+
+const isAuthenticatedRole = (req, role) =>
+  req.isAuthenticated &&
+  req.isAuthenticated() &&
+  String(req.user?.type || '').toLowerCase() === String(role || '').toLowerCase();
 
 /* ---------------- BASIC TEST ROUTE ---------------- */
 router.get('/', (req, res) => {
@@ -202,6 +236,77 @@ router.post('/department_login', (req, res, next) => {
   })(req, res, next);
 });
 
+/* ---------------- DEVELOPER LOGIN ---------------- */
+router.post('/developer_login', (req, res, next) => {
+  passport.authenticate('developer', (err, user) => {
+    if (err) {
+      return res.status(500).json({ error: 'Internal server error', details: err });
+    }
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    req.logIn(user, (loginErr) => {
+      if (loginErr) {
+        return res.status(500).json({ error: 'Login failed', details: loginErr });
+      }
+      res.status(200).json({ msg: 'Successfully Logged In', developer: user });
+    });
+  })(req, res, next);
+});
+
+/* ---------------- SEND OTP (DEVELOPER) ---------------- */
+router.post('/developer/send_otp', async (req, res) => {
+  try {
+    const email = String(req.body.email || '').toLowerCase().trim();
+    const dev = await Developer.findOne({ email });
+    if (!dev) return res.status(404).send({ success: false });
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    dev.otp = hashSync(otp, 10);
+    dev.otpExpiry = Date.now() + 10 * 60 * 1000;
+    await dev.save();
+
+    await sendOtpMail({
+      to: email,
+      subject: 'Developer Password Reset OTP',
+      otp,
+      intro: 'Use this OTP to reset your developer password.'
+    });
+
+    res.send({ success: true });
+  } catch (err) {
+    res.status(500).send({ success: false, msg: err.message });
+  }
+});
+
+/* ---------------- RESET PASSWORD (DEVELOPER) ---------------- */
+router.post('/developer/reset_password', async (req, res) => {
+  try {
+    const email = String(req.body.email || '').toLowerCase().trim();
+    const otp = String(req.body.otp || '');
+    const password = String(req.body.password || '');
+    const dev = await Developer.findOne({ email });
+
+    if (!dev || dev.otpExpiry < Date.now()) {
+      return res.status(400).send({ success: false, msg: 'OTP expired' });
+    }
+    if (!compareSync(otp, dev.otp)) {
+      return res.status(400).send({ success: false, msg: 'Invalid OTP' });
+    }
+
+    dev.password = hashSync(password, 10);
+    dev.otp = null;
+    dev.otpExpiry = null;
+    await dev.save();
+
+    res.send({ success: true });
+  } catch (err) {
+    res.status(500).send({ success: false, msg: err.message });
+  }
+});
+
 /* ---------------- VERIFY OTP (ADMIN) ---------------- */
 router.post('/admin/verify_otp', async (req, res) => {
   const { email, otp } = req.body;
@@ -242,6 +347,176 @@ router.post('/department/verify_otp', async (req, res) => {
   res.send({ success: true });
 });
 
+const ACCOUNT_ROLE_MAP = {
+  admin: { roleName: 'admin', model: Admin, defaultName: 'Admin' },
+  developer: { roleName: 'developer', model: Developer, defaultName: 'Developer' }
+};
+
+const getAccountRoleConfig = (roleParam) => ACCOUNT_ROLE_MAP[String(roleParam || '').toLowerCase()] || null;
+
+router.get('/account/:role', async (req, res) => {
+  try {
+    const cfg = getAccountRoleConfig(req.params.role);
+    if (!cfg) return res.status(404).json({ error: 'Invalid account role' });
+    if (!isAuthenticatedRole(req, cfg.roleName)) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    const account = await cfg.model.findById(req.user.id);
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+    res.json({
+      account: {
+        name: account.name || cfg.defaultName,
+        email: account.email,
+        phone: account.phone || '',
+        type: account.type || cfg.defaultName
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch('/account/:role/profile', async (req, res) => {
+  try {
+    const cfg = getAccountRoleConfig(req.params.role);
+    if (!cfg) return res.status(404).json({ error: 'Invalid account role' });
+    if (!isAuthenticatedRole(req, cfg.roleName)) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    const name = String(req.body.name || '').trim().slice(0, 120);
+    const phone = String(req.body.phone || '').trim().slice(0, 30);
+    const updates = {};
+    if (name) updates.name = name;
+    updates.phone = phone;
+
+    const account = await cfg.model.findByIdAndUpdate(req.user.id, { $set: updates }, { new: true });
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+    res.json({
+      account: {
+        name: account.name || cfg.defaultName,
+        email: account.email,
+        phone: account.phone || '',
+        type: account.type || cfg.defaultName
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/account/:role/send_email_otp', async (req, res) => {
+  try {
+    const cfg = getAccountRoleConfig(req.params.role);
+    if (!cfg) return res.status(404).json({ error: 'Invalid account role' });
+    if (!isAuthenticatedRole(req, cfg.roleName)) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    const newEmail = String(req.body.newEmail || '').toLowerCase().trim();
+    if (!newEmail) return res.status(400).json({ error: 'newEmail is required' });
+
+    const existingAdmin = await Admin.findOne({ email: newEmail });
+    const existingDev = await Developer.findOne({ email: newEmail });
+    if ((existingAdmin && String(existingAdmin._id) !== String(req.user.id)) || (existingDev && String(existingDev._id) !== String(req.user.id))) {
+      return res.status(409).json({ error: 'Email already in use.' });
+    }
+
+    const account = await cfg.model.findById(req.user.id);
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    account.otp = hashSync(otp, 10);
+    account.otpExpiry = Date.now() + 10 * 60 * 1000;
+    account.pendingEmail = newEmail;
+    await account.save();
+
+    await sendOtpMail({
+      to: newEmail,
+      subject: `${cfg.defaultName} Email Change OTP`,
+      otp,
+      intro: 'Enter this OTP in account page to confirm your new email.'
+    });
+
+    res.json({ success: true, message: 'OTP sent to new email.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/account/:role/verify_email_otp', async (req, res) => {
+  try {
+    const cfg = getAccountRoleConfig(req.params.role);
+    if (!cfg) return res.status(404).json({ error: 'Invalid account role' });
+    if (!isAuthenticatedRole(req, cfg.roleName)) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    const newEmail = String(req.body.newEmail || '').toLowerCase().trim();
+    const otp = String(req.body.otp || '');
+    const account = await cfg.model.findById(req.user.id);
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+
+    if (!account.pendingEmail || account.pendingEmail !== newEmail) {
+      return res.status(400).json({ error: 'No pending email change for this email.' });
+    }
+    if (!account.otp || !account.otpExpiry || account.otpExpiry < Date.now()) {
+      return res.status(400).json({ error: 'OTP expired.' });
+    }
+    if (!compareSync(otp, account.otp)) {
+      return res.status(400).json({ error: 'Invalid OTP.' });
+    }
+
+    account.email = newEmail;
+    account.pendingEmail = null;
+    account.otp = null;
+    account.otpExpiry = null;
+    await account.save();
+
+    if (req.user) req.user.email = newEmail;
+    res.json({
+      success: true,
+      account: {
+        name: account.name || cfg.defaultName,
+        email: account.email,
+        phone: account.phone || '',
+        type: account.type || cfg.defaultName
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/account/:role/change_password', async (req, res) => {
+  try {
+    const cfg = getAccountRoleConfig(req.params.role);
+    if (!cfg) return res.status(404).json({ error: 'Invalid account role' });
+    if (!isAuthenticatedRole(req, cfg.roleName)) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    const currentPassword = String(req.body.currentPassword || '');
+    const newPassword = String(req.body.newPassword || '');
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'currentPassword and newPassword are required' });
+    }
+
+    const account = await cfg.model.findById(req.user.id);
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+    if (!compareSync(currentPassword, account.password)) {
+      return res.status(400).json({ error: 'Current password is incorrect.' });
+    }
+
+    account.password = hashSync(newPassword, 10);
+    await account.save();
+    res.json({ success: true, message: 'Password updated.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 
 
@@ -268,4 +543,8 @@ router.use('/department', require('./routes/department'));
 router.use('/booking', require('./routes/booking'));
 router.use('/approval', require('./routes/approval'));
 router.use('/contact', require('./routes/contactRoutes'));
+router.use('/complaints', require('./routes/complaints'));
+router.use('/queries', require('./routes/queries'));
+router.use('/feedback', require('./routes/feedback'));
+router.use('/faq', require('./routes/faq'));
 module.exports = router;
