@@ -1,4 +1,5 @@
 .about-page {
+  --about-surface: #e6e9ec;
   min-height: 100vh;
   background: #e6e9ec;
   color: #000000;
@@ -8,18 +9,46 @@
 }
 
 body.dark-mode .about-page {
+  --about-surface: #000000;
   background: #000000;
   color: #ffffff;
 }
 
 .about-page .hero-video-wrapper {
-  position: sticky !important;
-  top: 0 !important;
+  position: relative !important;
+  top: auto !important;
   z-index: 1 !important;
 }
 
 .about-content {
   position: relative;
   z-index: 10;
+  width: 100%;
+  background: var(--about-surface);
+}
+
+.about-surface-layer {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  background: var(--about-surface);
+}
+
+.about-content-inner {
   background: transparent;
+}
+
+.about-page .home-footer {
+  position: relative;
+  z-index: 10;
+  margin-top: 0;
+  background: var(--about-surface);
+}
+
+@media (max-width: 1364px) {
+  .about-page .hero-video-wrapper {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 1 !important;
+  }
 }

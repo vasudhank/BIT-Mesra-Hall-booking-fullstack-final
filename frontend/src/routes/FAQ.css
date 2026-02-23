@@ -12,10 +12,10 @@
   flex-direction: column;
 }
 
-/* FAQ reuses HomeUpper; keep hero sticky so FAQ content slides over it */
+/* Desktop: normal scroll layout */
 .faq-page .hero-video-wrapper {
-  position: sticky !important;
-  top: 0 !important;
+  position: relative !important;
+  top: auto !important;
   z-index: 1 !important;
 }
 
@@ -28,6 +28,20 @@
   box-sizing: border-box;
   position: relative;
   z-index: 10;
+  background: var(--support-bg);
+}
+
+.faq-surface-layer {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  background: var(--support-bg);
+}
+
+.faq-page .home-footer {
+  position: relative;
+  z-index: 10;
+  margin-top: 0;
   background: var(--support-bg);
 }
 
@@ -295,5 +309,14 @@
 
   .faq-help-card {
     padding: 14px;
+  }
+}
+
+/* Mobile-only slide-over behavior, like HomeLower over HomeUpper */
+@media (max-width: 1364px) {
+  .faq-page .hero-video-wrapper {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 1 !important;
   }
 }

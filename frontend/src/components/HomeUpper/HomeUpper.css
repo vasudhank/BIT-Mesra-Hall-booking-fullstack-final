@@ -942,14 +942,13 @@ body.dark-mode .mobile-menu-toggle {
   display: flex;
   justify-content: center;
   align-items: center;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
   animation: fadeIn 0.5s ease;
 }
 
 .mobile-datetime-bar.mobile-datetime-bar--expanded {
   left: 0;
   width: 100%;
-  padding: 6px 10px 6px 88px;
+  padding: 6px 10px 8px 88px;
   justify-content: flex-start;
   box-sizing: border-box;
   white-space: nowrap;
@@ -960,7 +959,7 @@ body.dark-mode .mobile-menu-toggle {
 
 /* Theme Colors for Date-Time Bar */
 body:not(.dark-mode) .mobile-datetime-bar {
-  background-color: #ffffff;
+  background-color: #e6e9ec;
   color: #000000;
 }
 
