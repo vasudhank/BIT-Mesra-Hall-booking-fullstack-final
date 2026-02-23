@@ -103,7 +103,6 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
   const { id } = useParams();
   const issueCardRef = useRef(null);
   const addSolutionCardRef = useRef(null);
-  const answersStripRef = useRef(null);
   const [complaint, setComplaint] = useState(null);
   const [loading, setLoading] = useState(false);
   const [sort, setSort] = useState('DATE_DESC');
@@ -121,7 +120,6 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 960px)').matches : false
   );
   const [isAddSolutionCompact, setIsAddSolutionCompact] = useState(false);
-  const [isAnswersStripAtTop, setIsAnswersStripAtTop] = useState(false);
   const [isAnswersStripCollapsed, setIsAnswersStripCollapsed] = useState(false);
   const [isQuestionPopupOpen, setIsQuestionPopupOpen] = useState(false);
 
@@ -200,35 +198,30 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
   }, []);
 
   useEffect(() => {
-    if (!isMobile) {
+    if (!isMobile || !addSolutionCardRef.current) {
       setIsAddSolutionCompact(false);
-      setIsAnswersStripAtTop(false);
       return;
     }
 
-    const updateScrollState = () => {
-      const addRect = addSolutionCardRef.current?.getBoundingClientRect();
-      const stripRect = answersStripRef.current?.getBoundingClientRect();
-      const addPastViewport = Boolean(addRect && addRect.bottom <= 0);
-      const stripAtTop = Boolean(stripRect && stripRect.top <= 0);
-      setIsAddSolutionCompact(addPastViewport);
-      setIsAnswersStripAtTop(stripAtTop);
-    };
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsAddSolutionCompact(entry.intersectionRatio < 0.2);
+      },
+      {
+        threshold: [0, 0.2, 0.5, 1],
+        rootMargin: '-64px 0px 0px 0px'
+      }
+    );
 
-    updateScrollState();
-    window.addEventListener('scroll', updateScrollState, { passive: true });
-    window.addEventListener('resize', updateScrollState);
-    return () => {
-      window.removeEventListener('scroll', updateScrollState);
-      window.removeEventListener('resize', updateScrollState);
-    };
+    observer.observe(addSolutionCardRef.current);
+    return () => observer.disconnect();
   }, [id, isMobile]);
 
   useEffect(() => {
-    if (!isMobile || !isAddSolutionCompact || !isAnswersStripAtTop) {
+    if (!isMobile || !isAddSolutionCompact) {
       setIsAnswersStripCollapsed(false);
     }
-  }, [isMobile, isAddSolutionCompact, isAnswersStripAtTop]);
+  }, [isMobile, isAddSolutionCompact]);
 
   const filteredSolutions = useMemo(() => {
     if (!complaint) return [];
@@ -422,7 +415,7 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
 
   const listPath =
     mode === 'developer' ? '/developer/complaints' : mode === 'admin' ? '/admin/complaints' : '/complaints';
-  const showCompactAnswerControls = isMobile && isAddSolutionCompact && isAnswersStripAtTop;
+  const showCompactAnswerControls = isMobile && isAddSolutionCompact;
   const isAnswersStripCollapsedOnMobile = showCompactAnswerControls && isAnswersStripCollapsed;
   const scrollToAddSolutionCard = () =>
     addSolutionCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -526,7 +519,6 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
 
         <section className="thread-solutions-card">
           <div
-            ref={answersStripRef}
             className={`thread-solutions-strip ${showCompactAnswerControls ? 'mobile-compact' : ''} ${
               isAnswersStripCollapsedOnMobile ? 'strip-collapsed-mobile' : ''
             }`}

@@ -868,6 +868,10 @@
 }
 
 @media (max-width: 960px) {
+  .thread-solutions-card {
+    overflow: visible;
+  }
+
   .thread-solutions-strip.mobile-compact {
     position: sticky;
     top: 0;
