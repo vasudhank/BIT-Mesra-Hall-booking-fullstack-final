@@ -198,23 +198,24 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
   }, []);
 
   useEffect(() => {
-    if (!isMobile || !addSolutionCardRef.current) {
+    if (!isMobile) {
       setIsAddSolutionCompact(false);
       return;
     }
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsAddSolutionCompact(entry.intersectionRatio < 0.2);
-      },
-      {
-        threshold: [0, 0.2, 0.5, 1],
-        rootMargin: '-64px 0px 0px 0px'
-      }
-    );
+    const updateCompactState = () => {
+      const rect = addSolutionCardRef.current?.getBoundingClientRect();
+      const pastViewport = Boolean(rect && rect.bottom <= 0);
+      setIsAddSolutionCompact(pastViewport);
+    };
 
-    observer.observe(addSolutionCardRef.current);
-    return () => observer.disconnect();
+    updateCompactState();
+    window.addEventListener('scroll', updateCompactState, { passive: true });
+    window.addEventListener('resize', updateCompactState);
+    return () => {
+      window.removeEventListener('scroll', updateCompactState);
+      window.removeEventListener('resize', updateCompactState);
+    };
   }, [id, isMobile]);
 
   useEffect(() => {
