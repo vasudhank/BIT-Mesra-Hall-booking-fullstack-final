@@ -11,6 +11,8 @@ const SENT_BOX_CANDIDATES = [
   'INBOX.Sent'
 ];
 
+const DEFAULT_DEVELOPER_EMAIL = 'jarti2731@gmail.com';
+
 let syncTimer = null;
 let syncRunning = false;
 let selfSignedWarningPrinted = false;
@@ -36,6 +38,12 @@ const normalizeTitle = (value) =>
     .trim();
 
 const normalizeEmail = (value) => String(value || '').toLowerCase().trim();
+
+const getDeveloperSyncEmail = () =>
+  normalizeEmail(process.env.DEVELOPER_EMAIL || DEFAULT_DEVELOPER_EMAIL);
+
+const getAdminSyncEmail = () =>
+  normalizeEmail(process.env.EMAIL || process.env.ADMIN_EMAIL);
 
 const stripMailSyncTrackingHints = (value) =>
   String(value || '')
@@ -67,13 +75,16 @@ const METADATA_LINE_PATTERNS = [
   /^Open (complaint|query) thread/i,
   /^Reply to reporter \(subject auto-filled\)/i,
   /^Important:\s*Do not change\/remove subject text or (complaint|query) reference number\.?$/i,
-  /^Seminar Hall Booking System$/i
+  /^Seminar Hall Booking System$/i,
+  /^On .+ wrote:$/i,
+  /^-{2,}\s*Original Message\s*-{2,}$/i
 ];
 
 const isMetadataLine = (line) => {
   const text = String(line || '').trim();
   if (!text) return false;
   if (METADATA_LINE_PATTERNS.some((re) => re.test(text))) return true;
+  if (/^\s*>/.test(text)) return true;
   if (/^https?:\/\/\S+$/i.test(text)) return true;
   if (/^\[.*mailto:.*\]$/i.test(text)) return true;
   if (text.includes('subject=Regarding%20') && text.includes('Query%20Ref%3A')) return true;
@@ -89,8 +100,16 @@ const sanitizeMailSyncedBody = (value) => {
     ? normalized.slice(solutionMarker.index + solutionMarker[0].length)
     : normalized;
 
-  const lines = coreText
-    .split('\n')
+  const splitLines = coreText.split('\n');
+  const replyMarkerIndex = splitLines.findIndex((line) => {
+    const trimmed = String(line || '').trim();
+    return (
+      /^On .+ wrote:$/i.test(trimmed) ||
+      /^-{2,}\s*Original Message\s*-{2,}$/i.test(trimmed)
+    );
+  });
+
+  const lines = (replyMarkerIndex >= 0 ? splitLines.slice(0, replyMarkerIndex) : splitLines)
     .map((line) => line.trimEnd())
     .filter(
       (line) =>
@@ -155,7 +174,7 @@ const matchesTitleSubject = (subject, title) => {
 const isTrustedSender = (email) => {
   const sender = String(email || '').toLowerCase().trim();
   const trustedEmails = [
-    String(process.env.DEVELOPER_EMAIL || '').toLowerCase().trim(),
+    getDeveloperSyncEmail(),
     String(process.env.EMAIL || '').toLowerCase().trim(),
     String(process.env.ADMIN_EMAIL || '').toLowerCase().trim()
   ].filter(Boolean);
@@ -164,7 +183,7 @@ const isTrustedSender = (email) => {
 
 const senderRoleByEmail = (email) => {
   const sender = String(email || '').toLowerCase().trim();
-  const dev = String(process.env.DEVELOPER_EMAIL || '').toLowerCase().trim();
+  const dev = getDeveloperSyncEmail();
   return sender === dev ? 'DEVELOPER' : 'ADMIN';
 };
 
@@ -384,6 +403,8 @@ const processMailboxMessages = async ({ conn, searchCriteria }) => {
 };
 
 const buildImapConfig = ({ email, appPassword }) => {
+  const normalizedUser = String(email || '').trim();
+  const normalizedPassword = String(appPassword || '').trim();
   const rejectUnauthorized =
     String(process.env.COMPLAINT_MAIL_SYNC_TLS_REJECT_UNAUTHORIZED || 'true').toLowerCase() !== 'false';
 
@@ -394,8 +415,8 @@ const buildImapConfig = ({ email, appPassword }) => {
 
   return {
     imap: {
-      user: email,
-      password: appPassword,
+      user: normalizedUser,
+      password: normalizedPassword,
       host: 'imap.gmail.com',
       port: 993,
       tls: true,
@@ -406,9 +427,11 @@ const buildImapConfig = ({ email, appPassword }) => {
 };
 
 const syncMailbox = async ({ email, appPassword }) => {
-  if (!email || !appPassword) return;
+  const normalizedEmail = String(email || '').trim();
+  const normalizedPassword = String(appPassword || '').trim();
+  if (!normalizedEmail || !normalizedPassword) return;
 
-  const cfg = buildImapConfig({ email, appPassword });
+  const cfg = buildImapConfig({ email: normalizedEmail, appPassword: normalizedPassword });
   const sinceDate = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
 
   let conn;
@@ -448,12 +471,12 @@ const runSync = async () => {
   syncRunning = true;
   try {
     await syncMailbox({
-      email: process.env.EMAIL || process.env.ADMIN_EMAIL,
+      email: getAdminSyncEmail(),
       appPassword: process.env.EMAIL_APP_PASSWORD || process.env.ADMIN_EMAIL_APP_PASSWORD
     });
 
     await syncMailbox({
-      email: process.env.DEVELOPER_EMAIL,
+      email: getDeveloperSyncEmail(),
       appPassword: process.env.DEVELOPER_EMAIL_APP_PASSWORD
     });
   } finally {
