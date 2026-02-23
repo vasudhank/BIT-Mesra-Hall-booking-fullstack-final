@@ -6,6 +6,7 @@ import './About.css';
 export default function About({ lightMode, toggleTheme }) {
   const sectionTopRef = useRef(null);
   const [mobileHeaderExpanded, setMobileHeaderExpanded] = useState(false);
+  const [mobileHeaderLocked, setMobileHeaderLocked] = useState(false);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
@@ -15,10 +16,20 @@ export default function About({ lightMode, toggleTheme }) {
     const evaluate = () => {
       if (!sectionTopRef.current || window.innerWidth > 1364) {
         setMobileHeaderExpanded(false);
+        setMobileHeaderLocked(false);
+        return;
+      }
+      if (mobileHeaderLocked) {
+        setMobileHeaderExpanded(true);
         return;
       }
       const sectionTop = sectionTopRef.current.getBoundingClientRect().top;
-      setMobileHeaderExpanded(sectionTop <= 0);
+      if (sectionTop <= 0) {
+        setMobileHeaderExpanded(true);
+        setMobileHeaderLocked(true);
+      } else {
+        setMobileHeaderExpanded(false);
+      }
     };
 
     evaluate();
@@ -29,7 +40,7 @@ export default function About({ lightMode, toggleTheme }) {
       window.removeEventListener('scroll', evaluate);
       window.removeEventListener('resize', evaluate);
     };
-  }, []);
+  }, [mobileHeaderLocked]);
 
   return (
     <div className="about-page" style={{ 
@@ -43,10 +54,11 @@ export default function About({ lightMode, toggleTheme }) {
         toggleTheme={toggleTheme}
         mobileHeaderExpanded={mobileHeaderExpanded}
       />
-      <div ref={sectionTopRef} />
+      <div ref={sectionTopRef} className="section-top-anchor" />
 
       {/* Main Content Section */}
       <div
+        className="about-content"
         style={{ 
         flex: 1, 
         padding: '80px 24px', 

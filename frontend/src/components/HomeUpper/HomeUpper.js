@@ -408,7 +408,10 @@ export default function HomeUpper({
   };
   const handleScrollDown = () => {
     setShowArrow(false);
-    document.querySelector(".lower-div")?.scrollIntoView({ behavior: "smooth" });
+    const target =
+      document.querySelector(".section-top-anchor") ||
+      document.querySelector(".lower-div");
+    target?.scrollIntoView({ behavior: "smooth" });
   };
 
   const bgImage = isMobile 

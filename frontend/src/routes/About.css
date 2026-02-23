@@ -13,14 +13,13 @@ body.dark-mode .about-page {
 }
 
 .about-page .hero-video-wrapper {
-  position: relative !important;
-  top: auto !important;
+  position: sticky !important;
+  top: 0 !important;
   z-index: 1 !important;
 }
 
-@media (max-width: 760px) {
-  .about-page .hero-video-wrapper {
-    position: relative !important;
-    top: auto !important;
-  }
+.about-content {
+  position: relative;
+  z-index: 10;
+  background: transparent;
 }

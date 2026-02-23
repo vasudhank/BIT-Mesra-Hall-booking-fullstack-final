@@ -12,10 +12,10 @@
   flex-direction: column;
 }
 
-/* FAQ reuses HomeUpper; keep hero in normal flow on this route */
+/* FAQ reuses HomeUpper; keep hero sticky so FAQ content slides over it */
 .faq-page .hero-video-wrapper {
-  position: relative !important;
-  top: auto !important;
+  position: sticky !important;
+  top: 0 !important;
   z-index: 1 !important;
 }
 
@@ -26,6 +26,9 @@
   padding: 112px 24px 72px;
   flex: 1;
   box-sizing: border-box;
+  position: relative;
+  z-index: 10;
+  background: var(--support-bg);
 }
 
 .faq-header-wrapper {
@@ -270,11 +273,6 @@
 }
 
 @media (max-width: 760px) {
-  .faq-page .hero-video-wrapper {
-    position: relative !important;
-    top: auto !important;
-  }
-
   .faq-container {
     padding: 92px 12px 54px;
   }
