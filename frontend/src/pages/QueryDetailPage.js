@@ -102,6 +102,7 @@ export default function QueryDetailPage({ mode = 'public' }) {
   const { id } = useParams();
   const issueCardRef = useRef(null);
   const addSolutionCardRef = useRef(null);
+  const lastScrollYRef = useRef(0);
   const [queryDoc, setQueryDoc] = useState(null);
   const [loading, setLoading] = useState(false);
   const [sort, setSort] = useState('DATE_DESC');
@@ -201,20 +202,43 @@ export default function QueryDetailPage({ mode = 'public' }) {
       return;
     }
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        // Match /queries strip behavior, but only when card is past viewport upward.
-        const compact = entry.intersectionRatio < 0.2 && entry.boundingClientRect.top < 0;
-        setIsAddSolutionCompact(compact);
-      },
-      {
-        threshold: [0, 0.2, 0.5, 1],
-        rootMargin: '-64px 0px 0px 0px'
-      }
-    );
+    let rafId = 0;
+    let ticking = false;
 
-    observer.observe(addSolutionCardRef.current);
-    return () => observer.disconnect();
+    const updateCompactState = () => {
+      const rect = addSolutionCardRef.current?.getBoundingClientRect();
+      if (!rect) {
+        ticking = false;
+        return;
+      }
+
+      const currentY = window.scrollY || window.pageYOffset || 0;
+      const isScrollingDown = currentY >= lastScrollYRef.current;
+      lastScrollYRef.current = currentY;
+
+      setIsAddSolutionCompact((prev) => {
+        if (!prev && isScrollingDown && rect.bottom <= 64) return true;
+        if (prev && !isScrollingDown && rect.bottom > 0) return false;
+        return prev;
+      });
+      ticking = false;
+    };
+
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      rafId = window.requestAnimationFrame(updateCompactState);
+    };
+
+    lastScrollYRef.current = window.scrollY || window.pageYOffset || 0;
+    updateCompactState();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (rafId) window.cancelAnimationFrame(rafId);
+    };
   }, [id, isMobile]);
 
   useEffect(() => {
