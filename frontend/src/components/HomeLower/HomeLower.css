@@ -23,7 +23,7 @@
   --gap-book-marquee: 0rem; /* Gap between Book Button and Marquee */
   --gap-marquee-cards: 8rem; /* Gap between Marquee and Admin Card Row */
   --marquee-word-gap: 1.5rem; /* Gap between words in marquee */
-  --marquee-mobile-font-size: 1.7rem; /* Mobile running sentence size */
+  --marquee-mobile-font-size: 2rem; /* Mobile running sentence size */
   --marquee-mobile-font-size-xs: 1.55rem; /* Very small mobile screens */
 
   min-height: 100vh;
