@@ -102,7 +102,6 @@ export default function QueryDetailPage({ mode = 'public' }) {
   const { id } = useParams();
   const issueCardRef = useRef(null);
   const addSolutionCardRef = useRef(null);
-  const answersStripRef = useRef(null);
   const [queryDoc, setQueryDoc] = useState(null);
   const [loading, setLoading] = useState(false);
   const [sort, setSort] = useState('DATE_DESC');
@@ -202,24 +201,27 @@ export default function QueryDetailPage({ mode = 'public' }) {
       return;
     }
 
-    const stripHeight = answersStripRef.current?.offsetHeight || 64;
-    const rootMarginTop = -Math.max(64, Math.min(stripHeight, 220));
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        const compact = entry.boundingClientRect.top < 0 && !entry.isIntersecting;
-        setIsAddSolutionCompact(compact);
-      },
-      {
-        threshold: 0,
-        rootMargin: `${rootMarginTop}px 0px 0px 0px`
-      }
-    );
-
-    observer.observe(addSolutionCardRef.current);
-    return () => {
-      observer.disconnect();
+    let rafId = 0;
+    const updateCompactState = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const rect = addSolutionCardRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        const nextCompact = rect.bottom <= 0;
+        setIsAddSolutionCompact((prev) => (prev === nextCompact ? prev : nextCompact));
+      });
     };
-  }, [id, isMobile]);
+
+    updateCompactState();
+    window.addEventListener('scroll', updateCompactState, { passive: true });
+    window.addEventListener('resize', updateCompactState);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('scroll', updateCompactState);
+      window.removeEventListener('resize', updateCompactState);
+    };
+  }, [id, isMobile, queryDoc?._id]);
 
   useEffect(() => {
     if (!isMobile || !isAddSolutionCompact) {
@@ -505,7 +507,6 @@ export default function QueryDetailPage({ mode = 'public' }) {
 
         <section className="thread-solutions-card">
           <div
-            ref={answersStripRef}
             className={`thread-solutions-strip ${showCompactAnswerControls ? 'mobile-compact' : ''} ${
               isAnswersStripCollapsedOnMobile ? 'strip-collapsed-mobile' : ''
             }`}
