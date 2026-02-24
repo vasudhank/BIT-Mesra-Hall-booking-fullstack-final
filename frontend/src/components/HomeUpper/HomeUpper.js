@@ -132,8 +132,7 @@ const ThemeButton = ({ className, lightMode, toggleTheme }) => (
 
 export default function HomeUpper({
   lightMode = true,
-  toggleTheme = () => {},
-  mobileHeaderExpanded = false
+  toggleTheme = () => {}
 }) {
   const auth = useSelector((state) => state.user);
   const location = useLocation();
@@ -505,8 +504,13 @@ export default function HomeUpper({
 
       {/* 3. Mobile Date Time Bar (Fixed Top) */}
       {isMobile && (
-        <div className={`mobile-datetime-bar ${mobileHeaderExpanded ? 'mobile-datetime-bar--expanded' : ''}`}>
-          {timeData.mobileDateTimeStr}
+        <div className="mobile-datetime-bar mobile-datetime-bar--expanded">
+          <ThemeButton
+            className="mobile-toggle-in-bar"
+            lightMode={lightMode}
+            toggleTheme={toggleTheme}
+          />
+          <span className="mobile-datetime-text">{timeData.mobileDateTimeStr}</span>
         </div>
       )}
 
@@ -518,23 +522,14 @@ export default function HomeUpper({
         </button>
       )}
 
-      {/* 5. Mobile Theme Toggle (Fixed Center) */}
-      {isMobile && (
-        <ThemeButton 
-          className={`mobile-toggle-fixed ${mobileHeaderExpanded ? 'mobile-toggle-in-header' : ''}`} 
-          lightMode={lightMode} 
-          toggleTheme={toggleTheme} 
-        />
-      )}
-
-      {/* 6. Mobile AI FAB */}
+      {/* 5. Mobile AI FAB */}
       {isMobile && (
         <button className="mobile-ai-fab" onClick={handleAIClick}>
           <AutoAwesomeIcon sx={{ fontSize: 26, color: 'white' }} />
         </button>
       )}
 
-      {/* 7. Mobile Menu Overlay */}
+      {/* 6. Mobile Menu Overlay */}
       {isMobile && (
         <div className={`mobile-menu-overlay ${mobileMenuOpen ? 'open' : ''}`}>
            <div className="mobile-menu-content">

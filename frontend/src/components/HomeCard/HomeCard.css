@@ -30,7 +30,7 @@
 
 /* Dark Mode Variables */
 .lower-div.dark .home-card-scope {
-  --card-bg: rgba(0, 0, 0); /* Glassy Dark */
+  --card-bg: #000000; /* Pure black surface */
   
   --text-primary: #ffffff;
   --text-secondary: #8a929e;
@@ -164,10 +164,14 @@
 
 .btn-modern-card a {
   text-decoration: none;
-  color: inherit;
+  color: inherit !important;
   display: block;
   width: 100%;
   height: 100%;
+}
+
+body.dark-mode .home-card-scope .btn-modern-card a {
+  color: #000000 !important;
 }
 
 /* ================= LOTTIE WRAPPERS ================= */

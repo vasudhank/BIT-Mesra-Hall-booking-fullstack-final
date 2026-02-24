@@ -39,6 +39,11 @@
     color: var(--text-primary);
 }
 
+/* FAQ route only (light mode): footer item hover should be white */
+body:not(.dark-mode) .faq-page .footer-link:hover {
+    color: #ffffff;
+}
+
 .footer-branding {
     text-align: center;
 }

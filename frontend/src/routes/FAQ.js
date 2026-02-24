@@ -10,8 +10,6 @@ export default function FAQ({ lightMode, toggleTheme }) {
   const [faqs, setFaqs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [openFaqId, setOpenFaqId] = useState(null); // Added for accordion UI
-  const [mobileHeaderExpanded, setMobileHeaderExpanded] = useState(false);
-  const [mobileHeaderLocked, setMobileHeaderLocked] = useState(false);
 
   const loadFaqs = async () => {
     setLoading(true);
@@ -34,36 +32,6 @@ export default function FAQ({ lightMode, toggleTheme }) {
     window.scrollTo({ top: 0, behavior: 'auto' });
   }, []);
 
-  useEffect(() => {
-    const evaluate = () => {
-      if (!sectionTopRef.current || window.innerWidth > 1364) {
-        setMobileHeaderExpanded(false);
-        setMobileHeaderLocked(false);
-        return;
-      }
-      if (mobileHeaderLocked) {
-        setMobileHeaderExpanded(true);
-        return;
-      }
-      const sectionTop = sectionTopRef.current.getBoundingClientRect().top;
-      if (sectionTop <= 0) {
-        setMobileHeaderExpanded(true);
-        setMobileHeaderLocked(true);
-      } else {
-        setMobileHeaderExpanded(false);
-      }
-    };
-
-    evaluate();
-    window.addEventListener('scroll', evaluate, { passive: true });
-    window.addEventListener('resize', evaluate);
-
-    return () => {
-      window.removeEventListener('scroll', evaluate);
-      window.removeEventListener('resize', evaluate);
-    };
-  }, [mobileHeaderLocked]);
-
   const toggleFaq = (id) => {
     setOpenFaqId(openFaqId === id ? null : id);
   };
@@ -73,7 +41,6 @@ export default function FAQ({ lightMode, toggleTheme }) {
       <HomeUpper
         lightMode={lightMode}
         toggleTheme={toggleTheme}
-        mobileHeaderExpanded={mobileHeaderExpanded}
       />
       <div ref={sectionTopRef} className="section-top-anchor" />
       

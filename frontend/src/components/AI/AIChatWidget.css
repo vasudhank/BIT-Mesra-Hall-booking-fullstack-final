@@ -141,6 +141,11 @@ body.dark-mode .gemini-sidebar.resizing .sidebar-resize-handle::after {
   height: 32px;
 }
 
+.sidebar-top-row .MuiIconButton-root,
+.sidebar-bottom-icons .MuiIconButton-root {
+  color: var(--gemini-user-text) !important;
+}
+
 .gemini-sidebar.collapsed .sidebar-bottom-row {
   padding: 8px 4px 10px;
   justify-content: center;
@@ -326,6 +331,14 @@ body.dark-mode .gemini-sidebar.resizing .sidebar-resize-handle::after {
 
 .ai-sidebar-collapse-icon.left {
   transform: rotate(180deg);
+}
+
+body.dark-mode .sidebar-top-row .MuiIconButton-root,
+body.dark-mode .sidebar-bottom-icons .MuiIconButton-root,
+body.dark-mode .sidebar-settings-icon-btn,
+body.dark-mode .sidebar-home-icon-btn,
+body.dark-mode .sidebar-hide-icon-btn {
+  color: #e5e7eb !important;
 }
 
 .thread-item {
