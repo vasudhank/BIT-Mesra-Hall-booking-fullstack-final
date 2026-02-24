@@ -201,25 +201,51 @@ export default function QueryDetailPage({ mode = 'public' }) {
       return;
     }
 
+    const target = addSolutionCardRef.current;
+    const scrollParents = [];
+    let node = target.parentElement;
+    while (node) {
+      const styles = window.getComputedStyle(node);
+      const overflowY = styles.overflowY || styles.overflow;
+      if (/(auto|scroll|overlay)/i.test(overflowY)) {
+        scrollParents.push(node);
+      }
+      node = node.parentElement;
+    }
+
     let rafId = 0;
     const updateCompactState = () => {
       cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
-        const rect = addSolutionCardRef.current?.getBoundingClientRect();
-        if (!rect) return;
+        const rect = target.getBoundingClientRect();
         const nextCompact = rect.bottom <= 0;
         setIsAddSolutionCompact((prev) => (prev === nextCompact ? prev : nextCompact));
       });
     };
 
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const nextCompact = entry.boundingClientRect.bottom <= 0 || entry.intersectionRatio < 0.2;
+        setIsAddSolutionCompact((prev) => (prev === nextCompact ? prev : nextCompact));
+      },
+      {
+        threshold: [0, 0.2, 0.5, 1],
+        rootMargin: '-64px 0px 0px 0px'
+      }
+    );
+
+    observer.observe(target);
     updateCompactState();
     window.addEventListener('scroll', updateCompactState, { passive: true });
     window.addEventListener('resize', updateCompactState);
+    scrollParents.forEach((el) => el.addEventListener('scroll', updateCompactState, { passive: true }));
 
     return () => {
       cancelAnimationFrame(rafId);
+      observer.disconnect();
       window.removeEventListener('scroll', updateCompactState);
       window.removeEventListener('resize', updateCompactState);
+      scrollParents.forEach((el) => el.removeEventListener('scroll', updateCompactState));
     };
   }, [id, isMobile, queryDoc?._id]);
 
@@ -505,7 +531,7 @@ export default function QueryDetailPage({ mode = 'public' }) {
           </form>
         </section>
 
-        <section className="thread-solutions-card">
+        <section className="thread-solutions-block">
           <div
             className={`thread-solutions-strip ${showCompactAnswerControls ? 'mobile-compact' : ''} ${
               isAnswersStripCollapsedOnMobile ? 'strip-collapsed-mobile' : ''
@@ -598,7 +624,8 @@ export default function QueryDetailPage({ mode = 'public' }) {
             )}
           </div>
 
-          <div className="thread-solutions-list">
+          <section className="thread-solutions-card">
+            <div className="thread-solutions-list">
             {filteredSolutions.map((solution) => {
               const reaction = solutionReactionMap[solution._id] || 0;
               const isOpen = Boolean(openComments[solution._id]);
@@ -737,7 +764,8 @@ export default function QueryDetailPage({ mode = 'public' }) {
                 </article>
               );
             })}
-          </div>
+            </div>
+          </section>
         </section>
       </div>
       {isQuestionPopupOpen && (
