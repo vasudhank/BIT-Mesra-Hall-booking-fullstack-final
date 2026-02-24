@@ -2,6 +2,7 @@ services:
   - type: web
     name: hall-booking-frontend
     env: static
+    rootDir: frontend
     buildCommand: npm run build
     staticPublishPath: build
     routes:
