@@ -263,12 +263,6 @@
   height: 100%;
 }
 
-/* Dark mode: keep BOOK NOW text black */
-.lower-div.dark .hero-btn,
-.lower-div.dark .hero-btn.MuiButton-root {
-  color: #000000 !important;
-}
-
 /* =========================================================
    INFINITE MARQUEE STRIP
    ========================================================= */
@@ -352,6 +346,10 @@
   
   .lower-div.dark .hero-btn {
     background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  .lower-div.dark .hero-btn a {
     color: #000000 !important;
   }
 
