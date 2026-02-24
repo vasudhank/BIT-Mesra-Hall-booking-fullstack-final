@@ -943,7 +943,7 @@ body.dark-mode .mobile-menu-toggle {
 .mobile-datetime-text {
   flex: 1;
   min-width: 0;
-  text-align: left;
+  margin-left: 3vw;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
