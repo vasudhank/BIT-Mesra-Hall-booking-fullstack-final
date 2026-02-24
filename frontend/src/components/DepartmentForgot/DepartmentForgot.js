@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
 import "./DepartmentForgot.css";
+import { useNavigate } from "react-router-dom";
 import { departmentSendOtpApi, departmentResetPasswordApi, departmentVerifyOtpApi } from "../../api/departmentloginapi";
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 export default function DepartmentForgot() {
+  const navigate = useNavigate();
 
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState("");
@@ -72,7 +74,7 @@ export default function DepartmentForgot() {
           <CheckCircleIcon className="tick-icon" />
           <h2>Success!</h2>
           <p>Your password has been updated.</p>
-          <button autoFocus onClick={() => window.location.href = "/department_login"}>
+          <button autoFocus onClick={() => navigate("/department_login", { replace: true })}>
             Go to Login
           </button>
         </div>

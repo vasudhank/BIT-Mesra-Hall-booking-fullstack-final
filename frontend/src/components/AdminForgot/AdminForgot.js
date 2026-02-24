@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
 import "./AdminForgot.css";
+import { useNavigate } from "react-router-dom";
 import { adminSendOtpApi, adminResetPasswordApi, adminVerifyOtpApi } from "../../api/adminloginapi";
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 export default function AdminForgot() {
+  const navigate = useNavigate();
 
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState("");
@@ -73,7 +75,7 @@ export default function AdminForgot() {
           <CheckCircleIcon className="tick-icon" />
           <h2>Success!</h2>
           <p className="success-desc">Your admin password has been updated.</p>
-          <button autoFocus onClick={() => (window.location.href = "/admin_login")}>
+          <button autoFocus onClick={() => navigate("/admin_login", { replace: true })}>
             Go to Login
           </button>
         </div>

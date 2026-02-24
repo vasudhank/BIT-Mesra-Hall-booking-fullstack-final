@@ -8,7 +8,7 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 dayjs.extend(isoWeek);
 
@@ -88,6 +88,7 @@ function getBookingPosition(booking, selectedDateStr) {
 
 export default function Schedule() {
   const location = useLocation();
+  const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -387,7 +388,7 @@ export default function Schedule() {
             </Stack>
             <IconButton
               size="small"
-              onClick={() => window.location.href = "/"}
+              onClick={() => navigate('/')}
               aria-label="go home"
             >
               <HomeIcon sx={{ color: 'var(--text-primary)' }} />

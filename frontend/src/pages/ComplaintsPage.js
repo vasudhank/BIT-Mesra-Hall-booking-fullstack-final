@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import SearchIcon from '@mui/icons-material/Search';
 import { useSelector } from 'react-redux';
 import api from '../api/axiosInstance';
@@ -44,6 +44,7 @@ const openMailToInNewTab = (event) => {
 export default function ComplaintsPage({ mode = 'public' }) {
   const user = useSelector((s) => s.user);
   const location = useLocation();
+  const navigate = useNavigate();
   const isDeveloperView = mode === 'developer' || location.pathname.startsWith('/developer/');
   const isAdminView = mode === 'admin' || location.pathname.startsWith('/admin/');
   const role = String(user.user || '').toUpperCase();
@@ -78,7 +79,7 @@ export default function ComplaintsPage({ mode = 'public' }) {
     } catch {
       // ignore
     }
-    window.location.href = '/developer/login';
+    navigate('/developer/login', { replace: true });
   };
 
   const counts = useMemo(() => {

@@ -1,13 +1,12 @@
 import { useSelector } from 'react-redux';
 import { Navigate } from 'react-router-dom';
-import Loading from '../components/Loading/Loading';
 import AdminContacts from '../components/Dashboard/AdminContacts/AdminContacts';
 
 export default function AdminContactsRoute() {
   const user = useSelector((state) => state.user);
 
   if (user.status === 'Checking') {
-    return <Loading />;
+    return null;
   }
 
   if (user.status !== 'Authenticated') {
