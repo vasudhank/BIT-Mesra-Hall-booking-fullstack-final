@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { Suspense, lazy, useRef, useState, useEffect } from "react";
 import "./HomeUpper.css";
 import Grid from "@mui/material/Grid";
 import Box from "@mui/material/Box";
@@ -18,8 +18,8 @@ import OpenInFullIcon from '@mui/icons-material/OpenInFull'; // New icon for imm
 
 // Import the API call
 import { getContactsApi } from "../../api/contactApi";
-import AIChatWidget from "../AI/AIChatWidget";
 import { playElevenLabsSpeech, stopElevenLabsPlayback } from "../../utils/elevenLabsTts";
+const AIChatWidget = lazy(() => import("../AI/AIChatWidget"));
 
 // --- SUB-COMPONENT: FLIP UNIT (2-DIGIT) ---
 const FOLD_PHASE_MS = 250;
@@ -688,11 +688,13 @@ export default function HomeUpper({
 
             {/* Content: The Chat Widget */}
              <div className="gemini-card-body">
-               <AIChatWidget
-                 showHeaderBrand={false}
-                 onSidebarHiddenChange={setAiPopupSidebarHidden}
-                 externalRestoreSignal={aiPopupRestoreSignal}
-               />
+               <Suspense fallback={null}>
+                 <AIChatWidget
+                   showHeaderBrand={false}
+                   onSidebarHiddenChange={setAiPopupSidebarHidden}
+                   externalRestoreSignal={aiPopupRestoreSignal}
+                 />
+               </Suspense>
              </div>
 
           </div>
