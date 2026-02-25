@@ -55,6 +55,13 @@
   gap: 8px;
 }
 
+.role-account-input-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: #c3d6ff;
+}
+
 .role-account-form input {
   width: 100%;
   border: 1px solid rgba(131, 162, 217, 0.45);
@@ -64,6 +71,72 @@
   font-size: 1rem;
   padding: 10px 12px;
   outline: none;
+}
+
+.role-account-password-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.role-account-password-wrap input {
+  padding-right: 44px;
+}
+
+.role-account-eye-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #c8dafd;
+  background: transparent;
+}
+
+.role-account-eye-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.role-account-password-checklist {
+  border: 1px solid rgba(131, 162, 217, 0.3);
+  border-radius: 12px;
+  background: rgba(18, 33, 63, 0.52);
+  padding: 10px 12px;
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+
+.role-account-password-rule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+  color: #c7d2fe;
+  margin-bottom: 6px;
+}
+
+.role-account-password-rule:last-child {
+  margin-bottom: 0;
+}
+
+.role-account-password-rule-icon {
+  display: inline-flex;
+  color: rgba(203, 213, 225, 0.95);
+}
+
+.role-account-password-rule.passed {
+  color: #9ae6b4;
+}
+
+.role-account-password-rule.passed .role-account-password-rule-icon {
+  color: #22c55e;
 }
 
 .role-account-form button {
@@ -77,3 +150,8 @@
   cursor: pointer;
 }
 
+@media only screen and (max-width: 700px) {
+  .role-account-container h1 {
+    font-size: 2.15rem;
+  }
+}

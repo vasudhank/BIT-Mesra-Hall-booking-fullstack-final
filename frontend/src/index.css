@@ -77,3 +77,34 @@ body.dark-mode .MuiOutlinedInput-notchedOutline {
 body.dark-mode .MuiInputLabel-root {
   color: var(--text-secondary) !important;
 }
+
+/* =========================================
+   GLOBAL AUTOFILL STYLE RESET
+   Keep browser-saved values without forced
+   yellow/green autofill background.
+   ========================================= */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+textarea:-webkit-autofill:active,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus,
+select:-webkit-autofill:active {
+  -webkit-text-fill-color: inherit !important;
+  caret-color: inherit !important;
+  -webkit-box-shadow: 0 0 0 1000px transparent inset !important;
+  box-shadow: 0 0 0 1000px transparent inset !important;
+  transition: background-color 99999s ease-in-out 0s, color 99999s ease-in-out 0s !important;
+}
+
+input:-moz-autofill,
+textarea:-moz-autofill,
+select:-moz-autofill {
+  box-shadow: 0 0 0 1000px transparent inset !important;
+  color: inherit !important;
+}

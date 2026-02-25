@@ -1,15 +1,23 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import './AdminContacts.css';
 import Appbar from '../AppBar/AppBar';
 import {
   Alert,
   Backdrop,
   Box,
+  Button,
   Card,
   CircularProgress,
   Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControl,
   IconButton,
   InputBase,
+  MenuItem,
+  Select,
   Snackbar,
   Tooltip,
   Typography
@@ -17,7 +25,15 @@ import {
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
-import { adminUpdateContactApi, getContactsApi } from '../../../api/contactApi';
+import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import { adminAddContactApi, adminUpdateContactApi, getContactsApi } from '../../../api/contactApi';
+
+const SORT_OPTIONS = [
+  { value: 'name_asc', label: 'Name (A-Z)' },
+  { value: 'name_desc', label: 'Name (Z-A)' },
+  { value: 'phone_asc', label: 'Phone (Low-High)' },
+  { value: 'phone_desc', label: 'Phone (High-Low)' }
+];
 
 const applySearchFilter = (sourceContacts, query) => {
   if (!query.trim()) return sourceContacts;
@@ -29,18 +45,56 @@ const applySearchFilter = (sourceContacts, query) => {
   );
 };
 
+const sortContacts = (sourceContacts, sortBy) => {
+  const next = [...sourceContacts];
+
+  if (sortBy === 'name_asc') {
+    next.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }));
+    return next;
+  }
+
+  if (sortBy === 'name_desc') {
+    next.sort((a, b) => String(b.name || '').localeCompare(String(a.name || ''), undefined, { sensitivity: 'base' }));
+    return next;
+  }
+
+  if (sortBy === 'phone_asc') {
+    next.sort((a, b) => Number(String(a.number || '').replace(/\D/g, '')) - Number(String(b.number || '').replace(/\D/g, '')));
+    return next;
+  }
+
+  if (sortBy === 'phone_desc') {
+    next.sort((a, b) => Number(String(b.number || '').replace(/\D/g, '')) - Number(String(a.number || '').replace(/\D/g, '')));
+    return next;
+  }
+
+  return next;
+};
+
+const applySearchAndSort = (sourceContacts, query, sortBy) => sortContacts(applySearchFilter(sourceContacts, query), sortBy);
+
 export default function AdminContacts() {
   const [loading, setLoading] = useState(true);
   const [contacts, setContacts] = useState([]);
-  const [filteredContacts, setFilteredContacts] = useState([]);
   const [search, setSearch] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
+  const [sortBy, setSortBy] = useState('name_asc');
 
   const [editing, setEditing] = useState({ id: null, field: null });
   const [draftValue, setDraftValue] = useState('');
   const [savingKey, setSavingKey] = useState('');
 
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addSaving, setAddSaving] = useState(false);
+  const [newContact, setNewContact] = useState({ name: '', number: '', email: '' });
+
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+
+  const filteredContacts = useMemo(
+    () => applySearchAndSort(contacts, appliedSearch, sortBy),
+    [contacts, appliedSearch, sortBy]
+  );
 
   const loadContacts = async () => {
     setLoading(true);
@@ -51,7 +105,6 @@ export default function AdminContacts() {
       }
       const incoming = res?.data?.contacts || [];
       setContacts(incoming);
-      setFilteredContacts(incoming);
     } catch (err) {
       setErrorMsg(err.message || 'Failed to load contacts');
     } finally {
@@ -67,16 +120,12 @@ export default function AdminContacts() {
     const val = e.target.value;
     setSearch(val);
     if (val === '') {
-      setFilteredContacts(contacts);
+      setAppliedSearch('');
     }
   };
 
   const onSearchSubmit = () => {
-    if (!search.trim()) {
-      setFilteredContacts(contacts);
-      return;
-    }
-    setFilteredContacts(applySearchFilter(contacts, search));
+    setAppliedSearch(search);
   };
 
   const getEditKey = (id, field) => `${id}:${field}`;
@@ -126,12 +175,60 @@ export default function AdminContacts() {
       );
 
       setContacts(updatedContacts);
-      setFilteredContacts(applySearchFilter(updatedContacts, search));
       setSuccessMsg('Contact updated successfully');
       cancelEdit();
     } catch (err) {
       setErrorMsg(err?.data?.message || 'Failed to update contact');
       setSavingKey('');
+    }
+  };
+
+  const openAddDialog = () => {
+    setNewContact({ name: '', number: '', email: '' });
+    setAddDialogOpen(true);
+  };
+
+  const closeAddDialog = () => {
+    if (addSaving) return;
+    setAddDialogOpen(false);
+  };
+
+  const saveNewContact = async () => {
+    const payload = {
+      name: String(newContact.name || '').trim(),
+      number: String(newContact.number || '').replace(/\D/g, '').slice(0, 15),
+      email: String(newContact.email || '').trim()
+    };
+
+    if (!payload.name) {
+      setErrorMsg('Name is required');
+      return;
+    }
+
+    if (!/^\d{10,15}$/.test(payload.number)) {
+      setErrorMsg('Phone number must contain 10 to 15 digits');
+      return;
+    }
+
+    if (payload.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
+      setErrorMsg('Please provide a valid email address');
+      return;
+    }
+
+    setAddSaving(true);
+    try {
+      const res = await adminAddContactApi(payload);
+      const created = res?.data?.contact;
+      if (!created) {
+        throw new Error('Contact could not be created');
+      }
+      setContacts((prev) => [...prev, created]);
+      setSuccessMsg('Contact added successfully');
+      setAddDialogOpen(false);
+    } catch (err) {
+      setErrorMsg(err?.data?.message || 'Failed to add contact');
+    } finally {
+      setAddSaving(false);
     }
   };
 
@@ -221,10 +318,60 @@ export default function AdminContacts() {
           searchPlaceholder='Search name, number or email...'
         />
 
+        <div className='admin-contacts-mobile-controls'>
+          <FormControl size='small' className='admin-contacts-sort-control'>
+            <Select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              displayEmpty
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <Button
+            className='admin-contacts-add-btn'
+            variant='contained'
+            onClick={openAddDialog}
+            startIcon={<AddRoundedIcon />}
+          >
+            Add Contact
+          </Button>
+        </div>
+
         <Container maxWidth='xl'>
           <div className='admin-contacts-title-wrap'>
-            <h2 className='admin-contacts-title'>CONTACTS</h2>
-            <p className='admin-contacts-subtitle'>Manage Wish Your Day contact details</p>
+            <div className='admin-contacts-toolbar-left'>
+              <Typography className='admin-contacts-toolbar-label'>Sort</Typography>
+              <FormControl size='small' className='admin-contacts-sort-control'>
+                <Select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                >
+                  {SORT_OPTIONS.map((opt) => (
+                    <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </div>
+
+            <div className='admin-contacts-toolbar-center'>
+              <h2 className='admin-contacts-title'>CONTACTS</h2>
+              <p className='admin-contacts-subtitle'>Manage Wish Your Day contact details</p>
+            </div>
+
+            <div className='admin-contacts-toolbar-right'>
+              <Button
+                className='admin-contacts-add-btn'
+                variant='contained'
+                onClick={openAddDialog}
+                startIcon={<AddRoundedIcon />}
+              >
+                Add Contact
+              </Button>
+            </div>
           </div>
 
           <Card className='admin-contacts-card'>
@@ -259,6 +406,57 @@ export default function AdminContacts() {
         </Container>
       </div>
 
+      <Dialog open={addDialogOpen} onClose={closeAddDialog} fullWidth maxWidth='xs'>
+        <DialogTitle>Add Contact</DialogTitle>
+        <DialogContent sx={{ pt: '12px !important' }}>
+          <FormControl fullWidth sx={{ mb: 1.2 }}>
+            <InputBase
+              placeholder='Name'
+              value={newContact.name}
+              onChange={(e) => setNewContact((prev) => ({ ...prev, name: e.target.value }))}
+              sx={{
+                border: '1px solid rgba(15, 23, 42, 0.2)',
+                borderRadius: 2,
+                px: 1.2,
+                py: 1
+              }}
+            />
+          </FormControl>
+          <FormControl fullWidth sx={{ mb: 1.2 }}>
+            <InputBase
+              placeholder='Phone Number (10-15 digits)'
+              value={newContact.number}
+              onChange={(e) => setNewContact((prev) => ({ ...prev, number: e.target.value.replace(/\D/g, '').slice(0, 15) }))}
+              sx={{
+                border: '1px solid rgba(15, 23, 42, 0.2)',
+                borderRadius: 2,
+                px: 1.2,
+                py: 1
+              }}
+            />
+          </FormControl>
+          <FormControl fullWidth>
+            <InputBase
+              placeholder='Email Address (optional)'
+              value={newContact.email}
+              onChange={(e) => setNewContact((prev) => ({ ...prev, email: e.target.value }))}
+              sx={{
+                border: '1px solid rgba(15, 23, 42, 0.2)',
+                borderRadius: 2,
+                px: 1.2,
+                py: 1
+              }}
+            />
+          </FormControl>
+        </DialogContent>
+        <DialogActions sx={{ px: 2, pb: 2 }}>
+          <Button onClick={closeAddDialog} disabled={addSaving}>Cancel</Button>
+          <Button onClick={saveNewContact} variant='contained' disabled={addSaving}>
+            {addSaving ? <CircularProgress size={18} color='inherit' /> : 'Add'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Snackbar
         open={Boolean(successMsg)}
         autoHideDuration={2600}
@@ -283,4 +481,3 @@ export default function AdminContacts() {
     </>
   );
 }
-

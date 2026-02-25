@@ -34,6 +34,7 @@ import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import api from '../../../api/axiosInstance';
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import '../../../pages/RoleAccountPage.css';
 
 function checkPasswordStrength(pwd) {
   const checks = {
@@ -290,7 +291,7 @@ export default function DepartmentAccount() {
   };
 
   return (
-    <>
+    <div className="role-account-page">
       {!isSetupMode && (
         <Box sx={{ position: 'fixed', top: 8, right: 12, zIndex: 1400 }}>
           <Tooltip title="Open settings">
@@ -334,18 +335,18 @@ export default function DepartmentAccount() {
         </Box>
       )}
 
-      <Container sx={{ mt: 8 }}>
+      <Container sx={{ mt: 8, pb: 4 }}>
         <Grid container justifyContent="center">
           <Grid item xs={11} sm={8} md={6} lg={5}>
             <Card
               sx={{
                 borderRadius: 3,
-                border: '1px solid rgba(148, 163, 184, 0.2)',
-                boxShadow: '0 18px 40px rgba(15, 23, 42, 0.08)',
-                background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)'
+                border: '1px solid rgba(125, 157, 212, 0.34)',
+                boxShadow: '0 14px 34px rgba(2, 8, 23, 0.33)',
+                background: 'rgba(51, 73, 112, 0.9)'
               }}
             >
-              <CardContent sx={{ p: { xs: 2.4, sm: 3 } }}>
+              <CardContent sx={{ p: { xs: 2.4, sm: 3 }, color: '#ebf2ff' }}>
                 <Typography variant="h5" sx={{ mb: 2, fontWeight: 700 }}>
                   {isSetupMode ? "Secure Your Account" : "Account"}
                 </Typography>
@@ -383,7 +384,7 @@ export default function DepartmentAccount() {
                     p: 2,
                     borderRadius: 2.5,
                     border: '1px solid rgba(148, 163, 184, 0.28)',
-                    background: 'linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.95))',
+                    background:' #30466d',
                     mb: 2
                   }}
                 >
@@ -613,6 +614,6 @@ export default function DepartmentAccount() {
       <Snackbar open={errorOpen} autoHideDuration={4000} onClose={() => setErrorOpen(false)}>
         <Alert severity="error" onClose={() => setErrorOpen(false)}>{errMsg}</Alert>
       </Snackbar>
-    </>
+    </div>
   );
 }

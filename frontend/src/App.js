@@ -16,7 +16,7 @@ import AdminDepartmentRequestRoute from './routes/AdminDepartmentRequestRoute';
 import AdminContactsRoute from './routes/AdminContactsRoute';
 import DepartmentBookingRoute from './routes/DepartmentBookingRoute';
 import DepartmentHistoryRoute from './routes/DepartmentHistoryRoute';
-import DepartmentAccount from './components/Dashboard/DepartmentAccount/DepartmentAccount';
+import DepartmentAccountPage from './pages/DepartmentAccountPage';
 import Schedule from './components/Schedule/Schedule';
 import DepartmentForgot from './components/DepartmentForgot/DepartmentForgot';
 import AdminForgot from './components/AdminForgot/AdminForgot';
@@ -69,7 +69,7 @@ function App() {
         <Route path="/department_register" element={<DepartmentRegisterRoute />} />
         <Route path="/admin/forgot" element={<AdminForgot />} />
         <Route path="/department/forgot" element={<DepartmentForgot />} />
-        <Route path="/department/account" element={<DepartmentAccount />} />
+        <Route path="/department/account" element={<DepartmentAccountPage />} />
         <Route path="/developer/login" element={<DeveloperLogin />} />
 
         <Route path="/complaints" element={<ComplaintsPage />} />

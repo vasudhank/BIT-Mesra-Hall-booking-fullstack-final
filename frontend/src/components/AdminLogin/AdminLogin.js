@@ -34,16 +34,21 @@ export default function AdminLogin() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const response = await adminloginApi({ email, password });
+    try {
+      const response = await adminloginApi({ email, password });
+      if (!response || response.error || response.data?.error) {
+        setOpen(true);
+        setPassword('');
+        return;
+      }
 
-    if (!response || response.error || response.data?.error) {
+      dispatch(addStatus("Admin"));
+      navigate("/admin/hall");
+    } catch (_) {
       setOpen(true);
       setPassword('');
-      return;
+      setEmail((prev) => prev.trim());
     }
-
-    dispatch(addStatus("Admin"));
-    navigate("/admin/hall");
   };
 
   const auth = useSelector((state)=> state.user);
@@ -60,7 +65,7 @@ export default function AdminLogin() {
       <Snackbar open={open} autoHideDuration={3000} onClose={handleClose}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
         <Alert onClose={handleClose} severity="warning" sx={{ background: '#d32f2f', color: '#fff' }}>
-          Incorrect Username/Password
+          Incorrect email/password entered
         </Alert>
       </Snackbar>
 

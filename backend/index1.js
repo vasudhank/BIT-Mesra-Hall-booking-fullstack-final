@@ -348,11 +348,24 @@ router.post('/department/verify_otp', async (req, res) => {
 });
 
 const ACCOUNT_ROLE_MAP = {
-  admin: { roleName: 'admin', model: Admin, defaultName: 'Admin' },
-  developer: { roleName: 'developer', model: Developer, defaultName: 'Developer' }
+  admin: { roleName: 'admin', model: Admin, defaultName: 'Admin', nameField: 'name' },
+  department: { roleName: 'department', model: Department, defaultName: 'Department', nameField: 'head' },
+  developer: { roleName: 'developer', model: Developer, defaultName: 'Developer', nameField: 'name' }
 };
 
 const getAccountRoleConfig = (roleParam) => ACCOUNT_ROLE_MAP[String(roleParam || '').toLowerCase()] || null;
+
+const getAccountDisplayName = (cfg, account) => {
+  const primaryField = cfg?.nameField || 'name';
+  return String(account?.[primaryField] || account?.name || cfg?.defaultName || '').trim();
+};
+
+const toAccountPayload = (cfg, account) => ({
+  name: getAccountDisplayName(cfg, account),
+  email: account?.email || '',
+  phone: account?.phone || '',
+  type: account?.type || cfg?.defaultName || ''
+});
 
 router.get('/account/:role', async (req, res) => {
   try {
@@ -364,14 +377,7 @@ router.get('/account/:role', async (req, res) => {
 
     const account = await cfg.model.findById(req.user.id);
     if (!account) return res.status(404).json({ error: 'Account not found' });
-    res.json({
-      account: {
-        name: account.name || cfg.defaultName,
-        email: account.email,
-        phone: account.phone || '',
-        type: account.type || cfg.defaultName
-      }
-    });
+    res.json({ account: toAccountPayload(cfg, account) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -388,19 +394,18 @@ router.patch('/account/:role/profile', async (req, res) => {
     const name = String(req.body.name || '').trim().slice(0, 120);
     const phone = String(req.body.phone || '').trim().slice(0, 30);
     const updates = {};
-    if (name) updates.name = name;
+    if (name) {
+      const nameField = cfg.nameField || 'name';
+      updates[nameField] = name;
+      if (nameField !== 'name') {
+        updates.name = name;
+      }
+    }
     updates.phone = phone;
 
     const account = await cfg.model.findByIdAndUpdate(req.user.id, { $set: updates }, { new: true });
     if (!account) return res.status(404).json({ error: 'Account not found' });
-    res.json({
-      account: {
-        name: account.name || cfg.defaultName,
-        email: account.email,
-        phone: account.phone || '',
-        type: account.type || cfg.defaultName
-      }
-    });
+    res.json({ account: toAccountPayload(cfg, account) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -477,12 +482,7 @@ router.post('/account/:role/verify_email_otp', async (req, res) => {
     if (req.user) req.user.email = newEmail;
     res.json({
       success: true,
-      account: {
-        name: account.name || cfg.defaultName,
-        email: account.email,
-        phone: account.phone || '',
-        type: account.type || cfg.defaultName
-      }
+      account: toAccountPayload(cfg, account)
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

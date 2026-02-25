@@ -22,9 +22,65 @@
 }
 
 .admin-contacts-title-wrap {
-  text-align: center;
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) 1fr minmax(190px, 240px);
+  gap: 16px;
+  align-items: center;
   margin-top: 1.2rem;
   margin-bottom: 1.2rem;
+}
+
+.admin-contacts-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-contacts-toolbar-right {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.admin-contacts-toolbar-center {
+  text-align: center;
+}
+
+.admin-contacts-toolbar-label {
+  color: #bfdbfe !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 0.8rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.06em !important;
+}
+
+.admin-contacts-sort-control {
+  min-width: 170px;
+}
+
+.admin-contacts-sort-control .MuiOutlinedInput-root {
+  border-radius: 12px;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.admin-contacts-sort-control .MuiSvgIcon-root {
+  color: #dbeafe;
+}
+
+.admin-contacts-sort-control fieldset {
+  border-color: rgba(255, 255, 255, 0.26);
+}
+
+.admin-contacts-add-btn {
+  text-transform: none !important;
+  border-radius: 12px !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 700 !important;
+  background: linear-gradient(120deg, #1d4ed8, #2563eb) !important;
+}
+
+.admin-contacts-mobile-controls {
+  display: none;
 }
 
 .admin-contacts-title {
@@ -173,7 +229,41 @@
   .admin-contacts-body {
     padding-left: 16px;
     padding-right: 16px;
-    padding-top: 120px;
+    padding-top: 182px;
+  }
+
+  .admin-contacts-mobile-controls {
+    position: fixed;
+    top: 82px;
+    left: 0;
+    right: 0;
+    z-index: 1090;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+    background: linear-gradient(243.81deg, #25354f 0.9%, #1b2033 100%);
+  }
+
+  .admin-contacts-mobile-controls .admin-contacts-sort-control {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .admin-contacts-mobile-controls .admin-contacts-add-btn {
+    min-width: 144px;
+  }
+
+  .admin-contacts-title-wrap {
+    grid-template-columns: 1fr;
+    margin-top: 0.4rem;
+    margin-bottom: 0.9rem;
+  }
+
+  .admin-contacts-toolbar-left,
+  .admin-contacts-toolbar-right {
+    display: none;
   }
 
   .admin-contacts-list {

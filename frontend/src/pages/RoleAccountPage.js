@@ -1,5 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
+import RadioButtonUncheckedRoundedIcon from '@mui/icons-material/RadioButtonUncheckedRounded';
 import {
   changeAccountPassword,
   getAccount,
@@ -8,6 +12,22 @@ import {
   verifyAccountEmailOtp
 } from '../api/accountApi';
 import './RoleAccountPage.css';
+
+const checkPasswordStrength = (pwd = '') => ({
+  length: pwd.length >= 8,
+  lower: /[a-z]/.test(pwd),
+  upper: /[A-Z]/.test(pwd),
+  digit: /[0-9]/.test(pwd),
+  special: /[!@#$%^&*()_+=[\]{};:'",.<>/?`~\\-]/.test(pwd)
+});
+
+const PASSWORD_REQUIREMENTS = [
+  { key: 'length', text: 'At least 8 characters' },
+  { key: 'lower', text: 'One lowercase letter (a-z)' },
+  { key: 'upper', text: 'One uppercase letter (A-Z)' },
+  { key: 'digit', text: 'One number (0-9)' },
+  { key: 'special', text: 'One special character (!@#$...)' }
+];
 
 export default function RoleAccountPage({ role = 'admin', backPath = '/', title = 'Account' }) {
   const [loading, setLoading] = useState(false);
@@ -24,6 +44,17 @@ export default function RoleAccountPage({ role = 'admin', backPath = '/', title 
     newPassword: '',
     confirmPassword: ''
   });
+
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const passwordChecks = useMemo(
+    () => checkPasswordStrength(passwordForm.newPassword),
+    [passwordForm.newPassword]
+  );
+
+  const isPasswordValid = Object.values(passwordChecks).every(Boolean);
 
   const load = async () => {
     setLoading(true);
@@ -82,12 +113,19 @@ export default function RoleAccountPage({ role = 'admin', backPath = '/', title 
       alert('New password and confirm password do not match.');
       return;
     }
+    if (!isPasswordValid) {
+      alert('New password does not meet all requirements.');
+      return;
+    }
     try {
       await changeAccountPassword(role, {
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword
       });
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setShowCurrentPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
       alert('Password changed successfully.');
     } catch (err) {
       alert(err?.response?.data?.error || 'Password change failed');
@@ -117,12 +155,15 @@ export default function RoleAccountPage({ role = 'admin', backPath = '/', title 
                 </p>
               </div>
               <form onSubmit={saveProfile} className="role-account-form">
+                <label className="role-account-input-label">Name</label>
                 <input
                   type="text"
                   value={profile.name}
                   onChange={(e) => setProfile((prev) => ({ ...prev, name: e.target.value }))}
                   placeholder="Name"
                 />
+
+                <label className="role-account-input-label">Phone</label>
                 <input
                   type="text"
                   value={profile.phone}
@@ -160,24 +201,76 @@ export default function RoleAccountPage({ role = 'admin', backPath = '/', title 
             <section className="role-account-card">
               <h2>Change Password</h2>
               <form className="role-account-form" onSubmit={updatePassword}>
-                <input
-                  type="password"
-                  value={passwordForm.currentPassword}
-                  onChange={(e) => setPasswordForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
-                  placeholder="Current Password"
-                />
-                <input
-                  type="password"
-                  value={passwordForm.newPassword}
-                  onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
-                  placeholder="New Password"
-                />
-                <input
-                  type="password"
-                  value={passwordForm.confirmPassword}
-                  onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
-                  placeholder="Confirm New Password"
-                />
+                <label className="role-account-input-label">Current Password</label>
+                <div className="role-account-password-wrap">
+                  <input
+                    type={showCurrentPassword ? 'text' : 'password'}
+                    value={passwordForm.currentPassword}
+                    onChange={(e) => setPasswordForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
+                    placeholder="Current Password"
+                  />
+                  <button
+                    type="button"
+                    className="role-account-eye-btn"
+                    onClick={() => setShowCurrentPassword((prev) => !prev)}
+                    aria-label="Toggle current password visibility"
+                  >
+                    {showCurrentPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                  </button>
+                </div>
+
+                <label className="role-account-input-label">New Password</label>
+                <div className="role-account-password-wrap">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={passwordForm.newPassword}
+                    onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
+                    placeholder="New Password"
+                  />
+                  <button
+                    type="button"
+                    className="role-account-eye-btn"
+                    onClick={() => setShowNewPassword((prev) => !prev)}
+                    aria-label="Toggle new password visibility"
+                  >
+                    {showNewPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                  </button>
+                </div>
+
+                <div className="role-account-password-checklist">
+                  {PASSWORD_REQUIREMENTS.map((rule) => {
+                    const ok = Boolean(passwordChecks[rule.key]);
+                    return (
+                      <div
+                        key={rule.key}
+                        className={`role-account-password-rule ${ok ? 'passed' : ''}`}
+                      >
+                        <span className="role-account-password-rule-icon" aria-hidden="true">
+                          {ok ? <CheckCircleRoundedIcon fontSize="small" /> : <RadioButtonUncheckedRoundedIcon fontSize="small" />}
+                        </span>
+                        <span>{rule.text}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <label className="role-account-input-label">Confirm New Password</label>
+                <div className="role-account-password-wrap">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+                    placeholder="Confirm New Password"
+                  />
+                  <button
+                    type="button"
+                    className="role-account-eye-btn"
+                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                    aria-label="Toggle confirm password visibility"
+                  >
+                    {showConfirmPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                  </button>
+                </div>
                 <button type="submit">Update Password</button>
               </form>
             </section>
@@ -187,4 +280,3 @@ export default function RoleAccountPage({ role = 'admin', backPath = '/', title 
     </div>
   );
 }
-

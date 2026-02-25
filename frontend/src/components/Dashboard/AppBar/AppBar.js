@@ -46,6 +46,25 @@ export default function Appbar({
   const [anchorElUser, setAnchorElUser] = React.useState(null);
   const [dateTime, setDateTime] = React.useState("");
 
+  const searchInputSx = {
+    '& .MuiOutlinedInput-root': {
+      borderRadius: '24px',
+      background: 'rgba(255,255,255,0.9)',
+      '& input': {
+        color: '#1b2033',
+        fontFamily: 'Inter',
+        fontWeight: 500
+      },
+      '& input::placeholder': {
+        color: 'rgba(27, 32, 51, 0.75)',
+        opacity: 1
+      },
+      '& .MuiSvgIcon-root': {
+        color: '#34456b'
+      }
+    }
+  };
+
   const logout = async () => {
     try {
       await api.get('/logout', { withCredentials: true });
@@ -118,7 +137,7 @@ export default function Appbar({
                 size="small"
                 sx={{
                   minWidth: 220,
-                  '& .MuiOutlinedInput-root': { borderRadius: '24px', background: 'rgba(255,255,255,0.9)' }
+                  ...searchInputSx
                 }}
                 InputProps={{
                   endAdornment: (
@@ -163,7 +182,8 @@ export default function Appbar({
               <MenuItem onClick={() => { handleCloseUserMenu(); navigate('/admin/account'); }} sx={{ color: 'black' }}>
                 <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>ACCOUNTS</Typography>
               </MenuItem>
-              <MenuItem onClick={handleCloseUserMenu} sx={{ color: 'black' }}><Typography textAlign="center" className="dropdown-text" onClick={logout} sx={{ color: 'black' }}>LOGOUT</Typography></MenuItem>
+              <MenuItem onClick={handleCloseUserMenu} sx={{ color: 'black' }}><Typography textAlign="center" className="dropdown-text" onClick={logout} 
+  style={{ color: "red", fontWeight: "bold" }} sx={{ color: 'black' }}>LOGOUT</Typography></MenuItem>
             </Menu>
           </Box>
 
@@ -215,9 +235,9 @@ export default function Appbar({
                     sx={{
                       flex: 1,
                       minWidth: 0,
+                      ...searchInputSx,
                       '& .MuiOutlinedInput-root': {
-                        borderRadius: '24px',
-                        background: 'rgba(255,255,255,0.95)',
+                        ...searchInputSx['& .MuiOutlinedInput-root'],
                         fontSize: '0.9rem',
                         height: '40px'
                       }

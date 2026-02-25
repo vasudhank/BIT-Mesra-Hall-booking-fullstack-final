@@ -23,13 +23,33 @@ router.get('/get_contacts', async (req, res) => {
 
 // Optional: Route to add contacts (Use Postman or a script to add them initially)
 router.post('/add', async (req, res) => {
+  if (!isAdminAuthenticated(req)) {
+    return res.status(403).json({ success: false, message: 'You are not authorized' });
+  }
+
   try {
-    const { name, number, email, order } = req.body; // Added email here
-    const newContact = new Contact({ name, number, email, order }); // Added email here
+    const name = String(req.body.name || '').trim();
+    const number = String(req.body.number || '').replace(/\D/g, '').slice(0, 15);
+    const email = String(req.body.email || '').trim();
+    const order = Number(req.body.order) || 0;
+
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Name is required' });
+    }
+
+    if (!/^\d{10,15}$/.test(number)) {
+      return res.status(400).json({ success: false, message: 'Phone number must contain 10 to 15 digits' });
+    }
+
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ success: false, message: 'Please provide a valid email address' });
+    }
+
+    const newContact = new Contact({ name, number, email, order });
     await newContact.save();
-    res.status(201).json({ message: "Contact added", contact: newContact });
+    res.status(201).json({ success: true, message: "Contact added", contact: newContact });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 

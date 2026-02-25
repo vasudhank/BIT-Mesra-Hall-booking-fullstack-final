@@ -20,3 +20,15 @@ export const adminUpdateContactApi = async (contactId, inputData) => {
     throw error;
   }
 };
+
+export const adminAddContactApi = async (inputData) => {
+  try {
+    const response = await api.post('/contact/add', inputData);
+    return response;
+  } catch (error) {
+    if (error.response) {
+      throw error.response;
+    }
+    throw error;
+  }
+};

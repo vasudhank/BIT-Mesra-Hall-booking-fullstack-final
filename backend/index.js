@@ -13,6 +13,7 @@ require('./config/mongoose');
 const passport = require('./config/passport');
 const Developer = require('./models/developer');
 const { startFaqAutoPromotion } = require('./services/faqAutoPromotionService');
+const { startBookingCleanupSchedule } = require('./services/bookingCleanupService');
 
 const PORT = process.env.PORT || 8000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -93,6 +94,7 @@ const server = app.listen(PORT, () => {
     console.log('[Startup] Complaint mail sync disabled (COMPLAINT_MAIL_SYNC_ENABLED=false).');
   }
   startFaqAutoPromotion();
+  startBookingCleanupSchedule();
 });
 
 server.on('error', (err) => {

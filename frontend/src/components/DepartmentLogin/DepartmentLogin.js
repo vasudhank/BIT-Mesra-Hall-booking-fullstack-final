@@ -65,20 +65,19 @@ export default function DepartmentLogin() {
 
     e.preventDefault()
 
-    const response = await departmentLoginApi({ email, password });
+    try {
+      const response = await departmentLoginApi({ email, password });
 
-    if (!response.data.error) {
-
-      dispatch(addStatus("Department"))
-
-      navigate("/department/booking")
-
-    } else {
-
+      if (!response?.data?.error) {
+        dispatch(addStatus("Department"))
+        navigate("/department/booking")
+      } else {
+        setOpen(true)
+        setPassword('')
+      }
+    } catch (_) {
       setOpen(true)
-
       setPassword('')
-
     }
 
   }
@@ -93,8 +92,7 @@ export default function DepartmentLogin() {
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
 
         <Alert onClose={handleClose} severity="warning" sx={{ background: '#d32f2f', color: '#fff' }}>
-
-          Incorrect Username/Password
+          Incorrect email/password entered
 
         </Alert>
 

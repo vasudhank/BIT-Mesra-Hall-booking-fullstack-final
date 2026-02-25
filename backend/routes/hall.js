@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Hall = require('../models/hall');
+const { runBookingCleanup } = require('../services/bookingCleanupService');
 
 // Test route
 router.get('/', (req, res) => {
@@ -40,6 +41,8 @@ router.post('/create_hall', async (req, res) => {
 // Getting all the Halls (computes status at read-time)
 router.get('/view_halls', async (req, res) => {
   try {
+    await runBookingCleanup();
+
     const halls = await Hall.find()
       .populate({ path: 'bookings.department', select: 'head department email' })
       .lean();

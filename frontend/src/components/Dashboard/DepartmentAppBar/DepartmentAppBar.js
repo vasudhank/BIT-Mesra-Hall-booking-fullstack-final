@@ -17,6 +17,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import api from '../../../api/axiosInstance';
 import { removeStatus } from "../../../store/slices/userSlice";
+import { red } from "@mui/material/colors";
 
 export default function DepartmentAppBar({
   showSearch = false,
@@ -265,7 +266,8 @@ export default function DepartmentAppBar({
               <Typography className="dropdown-text">FEEDBACK</Typography>
             </MenuItem>
             <MenuItem onClick={() => setAnchorElUser(null)}>
-              <Typography className="dropdown-text" onClick={logout}>
+              <Typography className="dropdown-text" 
+  style={{ color: "red", fontWeight: "bold" }} onClick={logout}>
                 LOGOUT
               </Typography>
             </MenuItem>

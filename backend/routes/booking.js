@@ -17,6 +17,7 @@ const {
   sendBookingAutoBookedMail,
   sendDecisionToDepartment
 } = require('../services/emailService');
+const { runBookingCleanup } = require('../services/bookingCleanupService');
 
 const { generateApprovalToken, getTokenExpiry } = require('../utils/token');
 
@@ -56,8 +57,16 @@ router.get('/show_booking_requests', async (req, res) => {
       return res.status(403).json({ msg: 'You are not authorized' });
     }
 
+    await runBookingCleanup();
+    const now = new Date();
+
     const requests = await Booking_Requests
-      .find({ status: { $in: ['PENDING', 'AUTO_BOOKED'] } })
+      .find({
+        $or: [
+          { status: 'PENDING', startDateTime: { $gt: now } },
+          { status: 'AUTO_BOOKED', endDateTime: { $gt: now } }
+        ]
+      })
       .populate({ path: 'department', select: 'department head email' })
       .sort({ createdAt: -1 });
 
@@ -73,6 +82,8 @@ router.post('/create_booking', async (req, res) => {
     if (!(req.isAuthenticated && req.isAuthenticated() && req.user.type === 'Department')) {
       return res.status(403).json({ msg: 'Not Authorized to Make booking requests' });
     }
+
+    await runBookingCleanup();
 
     const {
       hall,
@@ -97,6 +108,11 @@ router.post('/create_booking', async (req, res) => {
     if (Number.isNaN(startDT.getTime()) || Number.isNaN(endDT.getTime())) {
       return res.status(400).json({ msg: 'Invalid date/time format' });
     }
+    const now = new Date();
+    if (startDT <= now) {
+      return res.status(400).json({ msg: 'Cannot create booking for a date/time that has already passed' });
+    }
+
     if (endDT <= startDT) {
       return res.status(400).json({ msg: 'endDateTime must be after startDateTime' });
     }
@@ -370,6 +386,7 @@ router.post('/change_booking_request', async (req, res) => {
 });
 
 router.get('/hall_status', async (req, res) => {
+  await runBookingCleanup();
   const halls = await Hall.find();
   const now = new Date();
 
