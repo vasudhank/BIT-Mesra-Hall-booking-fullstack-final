@@ -52,6 +52,15 @@ export default function DepartmentLogin() {
   const [password, setPassword] = useState("");
   const loginInFlightRef = useRef(false);
   const lastAutoFailedKeyRef = useRef('');
+  const emailInputRef = useRef(null);
+  const passwordInputRef = useRef(null);
+
+  const syncInputsFromDom = useCallback(() => {
+    const domEmail = emailInputRef.current?.value ?? '';
+    const domPassword = passwordInputRef.current?.value ?? '';
+    setEmail((prev) => (prev === domEmail ? prev : domEmail));
+    setPassword((prev) => (prev === domPassword ? prev : domPassword));
+  }, []);
 
 
   const handleClose = (_, reason) => {
@@ -64,8 +73,8 @@ export default function DepartmentLogin() {
 
 
   const performLogin = useCallback(async ({ showError = false, clearPasswordOnFail = false } = {}) => {
-    const normalizedEmail = email.trim().toLowerCase();
-    const loginPassword = password;
+    const normalizedEmail = String(emailInputRef.current?.value ?? email).trim().toLowerCase();
+    const loginPassword = String(passwordInputRef.current?.value ?? password);
     const attemptKey = `${normalizedEmail}::${loginPassword}`;
 
     if (!normalizedEmail || !loginPassword) return false;
@@ -104,6 +113,30 @@ export default function DepartmentLogin() {
     await performLogin({ showError: true, clearPasswordOnFail: true });
 
   }
+
+  useEffect(() => {
+    syncInputsFromDom();
+    let ticks = 0;
+    const syncInterval = setInterval(() => {
+      syncInputsFromDom();
+      ticks += 1;
+      if (ticks >= 80) clearInterval(syncInterval);
+    }, 125);
+
+    const handleWindowFocus = () => syncInputsFromDom();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') syncInputsFromDom();
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(syncInterval);
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [syncInputsFromDom]);
 
   useEffect(() => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -163,10 +196,13 @@ export default function DepartmentLogin() {
                     <FormControl fullWidth>
 
                       <Input
+                        inputRef={emailInputRef}
 
                         value={email}
 
                         onChange={(e) => setEmail(e.target.value)}
+                        onInput={(e) => setEmail(e.target.value)}
+                        onFocus={syncInputsFromDom}
 
                         disableUnderline
 
@@ -189,6 +225,7 @@ export default function DepartmentLogin() {
                         }
 
                         inputProps={{
+                          autoComplete: "email",
 
                           style: {
 
@@ -219,10 +256,13 @@ export default function DepartmentLogin() {
                     <FormControl fullWidth>
 
                       <Input
+                        inputRef={passwordInputRef}
 
                         value={password}
 
                         onChange={(e) => setPassword(e.target.value)}
+                        onInput={(e) => setPassword(e.target.value)}
+                        onFocus={syncInputsFromDom}
 
                         disableUnderline
 
@@ -245,6 +285,7 @@ export default function DepartmentLogin() {
                         }
 
                         inputProps={{
+                          autoComplete: "current-password",
 
                           style: {
 

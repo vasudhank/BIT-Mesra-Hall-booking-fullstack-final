@@ -28,6 +28,15 @@ export default function AdminLogin() {
   const [password, setPassword] = useState("");
   const loginInFlightRef = useRef(false);
   const lastAutoFailedKeyRef = useRef('');
+  const emailInputRef = useRef(null);
+  const passwordInputRef = useRef(null);
+
+  const syncInputsFromDom = useCallback(() => {
+    const domEmail = emailInputRef.current?.value ?? '';
+    const domPassword = passwordInputRef.current?.value ?? '';
+    setEmail((prev) => (prev === domEmail ? prev : domEmail));
+    setPassword((prev) => (prev === domPassword ? prev : domPassword));
+  }, []);
 
   const handleClose = (_, reason) => {
     if (reason === 'clickaway') return;
@@ -35,8 +44,8 @@ export default function AdminLogin() {
   };
 
   const performLogin = useCallback(async ({ showError = false, clearPasswordOnFail = false } = {}) => {
-    const normalizedEmail = email.trim().toLowerCase();
-    const loginPassword = password;
+    const normalizedEmail = String(emailInputRef.current?.value ?? email).trim().toLowerCase();
+    const loginPassword = String(passwordInputRef.current?.value ?? password);
     const attemptKey = `${normalizedEmail}::${loginPassword}`;
 
     if (!normalizedEmail || !loginPassword) return false;
@@ -80,6 +89,30 @@ export default function AdminLogin() {
 }, [auth.status, auth.user, navigate]);
 
   useEffect(() => {
+    syncInputsFromDom();
+    let ticks = 0;
+    const syncInterval = setInterval(() => {
+      syncInputsFromDom();
+      ticks += 1;
+      if (ticks >= 80) clearInterval(syncInterval);
+    }, 125);
+
+    const handleWindowFocus = () => syncInputsFromDom();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') syncInputsFromDom();
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(syncInterval);
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [syncInputsFromDom]);
+
+  useEffect(() => {
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || !password) return;
     if (!/\S+@\S+\.\S+/.test(normalizedEmail)) return;
@@ -119,8 +152,11 @@ export default function AdminLogin() {
                   <div className="input-group">
                     <FormControl fullWidth>
                       <Input
+                        inputRef={emailInputRef}
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
+                        onInput={(e) => setEmail(e.target.value)}
+                        onFocus={syncInputsFromDom}
                         disableUnderline
                         type="email"
                         placeholder="Email address"
@@ -132,6 +168,7 @@ export default function AdminLogin() {
                           </InputAdornment>
                         }
                         inputProps={{
+                          autoComplete: "email",
                           style: {
                             padding: 0,
                             height: "100%",
@@ -147,8 +184,11 @@ export default function AdminLogin() {
                   <div className="input-group">
                     <FormControl fullWidth>
                       <Input
+                        inputRef={passwordInputRef}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
+                        onInput={(e) => setPassword(e.target.value)}
+                        onFocus={syncInputsFromDom}
                         disableUnderline
                         type="password"
                         placeholder="Password"
@@ -160,6 +200,7 @@ export default function AdminLogin() {
                           </InputAdornment>
                         }
                         inputProps={{
+                          autoComplete: "current-password",
                           style: {
                             padding: 0,
                             height: "100%",
