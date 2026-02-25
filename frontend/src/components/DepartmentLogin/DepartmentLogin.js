@@ -1,4 +1,4 @@
- import React, { useState } from 'react'
+ import React, { useState, useEffect, useRef, useCallback } from 'react'
 
 import './DepartmentLogin.css'
 
@@ -50,6 +50,8 @@ export default function DepartmentLogin() {
   const [email, setEmail] = useState("");
 
   const [password, setPassword] = useState("");
+  const loginInFlightRef = useRef(false);
+  const lastAutoFailedKeyRef = useRef('');
 
 
   const handleClose = (_, reason) => {
@@ -61,26 +63,59 @@ export default function DepartmentLogin() {
   };
 
 
+  const performLogin = useCallback(async ({ showError = false, clearPasswordOnFail = false } = {}) => {
+    const normalizedEmail = email.trim().toLowerCase();
+    const loginPassword = password;
+    const attemptKey = `${normalizedEmail}::${loginPassword}`;
+
+    if (!normalizedEmail || !loginPassword) return false;
+    if (loginInFlightRef.current) return false;
+    if (!showError && lastAutoFailedKeyRef.current === attemptKey) return false;
+
+    loginInFlightRef.current = true;
+    try {
+      const response = await departmentLoginApi({ email: normalizedEmail, password: loginPassword });
+
+      if (!response?.data?.error) {
+        lastAutoFailedKeyRef.current = '';
+        dispatch(addStatus("Department"))
+        navigate("/department/booking")
+        return true;
+      } else {
+        lastAutoFailedKeyRef.current = attemptKey;
+        if (showError) setOpen(true)
+        if (clearPasswordOnFail) setPassword('')
+        return false;
+      }
+    } catch (_) {
+      lastAutoFailedKeyRef.current = attemptKey;
+      if (showError) setOpen(true)
+      if (clearPasswordOnFail) setPassword('')
+      return false;
+    } finally {
+      loginInFlightRef.current = false;
+    }
+  }, [email, password, dispatch, navigate]);
+
   const handleSubmit = async (e) => {
 
     e.preventDefault()
 
-    try {
-      const response = await departmentLoginApi({ email, password });
-
-      if (!response?.data?.error) {
-        dispatch(addStatus("Department"))
-        navigate("/department/booking")
-      } else {
-        setOpen(true)
-        setPassword('')
-      }
-    } catch (_) {
-      setOpen(true)
-      setPassword('')
-    }
+    await performLogin({ showError: true, clearPasswordOnFail: true });
 
   }
+
+  useEffect(() => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !password) return;
+    if (!/\S+@\S+\.\S+/.test(normalizedEmail)) return;
+
+    const timeoutId = setTimeout(() => {
+      performLogin({ showError: false, clearPasswordOnFail: false });
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
+  }, [email, password, performLogin]);
 
 
   return (

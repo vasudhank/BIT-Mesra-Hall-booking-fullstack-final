@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import "./AdminLogin.css";
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
@@ -26,29 +26,50 @@ export default function AdminLogin() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const loginInFlightRef = useRef(false);
+  const lastAutoFailedKeyRef = useRef('');
 
   const handleClose = (_, reason) => {
     if (reason === 'clickaway') return;
     setOpen(false);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const performLogin = useCallback(async ({ showError = false, clearPasswordOnFail = false } = {}) => {
+    const normalizedEmail = email.trim().toLowerCase();
+    const loginPassword = password;
+    const attemptKey = `${normalizedEmail}::${loginPassword}`;
+
+    if (!normalizedEmail || !loginPassword) return false;
+    if (loginInFlightRef.current) return false;
+    if (!showError && lastAutoFailedKeyRef.current === attemptKey) return false;
+
+    loginInFlightRef.current = true;
     try {
-      const response = await adminloginApi({ email, password });
+      const response = await adminloginApi({ email: normalizedEmail, password: loginPassword });
       if (!response || response.error || response.data?.error) {
-        setOpen(true);
-        setPassword('');
-        return;
+        lastAutoFailedKeyRef.current = attemptKey;
+        if (showError) setOpen(true);
+        if (clearPasswordOnFail) setPassword('');
+        return false;
       }
 
+      lastAutoFailedKeyRef.current = '';
       dispatch(addStatus("Admin"));
       navigate("/admin/hall");
+      return true;
     } catch (_) {
-      setOpen(true);
-      setPassword('');
-      setEmail((prev) => prev.trim());
+      lastAutoFailedKeyRef.current = attemptKey;
+      if (showError) setOpen(true);
+      if (clearPasswordOnFail) setPassword('');
+      return false;
+    } finally {
+      loginInFlightRef.current = false;
     }
+  }, [email, password, dispatch, navigate]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await performLogin({ showError: true, clearPasswordOnFail: true });
   };
 
   const auth = useSelector((state)=> state.user);
@@ -57,6 +78,18 @@ export default function AdminLogin() {
     navigate("/admin/hall");
   }
 }, [auth.status, auth.user, navigate]);
+
+  useEffect(() => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !password) return;
+    if (!/\S+@\S+\.\S+/.test(normalizedEmail)) return;
+
+    const timeoutId = setTimeout(() => {
+      performLogin({ showError: false, clearPasswordOnFail: false });
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
+  }, [email, password, performLogin]);
 
   
 
