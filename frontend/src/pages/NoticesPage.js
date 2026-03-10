@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { createNoticeApi, getNoticesApi } from '../api/noticesApi';
+import { createNoticeApi, deleteNoticeApi, getNoticesApi, updateNoticeApi } from '../api/noticesApi';
+import api from '../api/axiosInstance';
+import HallMultiSelectDropdown from '../components/Notices/HallMultiSelectDropdown';
+import { fuzzyFilterAndRank } from '../utils/fuzzySearch';
 import './NoticesPage.css';
 
 const READING_STORAGE_KEY = 'bit_notice_reading_preferences_v1';
@@ -40,11 +43,19 @@ const saveReadingPrefs = (prefs) => {
   localStorage.setItem(READING_STORAGE_KEY, JSON.stringify(prefs));
 };
 
-const splitRooms = (value) =>
-  String(value || '')
-    .split(/[,\n;|]/)
-    .map((x) => x.trim())
-    .filter(Boolean);
+const toDateTimeLocalInput = (value) => {
+  if (!value) return '';
+  const dt = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(dt.getTime())) return '';
+  return new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+};
+
+const toIsoOrNull = (value) => {
+  if (!value) return null;
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt.toISOString();
+};
 
 const formatDate = (value) => {
   if (!value) return 'N/A';
@@ -52,6 +63,24 @@ const formatDate = (value) => {
   if (Number.isNaN(dt.getTime())) return 'N/A';
   return dt.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
 };
+
+const filterNoticesByQuery = (sourceNotices, query) =>
+  fuzzyFilterAndRank(
+    sourceNotices,
+    query,
+    (notice) => [
+      notice?.title,
+      notice?.subject,
+      notice?.content,
+      notice?.body,
+      notice?.summary,
+      notice?.holidayName,
+      notice?.kind,
+      Array.isArray(notice?.rooms) ? notice.rooms.join(' ') : '',
+      notice?.closureAllHalls ? 'campus wide closure all halls' : ''
+    ],
+    { threshold: 0.45 }
+  );
 
 // Premium SVG Icons
 const Icons = {
@@ -63,17 +92,23 @@ const Icons = {
   Home: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
   ArrowRight: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>,
   Maximize: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>,
-  Minimize: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+  Minimize: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>,
+  Edit: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>,
+  Trash: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"></path><path d="M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>,
+  Close: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>,
+  Alert: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
 };
 
 export default function NoticesPage({ mode = 'public' }) {
   const auth = useSelector((s) => s.user);
-  const allowAdminComposer = mode === 'admin' || (auth.status === 'Authenticated' && auth.user === 'Admin');
+  const isAdmin = mode === 'admin' || (auth.status === 'Authenticated' && auth.user === 'Admin');
+  const allowAdminComposer = isAdmin;
 
   const [reading, setReading] = useState(loadReadingPrefs);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notices, setNotices] = useState([]);
+  const [halls, setHalls] = useState([]);
   const [search, setSearch] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
   const [sort, setSort] = useState('LATEST');
@@ -87,10 +122,27 @@ export default function NoticesPage({ mode = 'public' }) {
   const [holidayName, setHolidayName] = useState('');
   const [startDateTime, setStartDateTime] = useState('');
   const [endDateTime, setEndDateTime] = useState('');
-  const [roomsText, setRoomsText] = useState('');
+  const [selectedComposeHalls, setSelectedComposeHalls] = useState([]);
   const [closureAllHalls, setClosureAllHalls] = useState(false);
   const [posting, setPosting] = useState(false);
   const [postMessage, setPostMessage] = useState('');
+  const [editNoticeId, setEditNoticeId] = useState('');
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [editForm, setEditForm] = useState({
+    title: '',
+    description: '',
+    kind: 'GENERAL',
+    holidayName: '',
+    startDateTime: '',
+    endDateTime: '',
+    rooms: [],
+    closureAllHalls: false
+  });
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, notice: null });
+  const [deleteSaving, setDeleteSaving] = useState(false);
+  const [actionMessage, setActionMessage] = useState({ type: '', text: '' });
 
   useEffect(() => {
     saveReadingPrefs(reading);
@@ -101,12 +153,13 @@ export default function NoticesPage({ mode = 'public' }) {
     setError('');
     try {
       const data = await getNoticesApi({
-        search: appliedSearch,
+        search: '',
         sort,
         kind: kind === 'ALL' ? '' : kind,
         limit: 300
       });
-      setNotices(Array.isArray(data?.notices) ? data.notices : []);
+      const incoming = Array.isArray(data?.notices) ? data.notices : [];
+      setNotices(filterNoticesByQuery(incoming, appliedSearch));
     } catch (err) {
       setError(err?.response?.data?.error || 'Failed to load notices');
     } finally {
@@ -114,9 +167,23 @@ export default function NoticesPage({ mode = 'public' }) {
     }
   }, [appliedSearch, sort, kind]);
 
+  const fetchHalls = useCallback(async () => {
+    try {
+      const response = await api.get('/hall/view_halls', { withCredentials: true });
+      setHalls(Array.isArray(response?.data?.halls) ? response.data.halls : []);
+    } catch (_) {
+      setHalls([]);
+    }
+  }, []);
+
   useEffect(() => {
     fetchNotices();
   }, [fetchNotices]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    fetchHalls();
+  }, [isAdmin, fetchHalls]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -147,7 +214,7 @@ export default function NoticesPage({ mode = 'public' }) {
     setHolidayName('');
     setStartDateTime('');
     setEndDateTime('');
-    setRoomsText('');
+    setSelectedComposeHalls([]);
     setClosureAllHalls(false);
     setIsComposerMaximized(false);
   };
@@ -169,7 +236,7 @@ export default function NoticesPage({ mode = 'public' }) {
         holidayName: holidayName.trim(),
         startDateTime: startDateTime || undefined,
         endDateTime: endDateTime || undefined,
-        rooms: splitRooms(roomsText),
+        rooms: closureAllHalls ? [] : selectedComposeHalls,
         closureAllHalls
       });
       setPostMessage('Notice posted successfully.');
@@ -179,6 +246,125 @@ export default function NoticesPage({ mode = 'public' }) {
       setPostMessage(err?.response?.data?.error || 'Unable to post notice.');
     } finally {
       setPosting(false);
+    }
+  };
+
+  const openEditModal = (notice) => {
+    if (!isAdmin || !notice?._id) return;
+    setActionMessage({ type: '', text: '' });
+    setEditNoticeId(String(notice._id));
+    setEditForm({
+      title: String(notice.title || notice.subject || '').trim(),
+      description: String(notice.content || notice.body || notice.summary || '').trim(),
+      kind: String(notice.kind || '').toUpperCase() === 'HOLIDAY' ? 'HOLIDAY' : 'GENERAL',
+      holidayName: String(notice.holidayName || '').trim(),
+      startDateTime: toDateTimeLocalInput(notice.startDateTime),
+      endDateTime: toDateTimeLocalInput(notice.endDateTime),
+      rooms: Array.isArray(notice.rooms) ? notice.rooms : [],
+      closureAllHalls: Boolean(notice.closureAllHalls)
+    });
+    setEditError('');
+    setEditOpen(true);
+  };
+
+  const closeEditModal = () => {
+    if (editSaving) return;
+    setEditOpen(false);
+    setEditError('');
+    setEditNoticeId('');
+  };
+
+  const handleEditFormChange = (key, value) => {
+    setEditForm((prev) => {
+      const next = { ...prev, [key]: value };
+      if (key === 'closureAllHalls' && value) {
+        next.rooms = [];
+      }
+      return next;
+    });
+  };
+
+  const saveEditedNotice = async (e) => {
+    e?.preventDefault?.();
+    if (!isAdmin || !editNoticeId) return;
+
+    const nextTitle = String(editForm.title || '').trim();
+    const nextDescription = String(editForm.description || '').trim();
+    const nextStart = editForm.startDateTime ? toIsoOrNull(editForm.startDateTime) : null;
+    const nextEnd = editForm.endDateTime ? toIsoOrNull(editForm.endDateTime) : null;
+
+    if (!nextTitle && !nextDescription) {
+      setEditError('Title or description is required.');
+      return;
+    }
+
+    if ((editForm.startDateTime && !nextStart) || (editForm.endDateTime && !nextEnd)) {
+      setEditError('Please provide valid start/end timeline values.');
+      return;
+    }
+
+    if (nextStart && nextEnd && new Date(nextEnd) <= new Date(nextStart)) {
+      setEditError('End timeline must be after start timeline.');
+      return;
+    }
+
+    const payloadRooms = editForm.closureAllHalls ? [] : (Array.isArray(editForm.rooms) ? editForm.rooms : []);
+    const payloadKind = editForm.kind === 'HOLIDAY' ? 'HOLIDAY' : 'GENERAL';
+    const payloadHolidayName = payloadKind === 'HOLIDAY' ? String(editForm.holidayName || '').trim() : '';
+
+    setEditSaving(true);
+    setEditError('');
+    setActionMessage({ type: '', text: '' });
+    try {
+      await updateNoticeApi(editNoticeId, {
+        title: nextTitle,
+        subject: nextTitle,
+        description: nextDescription,
+        content: nextDescription,
+        body: nextDescription,
+        summary: nextDescription,
+        startDateTime: nextStart,
+        endDateTime: nextEnd,
+        rooms: payloadRooms,
+        closureAllHalls: Boolean(editForm.closureAllHalls),
+        kind: payloadKind,
+        holidayName: payloadHolidayName
+      });
+      setEditOpen(false);
+      setEditNoticeId('');
+      setActionMessage({ type: 'success', text: 'Notice updated successfully.' });
+      fetchNotices();
+    } catch (err) {
+      setEditError(err?.response?.data?.error || 'Unable to update notice.');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const openDeleteDialog = (notice) => {
+    if (!isAdmin || !notice?._id) return;
+    setActionMessage({ type: '', text: '' });
+    setDeleteDialog({ open: true, notice });
+  };
+
+  const closeDeleteDialog = () => {
+    if (deleteSaving) return;
+    setDeleteDialog({ open: false, notice: null });
+  };
+
+  const confirmDeleteNotice = async () => {
+    if (!isAdmin || !deleteDialog.notice?._id) return;
+    setDeleteSaving(true);
+    setActionMessage({ type: '', text: '' });
+    try {
+      await deleteNoticeApi(deleteDialog.notice._id);
+      setDeleteDialog({ open: false, notice: null });
+      setActionMessage({ type: 'success', text: 'Notice moved to trash.' });
+      fetchNotices();
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err?.response?.data?.error || 'Unable to delete notice.' });
+    } finally {
+      setDeleteSaving(false);
     }
   };
 
@@ -197,7 +383,13 @@ export default function NoticesPage({ mode = 'public' }) {
             <header className="notices-hero notices-hero-sidebar">
               <h1>Notice Board</h1>
               <p>Manage and broadcast institutional updates instantly.</p>
-              <Link className="notices-hero-home" to="/"><Icons.Home /> Return Home</Link>
+              <div className="notices-hero-quick-actions">
+                <Link className="notices-hero-home" to="/"><Icons.Home /> Home</Link>
+                <Link className="notices-hero-trash-btn" to="/trash" title="Open Trash" aria-label="Open Trash">
+                  <Icons.Trash />
+                  <span>Trash</span>
+                </Link>
+              </div>
             </header>
 
             {isComposerMaximized && (
@@ -253,11 +445,30 @@ export default function NoticesPage({ mode = 'public' }) {
 
                 <div className="input-group">
                   <label>Affected Rooms (Comma Separated)</label>
-                  <input className="premium-input" value={roomsText} onChange={(e) => setRoomsText(e.target.value)} placeholder="Hall 1, Main Aud." />
+                  <HallMultiSelectDropdown
+                    halls={halls}
+                    selectedHalls={selectedComposeHalls}
+                    onChange={setSelectedComposeHalls}
+                    disabled={closureAllHalls}
+                    startDateTime={startDateTime}
+                    endDateTime={endDateTime}
+                    fieldHeight={35}
+                    fieldPlaceholderOffsetY={5}
+                    fieldInputOffsetY={2}
+                    hallRowNameOffsetY={-1}
+                  />
                 </div>
 
                 <label className="notice-checkbox-label">
-                  <input type="checkbox" checked={closureAllHalls} onChange={(e) => setClosureAllHalls(e.target.checked)} />
+                  <input
+                    type="checkbox"
+                    checked={closureAllHalls}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setClosureAllHalls(checked);
+                      if (checked) setSelectedComposeHalls([]);
+                    }}
+                  />
                   Campus-wide closure applies
                 </label>
 
@@ -277,7 +488,13 @@ export default function NoticesPage({ mode = 'public' }) {
             <header className="notices-hero" style={{marginBottom: '24px'}}>
               <h1>Notice Board</h1>
               <p>Stay informed with the latest institutional announcements.</p>
-              <Link className="notices-hero-home" to="/"><Icons.Home /> Return Home</Link>
+              <div className="notices-hero-quick-actions">
+                <Link className="notices-hero-home" to="/"><Icons.Home /> Home</Link>
+                <Link className="notices-hero-trash-btn" to="/trash" title="Open Trash" aria-label="Open Trash">
+                  <Icons.Trash />
+                  <span>Trash</span>
+                </Link>
+              </div>
             </header>
           )}
 
@@ -344,6 +561,11 @@ export default function NoticesPage({ mode = 'public' }) {
 
           {/* Scrollable Notices List */}
           <section className="notices-list">
+            {actionMessage.text && (
+              <div className={`notice-inline-message ${actionMessage.type === 'error' ? 'error' : ''}`}>
+                {actionMessage.text}
+              </div>
+            )}
             {loading && <div className="notice-empty">Syncing latest notices...</div>}
             {!loading && error && <div className="notice-empty notice-error">{error}</div>}
             {!loading && !error && notices.length === 0 && (
@@ -354,19 +576,43 @@ export default function NoticesPage({ mode = 'public' }) {
               <article key={notice._id} className="notice-card">
                 <div className="notice-card-head">
                   <h3>{notice.title || notice.subject}</h3>
-                  <span className={`notice-badge ${notice.kind === 'HOLIDAY' ? 'holiday' : 'general'}`}>
-                    {notice.kind === 'HOLIDAY' ? 'Closure' : 'Update'}
-                  </span>
+                  <div className="notice-card-head-right">
+                    {isAdmin && (
+                      <div className="notice-admin-icon-group" role="group" aria-label="Notice actions">
+                        <button
+                          type="button"
+                          className="notice-admin-icon-btn"
+                          onClick={() => openEditModal(notice)}
+                          title="Edit notice"
+                          aria-label="Edit notice"
+                        >
+                          <Icons.Edit />
+                        </button>
+                        <button
+                          type="button"
+                          className="notice-admin-icon-btn danger"
+                          onClick={() => openDeleteDialog(notice)}
+                          title="Delete notice"
+                          aria-label="Delete notice"
+                        >
+                          <Icons.Trash />
+                        </button>
+                      </div>
+                    )}
+                    <span className={`notice-badge ${notice.kind === 'HOLIDAY' ? 'holiday' : 'general'}`}>
+                      {notice.kind === 'HOLIDAY' ? 'Closure' : 'Notice'}
+                    </span>
+                  </div>
                 </div>
                 <p className="notice-summary">{notice.summary || 'Click below to read the full details of this announcement.'}</p>
                 <div className="notice-meta">
-                  <span>🗓 {formatDate(notice.createdAt)}</span>
-                  {notice.startDateTime && <span>⏱ Starts: {formatDate(notice.startDateTime)}</span>}
-                  {notice.endDateTime && <span>⏱ Ends: {formatDate(notice.endDateTime)}</span>}
+                  <span>Published: {formatDate(notice.createdAt)}</span>
+                  {notice.startDateTime && <span>Starts: {formatDate(notice.startDateTime)}</span>}
+                  {notice.endDateTime && <span>Ends: {formatDate(notice.endDateTime)}</span>}
                   {Array.isArray(notice.rooms) && notice.rooms.length > 0 && (
-                    <span>📍 Locations: {notice.rooms.join(', ')}</span>
+                    <span>Locations: {notice.rooms.join(', ')}</span>
                   )}
-                  {notice.closureAllHalls && <span>🚨 Campus-wide Closure</span>}
+                  {notice.closureAllHalls && <span>Campus-wide Closure</span>}
                 </div>
                 <div className="notice-actions">
                   <Link to={`/notices/${notice._id}`} className="read-more-link">
@@ -378,6 +624,159 @@ export default function NoticesPage({ mode = 'public' }) {
           </section>
         </main>
       </div>
+
+      {editOpen && (
+        <div className="notice-admin-modal-backdrop" onClick={closeEditModal}>
+          <section className="notice-admin-modal-card" onClick={(e) => e.stopPropagation()}>
+            <header className="notice-admin-modal-header">
+              <h3>Edit Notice</h3>
+              <button type="button" className="notice-admin-modal-close" onClick={closeEditModal} aria-label="Close">
+                <Icons.Close />
+              </button>
+            </header>
+
+            <form onSubmit={saveEditedNotice} className="notice-admin-modal-form">
+              <label className="input-group">
+                <span>Title</span>
+                <input
+                  className="premium-input"
+                  value={editForm.title}
+                  onChange={(e) => handleEditFormChange('title', e.target.value)}
+                  placeholder="Notice title"
+                  maxLength={240}
+                />
+              </label>
+
+              <label className="input-group">
+                <span>Description</span>
+                <textarea
+                  className="premium-input"
+                  value={editForm.description}
+                  onChange={(e) => handleEditFormChange('description', e.target.value)}
+                  placeholder="Detailed notice content"
+                />
+              </label>
+
+              <div className="notice-admin-modal-grid">
+                <label className="input-group">
+                  <span>Classification</span>
+                  <select
+                    className="premium-input"
+                    value={editForm.kind}
+                    onChange={(e) => handleEditFormChange('kind', e.target.value)}
+                  >
+                    <option value="GENERAL">General Notice</option>
+                    <option value="HOLIDAY">Holiday / Closure</option>
+                  </select>
+                </label>
+
+                <label className="input-group">
+                  <span>Holiday Event Name (Optional)</span>
+                  <input
+                    className="premium-input"
+                    value={editForm.holidayName}
+                    onChange={(e) => handleEditFormChange('holidayName', e.target.value)}
+                    placeholder="Event name"
+                    maxLength={180}
+                    disabled={editForm.kind !== 'HOLIDAY'}
+                  />
+                </label>
+              </div>
+
+              <div className="notice-admin-modal-grid">
+                <label className="input-group">
+                  <span>Start Timeline</span>
+                  <input
+                    className="premium-input"
+                    type="datetime-local"
+                    value={editForm.startDateTime}
+                    onChange={(e) => handleEditFormChange('startDateTime', e.target.value)}
+                  />
+                </label>
+
+                <label className="input-group">
+                  <span>End Timeline</span>
+                  <input
+                    className="premium-input"
+                    type="datetime-local"
+                    value={editForm.endDateTime}
+                    onChange={(e) => handleEditFormChange('endDateTime', e.target.value)}
+                  />
+                </label>
+              </div>
+
+              <label className="input-group">
+                <span>Affected Halls (Comma Separated)</span>
+                <HallMultiSelectDropdown
+                  halls={halls}
+                  selectedHalls={editForm.rooms}
+                  onChange={(next) => handleEditFormChange('rooms', next)}
+                  disabled={editForm.closureAllHalls}
+                  startDateTime={editForm.startDateTime}
+                  endDateTime={editForm.endDateTime}
+                  fieldHeight={35}
+                  fieldPlaceholderOffsetY={5}
+                  fieldInputOffsetY={2}
+                  hallRowNameOffsetY={-1}
+                />
+              </label>
+
+              <label className="notice-checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={editForm.closureAllHalls}
+                  onChange={(e) => handleEditFormChange('closureAllHalls', e.target.checked)}
+                />
+                Campus-wide closure applies
+              </label>
+
+              {editError && <div className="notice-admin-error">{editError}</div>}
+
+              <div className="notice-admin-modal-actions">
+                <button type="button" className="notice-admin-secondary-btn" onClick={closeEditModal} disabled={editSaving}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" disabled={editSaving}>
+                  {editSaving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {deleteDialog.open && (
+        <div className="notice-admin-modal-backdrop" onClick={closeDeleteDialog}>
+          <section className="notice-delete-confirm-card" onClick={(e) => e.stopPropagation()}>
+            <div className="notice-delete-confirm-head">
+              <div className="notice-delete-confirm-icon">
+                <Icons.Alert />
+              </div>
+              <div className="notice-delete-confirm-copy">
+                <h4>Delete this notice?</h4>
+                <p className="notice-delete-confirm-title">
+                  {deleteDialog.notice?.title || deleteDialog.notice?.subject || 'Selected notice'}
+                </p>
+                <p className="notice-delete-confirm-desc">
+                  This will remove the notice from the board and move it to trash.
+                </p>
+              </div>
+            </div>
+
+            <div className="notice-delete-confirm-actions">
+              <button type="button" className="notice-admin-secondary-btn" onClick={closeDeleteDialog} disabled={deleteSaving}>
+                Cancel
+              </button>
+              <button type="button" className="notice-admin-danger-btn" onClick={confirmDeleteNotice} disabled={deleteSaving}>
+                {deleteSaving ? 'Deleting...' : 'Delete Notice'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
+
+
+

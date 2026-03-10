@@ -8,6 +8,7 @@ import DepartmentBookingCard from './DepartmentBookingCard';
 import Backdrop from '@mui/material/Backdrop';
 import CircularProgress from '@mui/material/CircularProgress';
 import api from '../../../api/axiosInstance';
+import { fuzzyFilterHallLike } from '../../../utils/fuzzySearch';
 
 const SORT_OPTIONS = [
   { value: 'NAME_ASC', label: 'Hall Name (A-Z)' },
@@ -56,13 +57,15 @@ export default function DepartmentBooking() {
   }, []);
 
   const filteredHalls = useMemo(() => {
-    const query = searchValue.trim().toLowerCase();
+    const query = searchValue.trim();
     const searched = !query
       ? [...halls]
-      : halls.filter((hall) =>
-          String(hall.name || '').toLowerCase().includes(query) ||
-          String(hall.capacity || '').toLowerCase().includes(query) ||
-          String(hall.status || '').toLowerCase().includes(query)
+      : fuzzyFilterHallLike(
+          halls,
+          query,
+          (hall) => hall?.name,
+          (hall) => [hall?.capacity, hall?.status],
+          { threshold: 0.48, nameThreshold: 0.4 }
         );
     return searched.sort((a, b) => compareHalls(a, b, sortMode));
   }, [halls, searchValue, sortMode]);

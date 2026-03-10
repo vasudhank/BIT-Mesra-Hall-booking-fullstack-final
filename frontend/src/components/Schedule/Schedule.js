@@ -11,6 +11,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { fuzzyFilterHallLike } from '../../utils/fuzzySearch';
 
 dayjs.extend(isoWeek);
 
@@ -322,13 +323,22 @@ export default function Schedule() {
         .map((notice) => noticeIdentityKey(notice))
     ).size > 1;
 
+  const filteredScheduleHalls = useMemo(() => {
+    const source = Array.isArray(halls) ? halls : [];
+    if (!searchQuery) return source;
+    return fuzzyFilterHallLike(
+      source,
+      searchQuery,
+      (hall) => hall?.name,
+      (hall) => [hall?.capacity, hall?.status],
+      { threshold: 0.48, nameThreshold: 0.4 }
+    );
+  }, [halls, searchQuery]);
+
   // Process data for Grid/List views
   const gridData = useMemo(() => {
     const cols = weekDates.map(d => ({ label: d.format('ddd'), date: d.format('YYYY-MM-DD'), longLabel: d.format('DD MMM') }));
-    const filteredRows = (halls || []).filter(h => {
-      if (!searchQuery) return true;
-      return (h.name || '').toLowerCase().includes(searchQuery.toLowerCase());
-    }).map(h => ({ id: h._id || h.name, name: h.name, capacity: h.capacity, bookings: h.bookings || [], status: h.status }));
+    const filteredRows = filteredScheduleHalls.map(h => ({ id: h._id || h.name, name: h.name, capacity: h.capacity, bookings: h.bookings || [], status: h.status }));
     
     const map = {};
     filteredRows.forEach(r => {
@@ -339,7 +349,7 @@ export default function Schedule() {
       });
     });
     return { cols, rows: filteredRows, map };
-  }, [halls, weekDates, searchQuery]);
+  }, [filteredScheduleHalls, weekDates]);
 
   const syncWeekHeaderScroll = (scrollLeft) => {
     if (weekHeaderRef.current) {
@@ -378,7 +388,9 @@ export default function Schedule() {
   const weekHeaderStickyTop = navbarHeightPx + topOffsetPx + topStripHeight - 2;
 
   const onSearchChange = (e) => {
-    setSearchTerm(e.target.value);
+    const next = String(e.target.value || '');
+    setSearchTerm(next);
+    setSearchQuery(next.trim());
   };
 
   const onSearchSubmit = () => {
@@ -436,17 +448,14 @@ export default function Schedule() {
 
   // Filter rows for Today view (reuses searchQuery)
   const todayRows = useMemo(() => {
-    return (halls || []).filter(h => {
-      if (!searchQuery) return true;
-      return (h.name || '').toLowerCase().includes(searchQuery.toLowerCase());
-    }).map((hall) => ({
+    return filteredScheduleHalls.map((hall) => ({
       id: hall._id || hall.name,
       name: hall.name,
       capacity: hall.capacity,
       bookings: hall.bookings || [],
       status: hall.status
     }));
-  }, [halls, searchQuery]);
+  }, [filteredScheduleHalls]);
 
   // Width for one hour column in Today View
   const hourColumnWidth = 140; 

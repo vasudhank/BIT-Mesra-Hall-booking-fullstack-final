@@ -16,6 +16,30 @@ const toDateOrNull = (value) => {
   return Number.isNaN(dt.getTime()) ? null : dt;
 };
 
+const safeStyleText = (value, max = 160000) =>
+  String(value ?? '')
+    .trim()
+    .slice(0, max);
+
+const sanitizeStyleHtml = (value, max = 150000) =>
+  safeStyleText(value, max)
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    .replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, '')
+    .replace(/\son[a-z]+\s*=\s*'[^']*'/gi, '')
+    .replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, '')
+    .replace(/javascript:/gi, '');
+
+const normalizePublicStyle = (value) => {
+  const style = value && typeof value === 'object' ? value : {};
+  return {
+    titleColor: safeStyleText(style.titleColor, 40),
+    descriptionColor: safeStyleText(style.descriptionColor, 40),
+    contentHtml: sanitizeStyleHtml(style.contentHtml, 150000),
+    updatedAt: style.updatedAt || null,
+    updatedBy: safeStyleText(style.updatedBy, 120)
+  };
+};
+
 const normalizeNoticeSort = (sort) => {
   const key = String(sort || '').toUpperCase();
   if (key === 'TRASH_LATEST') return { deletedAt: -1, createdAt: -1 };
@@ -121,6 +145,7 @@ const serializeNotice = (noticeDoc) => {
     endDateTime: notice.endDateTime || null,
     closureAllHalls: globalClosure,
     rooms: Array.isArray(notice.rooms) ? notice.rooms : [],
+    publicStyle: normalizePublicStyle(notice.publicStyle),
     isDeleted: Boolean(notice.isDeleted),
     deletedAt: notice.deletedAt || null,
     deletedBy: {

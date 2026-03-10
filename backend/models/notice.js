@@ -28,6 +28,13 @@ const NoticeSchema = new mongoose.Schema({
   emailMessageId: { type: String, default: '', index: true },
   emailFrom: { type: String, default: '' },
   parsedMeta: { type: mongoose.Schema.Types.Mixed, default: {} },
+  publicStyle: {
+    titleColor: { type: String, default: '' },
+    descriptionColor: { type: String, default: '' },
+    contentHtml: { type: String, default: '' },
+    updatedAt: { type: Date, default: null },
+    updatedBy: { type: String, default: '' }
+  },
   postedBy: {
     id: { type: mongoose.Schema.Types.ObjectId, default: null },
     type: { type: String, default: '' },

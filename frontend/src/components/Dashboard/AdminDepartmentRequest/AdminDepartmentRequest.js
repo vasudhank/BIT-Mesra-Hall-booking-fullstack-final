@@ -7,6 +7,7 @@ import api from '../../../api/axiosInstance';
 import AdminDepartmentRequestCard from './AdminDepartmentRequestCard';
 import Backdrop from '@mui/material/Backdrop';
 import CircularProgress from '@mui/material/CircularProgress';
+import { fuzzyFilterAndRank } from '../../../utils/fuzzySearch';
 
 export default function AdminDepartmentRequest() {
 
@@ -57,12 +58,16 @@ export default function AdminDepartmentRequest() {
       setFilteredList(list);
       return;
     }
-    const q = search.toLowerCase();
-    const filtered = list.filter(req => 
-      (req.department && req.department.toLowerCase().includes(q)) ||
-      (req.head && req.head.toLowerCase().includes(q)) ||
-      (req.email && req.email.toLowerCase().includes(q)) ||
-      (req.phone && req.phone.toLowerCase().includes(q))
+    const filtered = fuzzyFilterAndRank(
+      list,
+      search,
+      (req) => [
+        req?.department,
+        req?.head,
+        req?.email,
+        req?.phone
+      ],
+      { threshold: 0.46 }
     );
     setFilteredList(filtered);
   };

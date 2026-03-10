@@ -19,6 +19,7 @@ import {
 
 import Appbar from '../AppBar/AppBar';
 import HallCard from './HallCard';
+import { fuzzyFilterHallLike } from '../../../utils/fuzzySearch';
 
 import api from '../../../api/axiosInstance';
 import { createHallApi } from '../../../api/createhallapi';
@@ -102,13 +103,15 @@ export default function AdminHall() {
   }, [showAppbar, isMobile]);
 
   const filteredHalls = useMemo(() => {
-    const query = search.trim().toLowerCase();
+    const query = search.trim();
     const searched = !query
       ? [...halls]
-      : halls.filter((hall) =>
-          String(hall.name || '').toLowerCase().includes(query) ||
-          String(hall.capacity || '').toLowerCase().includes(query) ||
-          String(hall.status || '').toLowerCase().includes(query)
+      : fuzzyFilterHallLike(
+          halls,
+          query,
+          (hall) => hall?.name,
+          (hall) => [hall?.capacity, hall?.status],
+          { threshold: 0.48, nameThreshold: 0.4 }
         );
     return searched.sort((a, b) => compareHalls(a, b, sortMode));
   }, [halls, search, sortMode]);

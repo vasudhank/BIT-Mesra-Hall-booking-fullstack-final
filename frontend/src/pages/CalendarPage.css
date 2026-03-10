@@ -554,6 +554,35 @@
 
 .gcal-checkbox-text { font-size: 14px; color: #3c4043; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
 
+.gcal-sidebar-footer {
+  margin-top: auto;
+  padding: 12px 24px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: #5f6368;
+}
+
+.gcal-sidebar-footer-link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.gcal-sidebar-footer-link:hover,
+.gcal-sidebar-footer-link:focus-visible {
+  text-decoration: underline;
+}
+
+.gcal-sidebar-footer-divider {
+  color: #9aa0a6;
+}
+
 /* --- MAIN CALENDAR AREA --- */
 .gcal-main {
   position: relative; /* Needed for placing collapsed FAB */
@@ -4405,6 +4434,14 @@ al-search-result-date span,
 }
 
 .theme-dark .gcal-checkbox-custom { border-color: #9aa0a6; }
+
+.theme-dark .gcal-sidebar-footer {
+  color: #9aa0a6;
+}
+
+.theme-dark .gcal-sidebar-footer-divider {
+  color: #5f6368;
+}
 
 .theme-dark .fc-popover { 
   background: #202124; 

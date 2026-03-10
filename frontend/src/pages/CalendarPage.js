@@ -23,6 +23,7 @@ import {
 import { createNoticeApi, deleteNoticeApi, getNoticeByIdApi, updateNoticeApi } from '../api/noticesApi';
 import api from '../api/axiosInstance';
 import { removeStatus } from '../store/slices/userSlice';
+import { fuzzyFilterAndRank } from '../utils/fuzzySearch';
 import './CalendarPage.css';
 
 const WEEK_DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -1949,6 +1950,93 @@ export default function CalendarPage() {
 
   const shouldShowSearchPanel = searchOpen;
 
+  const searchCalendarEventsWithFuzzy = useCallback(async (query, options = {}) => {
+    const trimmedQuery = String(query || '').trim();
+    if (!trimmedQuery) {
+      setSearchResults([]);
+      if (options.updateMessage) {
+        setSearchMessage('Type a keyword and press Enter to search across months and years.');
+      }
+      return { results: [], remoteError: null };
+    }
+
+    let remoteEvents = [];
+    let remoteError = null;
+    try {
+      const data = await searchCalendarEventsApi({ q: trimmedQuery, limit: 320 });
+      remoteEvents = sanitizeCalendarEvents(data?.events);
+    } catch (err) {
+      remoteError = err;
+    }
+
+    const pickSearchFields = (eventLike) => [
+      eventLike?.title,
+      eventDescriptionOf(eventLike),
+      eventLike?.extendedProps?.summary,
+      eventLike?.extendedProps?.holidayName,
+      eventSourceOf(eventLike),
+      toSearchBadge(eventLike)?.label,
+      formatResultDate(eventLike)?.full,
+      formatResultTime(eventLike)
+    ];
+
+    const fuzzyOptions = { threshold: 0.44 };
+    const remoteMatches = fuzzyFilterAndRank(remoteEvents, trimmedQuery, pickSearchFields, fuzzyOptions);
+    const localMatches = fuzzyFilterAndRank(allEvents, trimmedQuery, pickSearchFields, fuzzyOptions);
+
+    const unique = new Map();
+    const pushUnique = (items) => {
+      (Array.isArray(items) ? items : []).forEach((eventLike, index) => {
+        const key =
+          eventIdentityKeyOf(eventLike) ||
+          `${String(eventLike?.id || '')}::${String(eventLike?.start || '')}::${index}`;
+        if (!unique.has(key)) unique.set(key, eventLike);
+      });
+    };
+
+    pushUnique(remoteMatches);
+    pushUnique(localMatches);
+
+    let merged = Array.from(unique.values()).sort((a, b) => {
+      const aTime = toDateOrNull(a?.start)?.getTime() || Number.MAX_SAFE_INTEGER;
+      const bTime = toDateOrNull(b?.start)?.getTime() || Number.MAX_SAFE_INTEGER;
+      if (aTime !== bTime) return aTime - bTime;
+      return String(a?.title || '').localeCompare(String(b?.title || ''), undefined, {
+        numeric: true,
+        sensitivity: 'base'
+      });
+    });
+
+    if (merged.length === 0) {
+      try {
+        const now = new Date();
+        const start = new Date(now.getFullYear() - 2, 0, 1).toISOString();
+        const end = new Date(now.getFullYear() + 3, 0, 1).toISOString();
+        const wideData = await getCalendarEventsApi({ start, end });
+        const wideEvents = sanitizeCalendarEvents(wideData?.events);
+        merged = fuzzyFilterAndRank(wideEvents, trimmedQuery, pickSearchFields, fuzzyOptions);
+      } catch (_) {
+        // Ignore fallback errors and keep prior merged result.
+      }
+    }
+
+    setSearchResults(merged);
+
+    if (options.updateMessage) {
+      if (merged.length > 0) {
+        setSearchMessage('');
+      } else if (remoteError) {
+        setSearchMessage(
+          remoteError?.response?.data?.error || 'Unable to search beyond current month right now.'
+        );
+      } else {
+        setSearchMessage(`No matching items found for "${trimmedQuery}".`);
+      }
+    }
+
+    return { results: merged, remoteError };
+  }, [allEvents]);
+
   const loadEvents = useCallback(async (range) => {
     if (!range?.start || !range?.end) return;
     activeRangeRef.current = range;
@@ -2982,10 +3070,9 @@ export default function CalendarPage() {
       await loadEvents(activeRangeRef.current);
     }
     if (searchExecutedQuery) {
-      const searchData = await searchCalendarEventsApi({ q: searchExecutedQuery, limit: 320 });
-      setSearchResults(sanitizeCalendarEvents(searchData?.events));
+      await searchCalendarEventsWithFuzzy(searchExecutedQuery);
     }
-  }, [loadEvents, searchExecutedQuery]);
+  }, [loadEvents, searchExecutedQuery, searchCalendarEventsWithFuzzy]);
 
   const runQueuedMove = useCallback((work) => {
     const runner = async () => work();
@@ -6175,12 +6262,10 @@ export default function CalendarPage() {
     setSearchLoading(true);
     setSearchMessage('');
     try {
-      const data = await searchCalendarEventsApi({ q: query, limit: 320 });
-      setSearchResults(sanitizeCalendarEvents(data?.events));
-      setSearchMessage('');
-    } catch (err) {
-      searchResults([]);
-      setSearchMessage(err?.response?.data?.error || 'Unable to search beyond current month right now.');
+      await searchCalendarEventsWithFuzzy(query, { updateMessage: true });
+    } catch (_) {
+      setSearchResults([]);
+      setSearchMessage('Unable to process search right now.');
     } finally {
       setSearchLoading(false);
     }
@@ -6396,8 +6481,7 @@ export default function CalendarPage() {
           await loadEvents(activeRangeRef.current);
         }
         if (searchExecutedQuery) {
-          const searchData = await searchCalendarEventsApi({ q: searchExecutedQuery, limit: 320 });
-          setSearchResults(sanitizeCalendarEvents(searchData?.events));
+          await searchCalendarEventsWithFuzzy(searchExecutedQuery);
         }
 
         setPopoverEditMode(false);
@@ -6458,8 +6542,7 @@ export default function CalendarPage() {
         await loadEvents(activeRangeRef.current);
       }
       if (searchExecutedQuery) {
-        const searchData = await searchCalendarEventsApi({ q: searchExecutedQuery, limit: 320 });
-        setSearchResults(sanitizeCalendarEvents(searchData?.events));
+        await searchCalendarEventsWithFuzzy(searchExecutedQuery);
       }
 
       setPopoverEditMode(false);
@@ -6531,8 +6614,7 @@ export default function CalendarPage() {
         await loadEvents(activeRangeRef.current);
       }
       if (searchExecutedQuery) {
-        const searchData = await searchCalendarEventsApi({ q: searchExecutedQuery, limit: 320 });
-        setSearchResults(sanitizeCalendarEvents(searchData?.events));
+        await searchCalendarEventsWithFuzzy(searchExecutedQuery);
       }
 
       setSnackbarSeverity('success');
@@ -7016,6 +7098,24 @@ export default function CalendarPage() {
                 </label>
               </div>
             )}
+          </div>
+
+          <div className="gcal-sidebar-footer">
+            <button
+              type="button"
+              className="gcal-sidebar-footer-link"
+              onClick={() => navigate('/schedule')}
+            >
+              Schedule
+            </button>
+            <span className="gcal-sidebar-footer-divider">&middot;</span>
+            <button
+              type="button"
+              className="gcal-sidebar-footer-link"
+              onClick={() => navigate('/notices')}
+            >
+              Notices
+            </button>
           </div>
         </aside>
 

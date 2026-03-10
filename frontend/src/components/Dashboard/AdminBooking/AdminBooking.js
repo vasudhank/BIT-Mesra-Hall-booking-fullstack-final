@@ -14,6 +14,7 @@ import Checkbox from '@mui/material/Checkbox';
 import api from '../../../api/axiosInstance';
 import { changeBookingRequestApi } from '../../../api/changebookingrequestapi';
 import { Container, useMediaQuery, useTheme, FormControl, Select, MenuItem } from '@mui/material';
+import { fuzzyFilterAndRank } from '../../../utils/fuzzySearch';
 
 export default function AdminBooking() {
 
@@ -86,15 +87,20 @@ export default function AdminBooking() {
   };
 
   const applySearchAndSort = (requests, searchTerm, mode) => {
-    const term = String(searchTerm || '').trim().toLowerCase();
+    const term = String(searchTerm || '').trim();
     const searched = !term
       ? [...requests]
-      : requests.filter(req =>
-          (req.hall || "").toLowerCase().includes(term) ||
-          (req.department?.department || "").toLowerCase().includes(term) ||
-          (req.department?.head || "").toLowerCase().includes(term) ||
-          (req.department?.email || "").toLowerCase().includes(term) ||
-          (req.event || "").toLowerCase().includes(term)
+      : fuzzyFilterAndRank(
+          requests,
+          term,
+          (req) => [
+            req?.hall,
+            req?.department?.department,
+            req?.department?.head,
+            req?.department?.email,
+            req?.event
+          ],
+          { threshold: 0.46 }
         );
     return sortRequests(searched, mode);
   };

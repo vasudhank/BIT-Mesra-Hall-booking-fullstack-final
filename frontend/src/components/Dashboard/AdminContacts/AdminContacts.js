@@ -27,6 +27,7 @@ import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import { adminAddContactApi, adminUpdateContactApi, getContactsApi } from '../../../api/contactApi';
+import { fuzzyFilterAndRank } from '../../../utils/fuzzySearch';
 
 const SORT_OPTIONS = [
   { value: 'name_asc', label: 'Name (A-Z)' },
@@ -37,11 +38,11 @@ const SORT_OPTIONS = [
 
 const applySearchFilter = (sourceContacts, query) => {
   if (!query.trim()) return sourceContacts;
-  const lower = query.toLowerCase();
-  return sourceContacts.filter((contact) =>
-    (contact.name || '').toLowerCase().includes(lower) ||
-    (contact.number || '').toLowerCase().includes(lower) ||
-    (contact.email || '').toLowerCase().includes(lower)
+  return fuzzyFilterAndRank(
+    sourceContacts,
+    query,
+    (contact) => [contact?.name, contact?.number, contact?.email],
+    { threshold: 0.46 }
   );
 };
 

@@ -19,7 +19,51 @@ const safeText = (value, max = 4000) =>
     .trim()
     .slice(0, max);
 
+const sanitizeHtmlSnippet = (value, max = 150000) =>
+  safeText(value, max)
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    .replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, '')
+    .replace(/\son[a-z]+\s*=\s*'[^']*'/gi, '')
+    .replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, '')
+    .replace(/javascript:/gi, '');
+
 const hasField = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
+
+const uniqueStrings = (list) =>
+  Array.from(
+    new Set(
+      (Array.isArray(list) ? list : [])
+        .map((item) => String(item || '').trim())
+        .filter(Boolean)
+    )
+  );
+
+const parseRoomsInput = (value) => {
+  if (value === undefined || value === null || value === '') return [];
+  if (Array.isArray(value)) {
+    return uniqueStrings(value.map((item) => safeText(item, 120)));
+  }
+  return uniqueStrings(
+    String(value)
+      .split(/[,\n;|]/)
+      .map((item) => safeText(item, 120))
+  );
+};
+
+const parseBooleanStrict = (value) => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true' || normalized === '1' || normalized === 'yes') return true;
+    if (normalized === 'false' || normalized === '0' || normalized === 'no') return false;
+  }
+  return null;
+};
+
+const parseKind = (value) => {
+  const normalized = String(value || '').trim().toUpperCase();
+  return normalized === 'GENERAL' || normalized === 'HOLIDAY' ? normalized : '';
+};
 
 const toDateOrNull = (value) => {
   if (value === null || value === '') return null;
@@ -125,8 +169,24 @@ router.patch('/:id', async (req, res) => {
       hasField(body, 'description') || hasField(body, 'content') || hasField(body, 'body') || hasField(body, 'summary');
     const editStart = hasField(body, 'startDateTime');
     const editEnd = hasField(body, 'endDateTime');
+    const editKind = hasField(body, 'kind');
+    const editHolidayName = hasField(body, 'holidayName');
+    const editClosureAllHalls = hasField(body, 'closureAllHalls');
+    const editRooms = hasField(body, 'rooms') || hasField(body, 'halls');
+    const editPublicStyle = hasField(body, 'publicStyle');
 
-    if (!editTitle && !editSubject && !editDescription && !editStart && !editEnd) {
+    if (
+      !editTitle &&
+      !editSubject &&
+      !editDescription &&
+      !editStart &&
+      !editEnd &&
+      !editKind &&
+      !editHolidayName &&
+      !editClosureAllHalls &&
+      !editRooms &&
+      !editPublicStyle
+    ) {
       return res.status(400).json({ error: 'No editable notice fields provided' });
     }
 
@@ -165,6 +225,44 @@ router.patch('/:id', async (req, res) => {
       notice.endDateTime = nextEnd || null;
     }
 
+    if (editKind) {
+      const kind = parseKind(body.kind);
+      if (!kind) {
+        return res.status(400).json({ error: 'Invalid kind. Use GENERAL or HOLIDAY.' });
+      }
+      notice.kind = kind;
+    }
+
+    if (editHolidayName) {
+      notice.holidayName = safeText(body.holidayName, 180);
+    }
+
+    if (editClosureAllHalls) {
+      const closure = parseBooleanStrict(body.closureAllHalls);
+      if (closure === null) {
+        return res.status(400).json({ error: 'closureAllHalls must be a boolean value' });
+      }
+      notice.closureAllHalls = closure;
+    }
+
+    if (editRooms) {
+      const rooms = parseRoomsInput(body.rooms ?? body.halls);
+      notice.rooms = rooms;
+      notice.halls = rooms;
+    }
+
+    if (editPublicStyle) {
+      const styleInput = body.publicStyle && typeof body.publicStyle === 'object' ? body.publicStyle : {};
+      notice.publicStyle = {
+        ...((notice.publicStyle && typeof notice.publicStyle === 'object') ? notice.publicStyle : {}),
+        titleColor: safeText(styleInput.titleColor, 40),
+        descriptionColor: safeText(styleInput.descriptionColor, 40),
+        contentHtml: sanitizeHtmlSnippet(styleInput.contentHtml, 150000),
+        updatedAt: new Date(),
+        updatedBy: safeText(req.user?.name || req.user?.email || 'Admin', 120)
+      };
+    }
+
     await notice.save();
 
     return res.status(200).json({
@@ -176,7 +274,12 @@ router.patch('/:id', async (req, res) => {
         content: notice.content || '',
         body: notice.body || '',
         startDateTime: notice.startDateTime || null,
-        endDateTime: notice.endDateTime || null
+        endDateTime: notice.endDateTime || null,
+        kind: notice.kind || 'GENERAL',
+        holidayName: notice.holidayName || '',
+        closureAllHalls: Boolean(notice.closureAllHalls),
+        rooms: Array.isArray(notice.rooms) ? notice.rooms : [],
+        publicStyle: notice.publicStyle || {}
       }
     });
   } catch (err) {

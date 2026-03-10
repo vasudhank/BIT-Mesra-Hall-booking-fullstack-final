@@ -15,6 +15,8 @@ import CloseIcon from '@mui/icons-material/Close';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'; 
 import CakeIcon from '@mui/icons-material/Cake'; 
 import OpenInFullIcon from '@mui/icons-material/OpenInFull'; // New icon for immersive
+import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
+import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
 
 // Import the API call
 import { getContactsApi } from "../../api/contactApi";
@@ -144,6 +146,7 @@ export default function HomeUpper({
   const navCoreLinksRef = useRef(null);
   const navQuickButtonRef = useRef(null);
   const navQuickCardRef = useRef(null);
+  const selectAllContactsRef = useRef(null);
 
   // === RESPONSIVE STATE ===
   const [isMobile, setIsMobile] = useState(window.innerWidth <= DESKTOP_BREAKPOINT);
@@ -184,6 +187,7 @@ export default function HomeUpper({
   // === CONTACTS LOGIC ===
   const [contacts, setContacts] = useState([]);
   const [filteredContacts, setFilteredContacts] = useState([]);
+  const [selectedContactKeys, setSelectedContactKeys] = useState([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [searchText, setSearchText] = useState("");
 
@@ -227,6 +231,7 @@ export default function HomeUpper({
   const openContactsModal = async () => {
     setShowWishModal(true);
     setLoadingContacts(true);
+    setSelectedContactKeys([]);
     try {
       const res = await getContactsApi();
       if (res && res.data && res.data.contacts) {
@@ -296,6 +301,7 @@ export default function HomeUpper({
     setAiPopupRestoreSignal(0);
     setShowDateModal(false);
     setSearchText("");
+    setSelectedContactKeys([]);
     setFilteredContacts(contacts);
   };
 
@@ -327,6 +333,271 @@ export default function HomeUpper({
     if (!text) return;
     navigator.clipboard.writeText(text);
     setSnackbarMessage(`${type} copied to clipboard!`);
+    setSnackbarOpen(true);
+  };
+
+  const getContactSelectionKey = (contact) =>
+    String(
+      contact?._id ||
+      `${String(contact?.name || '').trim()}__${String(contact?.number || '').trim()}__${String(contact?.email || '').trim()}`
+    );
+
+  const toggleContactSelection = (contactKey) => {
+    const key = String(contactKey || '');
+    if (!key) return;
+    setSelectedContactKeys((prev) =>
+      prev.includes(key)
+        ? prev.filter((item) => item !== key)
+        : [...prev, key]
+    );
+  };
+
+  const toggleSelectAllFilteredContacts = () => {
+    const visibleKeys = Array.from(
+      new Set(
+        filteredContacts
+          .map((entry) => getContactSelectionKey(entry))
+          .filter(Boolean)
+      )
+    );
+
+    if (!visibleKeys.length) return;
+
+    setSelectedContactKeys((prev) => {
+      const nextSet = new Set(prev);
+      const areAllVisibleAlreadySelected = visibleKeys.every((key) => nextSet.has(key));
+      if (areAllVisibleAlreadySelected) {
+        visibleKeys.forEach((key) => nextSet.delete(key));
+      } else {
+        visibleKeys.forEach((key) => nextSet.add(key));
+      }
+      return Array.from(nextSet);
+    });
+  };
+
+  const getAllWishContactsForExport = () =>
+    Array.isArray(contacts)
+      ? contacts.filter((entry) => entry && (entry.name || entry.number || entry.email))
+      : [];
+
+  const getWishContactsForExport = () =>
+    getAllWishContactsForExport().filter((entry) =>
+      selectedContactKeys.includes(getContactSelectionKey(entry))
+    );
+
+  const escapeHtml = (value) =>
+    String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+  const escapeVCardField = (value) =>
+    String(value || '')
+      .replace(/\\/g, '\\\\')
+      .replace(/\n/g, '\\n')
+      .replace(/,/g, '\\,')
+      .replace(/;/g, '\\;');
+
+  const handleWishContactsPrint = () => {
+    const selectedContacts = getWishContactsForExport();
+    const printableContacts = selectedContacts.length > 0
+      ? selectedContacts
+      : getAllWishContactsForExport();
+    if (!printableContacts.length) {
+      setSnackbarMessage('No contacts available to print.');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    const generatedAt = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+    const rowsHtml = printableContacts
+      .map(
+        (contact, index) => `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(contact.name || '-')}</td>
+            <td>${escapeHtml(contact.number || '-')}</td>
+            <td>${escapeHtml(contact.email || '-')}</td>
+          </tr>
+        `
+      )
+      .join('');
+
+    const printDoc = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Wish Your Day Contacts</title>
+  <style>
+    @page { margin: 14mm; }
+    html, body { margin: 0; padding: 0; font-family: 'Outfit', 'Inter', Arial, sans-serif; color: #0f172a; background: #ffffff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .sheet { padding: 0; }
+    h1 { margin: 0 0 6mm; font-size: 20px; font-weight: 700; letter-spacing: 0.01em; }
+    .meta { margin: 0 0 5mm; color: #475569; font-size: 12px; }
+    table {
+      width: 100%;
+      table-layout: fixed;
+      border-collapse: separate;
+      border-spacing: 0;
+      border: 1.8pt solid #0f172a;
+      background: #ffffff;
+    }
+    thead { display: table-header-group; }
+    tbody { display: table-row-group; }
+    tr, td, th { page-break-inside: avoid; break-inside: avoid; }
+    thead th {
+      background: #e2e8f0;
+      border-right: 1.2pt solid #1e293b;
+      border-bottom: 1.2pt solid #1e293b;
+      padding: 10px 8px;
+      font-size: 12px;
+      text-align: left;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    tbody td {
+      border-right: 1.2pt solid #334155;
+      border-bottom: 1.2pt solid #334155;
+      padding: 9px 8px;
+      font-size: 12px;
+      vertical-align: top;
+      overflow-wrap: anywhere;
+      color: #0f172a;
+      background: #ffffff;
+    }
+    thead th:last-child,
+    tbody td:last-child { border-right: 0; }
+    tbody tr:last-child td { border-bottom: 0; }
+    th:nth-child(1), td:nth-child(1) { width: 42px; text-align: center; }
+    th:nth-child(2), td:nth-child(2) { width: 30%; }
+    th:nth-child(3), td:nth-child(3) { width: 27%; }
+    th:nth-child(4), td:nth-child(4) { width: 43%; }
+  </style>
+</head>
+<body>
+  <main class="sheet">
+    <h1>Wish Your Day Contact List</h1>
+    <p class="meta">Generated: ${escapeHtml(generatedAt)}</p>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Name</th>
+          <th>Phone Number</th>
+          <th>Email Address</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml}
+      </tbody>
+    </table>
+  </main>
+</body>
+</html>`;
+
+    const frame = document.createElement('iframe');
+    frame.style.position = 'fixed';
+    frame.style.width = '0';
+    frame.style.height = '0';
+    frame.style.right = '-9999px';
+    frame.style.bottom = '0';
+    frame.setAttribute('aria-hidden', 'true');
+    frame.style.opacity = '0';
+
+    let hasPrinted = false;
+    let cleanupTimerId = null;
+
+    const cleanup = () => {
+      frame.removeEventListener('load', onFrameLoad);
+      if (cleanupTimerId) {
+        clearTimeout(cleanupTimerId);
+      }
+      if (frame.parentNode) {
+        frame.parentNode.removeChild(frame);
+      }
+    };
+
+    const runPrintIfReady = () => {
+      if (hasPrinted) return;
+      const printWindow = frame.contentWindow;
+      const doc = frame.contentDocument;
+      if (!printWindow || !doc || !doc.body) return;
+      const hasPrintableTable = Boolean(doc.querySelector('table'));
+      const hasPrintableText = String(doc.body.textContent || '').trim().length > 0;
+      if (!hasPrintableTable || !hasPrintableText) return;
+
+      hasPrinted = true;
+
+      const doPrint = () => {
+        const onAfterPrint = () => {
+          printWindow.removeEventListener('afterprint', onAfterPrint);
+          cleanup();
+        };
+        printWindow.addEventListener('afterprint', onAfterPrint);
+        printWindow.focus();
+        printWindow.print();
+        cleanupTimerId = window.setTimeout(cleanup, 3500);
+      };
+
+      if (doc.fonts && doc.fonts.ready) {
+        doc.fonts.ready.then(() => setTimeout(doPrint, 60)).catch(() => setTimeout(doPrint, 60));
+      } else {
+        setTimeout(doPrint, 60);
+      }
+    };
+
+    const onFrameLoad = () => {
+      setTimeout(runPrintIfReady, 30);
+    };
+
+    frame.addEventListener('load', onFrameLoad);
+    frame.srcdoc = printDoc;
+    document.body.appendChild(frame);
+    setTimeout(runPrintIfReady, 250);
+    cleanupTimerId = window.setTimeout(cleanup, 20000);
+  };
+
+  const handleWishContactsDownload = () => {
+    const selectedContacts = getWishContactsForExport();
+    const exportContacts = selectedContacts.length > 0
+      ? selectedContacts
+      : getAllWishContactsForExport();
+    if (!exportContacts.length) {
+      setSnackbarMessage('No contacts available to download.');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    const vcfBody = exportContacts
+      .map((contact) => {
+        const name = escapeVCardField(contact.name || 'Unknown');
+        const number = escapeVCardField(contact.number || '');
+        const email = escapeVCardField(contact.email || '');
+        const lines = [
+          'BEGIN:VCARD',
+          'VERSION:3.0',
+          `FN:${name}`
+        ];
+        if (number) lines.push(`TEL;TYPE=CELL:${number}`);
+        if (email) lines.push(`EMAIL;TYPE=INTERNET:${email}`);
+        lines.push('END:VCARD');
+        return lines.join('\r\n');
+      })
+      .join('\r\n');
+
+    const blob = new Blob([vcfBody], { type: 'text/vcard;charset=utf-8' });
+    const href = URL.createObjectURL(blob);
+    const stamp = new Date().toISOString().slice(0, 10);
+    const anchor = document.createElement('a');
+    anchor.href = href;
+    anchor.download = `wish-your-day-contacts-${stamp}.vcf`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(href);
+    setSnackbarMessage('Contacts downloaded as VCF.');
     setSnackbarOpen(true);
   };
 
@@ -495,6 +766,28 @@ export default function HomeUpper({
     : (!showVideo 
         ? "url('https://res.cloudinary.com/dkgbflzrc/image/upload/v1768669856/97f75189-9827-4de8-a5ec-22fc1c1cd814_xszdio.jpg')" 
         : "none");
+
+  const visibleContactKeys = Array.from(
+    new Set(
+      filteredContacts
+        .map((entry) => getContactSelectionKey(entry))
+        .filter(Boolean)
+    )
+  );
+  const selectedContactSet = new Set(selectedContactKeys);
+  const selectedVisibleCount = visibleContactKeys.reduce(
+    (count, key) => count + (selectedContactSet.has(key) ? 1 : 0),
+    0
+  );
+  const isAllVisibleContactsSelected =
+    visibleContactKeys.length > 0 && selectedVisibleCount === visibleContactKeys.length;
+  const isPartiallyVisibleContactsSelected =
+    selectedVisibleCount > 0 && selectedVisibleCount < visibleContactKeys.length;
+
+  useEffect(() => {
+    if (!selectAllContactsRef.current) return;
+    selectAllContactsRef.current.indeterminate = isPartiallyVisibleContactsSelected;
+  }, [isPartiallyVisibleContactsSelected, isAllVisibleContactsSelected, visibleContactKeys.length]);
 
   /* ================= RENDER ================= */
   return (
@@ -675,10 +968,21 @@ export default function HomeUpper({
               </div>
             </div>
 
-            <div className="contact-header-row">
-              <span>NAME</span>
-              <span>PHONE NUMBER</span>
-              <span>EMAIL ADDRESS</span>
+            <div className="contact-header-wrap">
+              <label className="contact-header-check-spacer contact-header-check" title="Select all visible contacts">
+                <input
+                  ref={selectAllContactsRef}
+                  type="checkbox"
+                  checked={isAllVisibleContactsSelected}
+                  onChange={toggleSelectAllFilteredContacts}
+                  aria-label="Select all contacts"
+                />
+              </label>
+              <div className="contact-header-row">
+                <span>NAME</span>
+                <span>PHONE NUMBER</span>
+                <span>EMAIL ADDRESS</span>
+              </div>
             </div>
 
             <div className="contact-list-scrollable">
@@ -687,25 +991,38 @@ export default function HomeUpper({
                   <CircularProgress size={30} />
                 </Box>
               ) : filteredContacts.length > 0 ? (
-                filteredContacts.map((contact) => (
-                  <div className="contact-item-row" key={contact._id}>
-                    <span className="c-name" title={contact.name}>{contact.name}</span>
-                    <span 
-                      className="c-num clickable" 
-                      onClick={() => copyToClipboard(contact.number, "Number")}
-                      title="Copy Number"
-                    >
-                      {contact.number}
-                    </span>
-                    <span 
-                      className="c-email clickable" 
-                      onClick={() => copyToClipboard(contact.email, "Email")}
-                      title={contact.email ? "Copy Email" : ""}
-                    >
-                      {contact.email || "-"}
-                    </span>
+                filteredContacts.map((contact) => {
+                  const contactKey = getContactSelectionKey(contact);
+                  const isSelected = selectedContactKeys.includes(contactKey);
+                  return (
+                  <div className="contact-row-wrap" key={contactKey}>
+                    <label className="contact-row-check" title="Select contact">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleContactSelection(contactKey)}
+                        aria-label={`Select ${contact.name || 'contact'}`}
+                      />
+                    </label>
+                    <div className="contact-item-row">
+                      <span className="c-name" title={contact.name}>{contact.name}</span>
+                      <span 
+                        className="c-num clickable" 
+                        onClick={() => copyToClipboard(contact.number, "Number")}
+                        title="Copy Number"
+                      >
+                        {contact.number}
+                      </span>
+                      <span 
+                        className="c-email clickable" 
+                        onClick={() => copyToClipboard(contact.email, "Email")}
+                        title={contact.email ? "Copy Email" : ""}
+                      >
+                        {contact.email || "-"}
+                      </span>
+                    </div>
                   </div>
-                ))
+                )})
               ) : (
                 <div className="no-contacts-msg">
                   {contacts.length === 0 ? "Loading contacts..." : "No contacts found matching criteria."}
@@ -714,7 +1031,29 @@ export default function HomeUpper({
             </div>
             
             {!loadingContacts && (
-              <p className="modal-footer-hint">Click on phone or email to copy</p>
+              <div className="modal-footer-actions-row">
+                <p className="modal-footer-hint">Click on phone or email to copy</p>
+                <div className="modal-footer-actions">
+                  <button
+                    type="button"
+                    className="modal-icon-action-btn"
+                    onClick={handleWishContactsDownload}
+                    title="Download contacts (.vcf)"
+                    aria-label="Download contacts as VCF"
+                  >
+                    <DownloadOutlinedIcon fontSize="small" />
+                  </button>
+                  <button
+                    type="button"
+                    className="modal-icon-action-btn"
+                    onClick={handleWishContactsPrint}
+                    title="Print contacts list"
+                    aria-label="Print contacts list"
+                  >
+                    <PrintOutlinedIcon fontSize="small" />
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </div>

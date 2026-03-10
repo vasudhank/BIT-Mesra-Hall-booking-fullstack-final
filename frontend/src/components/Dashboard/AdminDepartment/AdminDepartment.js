@@ -23,6 +23,7 @@ import FormControl from '@mui/material/FormControl';
 import Input from '@mui/material/Input';
 import { createDepartmentApi } from "../../../api/createdepartmentapi";
 import { deleteDepartmentApi } from "../../../api/deletedepartmentapi";
+import { fuzzyFilterAndRank } from '../../../utils/fuzzySearch';
 
 export default function AdminDepartment() {
 
@@ -59,11 +60,15 @@ export default function AdminDepartment() {
       setFilteredList(list);
       return;
     }
-    const q = search.toLowerCase();
-    const filtered = list.filter(dept => 
-      (dept.department && dept.department.toLowerCase().includes(q)) ||
-      (dept.head && dept.head.toLowerCase().includes(q)) ||
-      (dept.email && dept.email.toLowerCase().includes(q))
+    const filtered = fuzzyFilterAndRank(
+      list,
+      search,
+      (dept) => [
+        dept?.department,
+        dept?.head,
+        dept?.email
+      ],
+      { threshold: 0.46 }
     );
     setFilteredList(filtered);
   };
