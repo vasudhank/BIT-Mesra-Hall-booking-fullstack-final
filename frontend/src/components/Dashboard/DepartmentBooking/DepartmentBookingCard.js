@@ -23,10 +23,15 @@ export default function DepartmentBookingCard(props) {
   // ---------------------------------------------
 
   const [successOpen, setSuccessOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("Booking Request Made");
   const [errorOpen, setErrorOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [feedbackSeverity, setFeedbackSeverity] = useState("error");
   const [description, setDescription] = useState("");
+  const [conflictModalOpen, setConflictModalOpen] = useState(false);
+  const [conflictDetails, setConflictDetails] = useState(null);
+  const [pendingRequestData, setPendingRequestData] = useState(null);
+  const [forcing, setForcing] = useState(false);
 
   const handleCloseSuccess = (event, reason) => {
     if (reason === "clickaway") return;
@@ -140,8 +145,31 @@ export default function DepartmentBookingCard(props) {
     };
   };
 
+  const formatDateTime = (value) => {
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return value || "N/A";
+    return dt.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+  };
+
+  const buildRequestData = (validated) => ({
+    hall: props.data.name,
+    event,
+    description,
+    startDate,
+    endDate,
+    startTime12: validated.startTime12,
+    endTime12: validated.endTime12,
+    startTime24: validated.startTime24,
+    endTime24: validated.endTime24,
+    startDateTime: validated.startDateTime,
+    endDateTime: validated.endDateTime
+  });
+
   const handleClose = () => {
     setModal(false);
+    setConflictModalOpen(false);
+    setConflictDetails(null);
+    setPendingRequestData(null);
     setEvent("");
     setDescription("");
     setStartDate("");
@@ -164,27 +192,23 @@ export default function DepartmentBookingCard(props) {
     const validated = validateRange();
     if (!validated) return;
 
-    const data = {
-      hall: props.data.name,
-      event,
-      description,
-      startDate,
-      endDate,
-      startTime12: validated.startTime12,
-      endTime12: validated.endTime12,
-      startTime24: validated.startTime24,
-      endTime24: validated.endTime24,
-      startDateTime: validated.startDateTime,
-      endDateTime: validated.endDateTime
-    };
+    const data = buildRequestData(validated);
 
     try {
-      await createBookingRequestApi(data);
+      const response = await createBookingRequestApi(data);
+      setSuccessMessage(response?.data?.message || "Booking Request Made");
       setSuccessOpen(true);
       handleClose();
       props.gethall();
     } catch (err) {
       console.error(err);
+      if (err?.status === 409 && err?.data?.canForce && err?.data?.conflicts) {
+        setPendingRequestData(data);
+        setConflictDetails(err.data.conflicts);
+        setConflictModalOpen(true);
+        return;
+      }
+
       const serverMessage =
         err?.data?.msg ||
         err?.data?.message ||
@@ -193,6 +217,30 @@ export default function DepartmentBookingCard(props) {
 
       const warningMatch = /already passed|after start|date\/time|enddatetime/i.test(serverMessage);
       showFeedback(serverMessage, warningMatch ? "warning" : "error");
+    }
+  };
+
+  const handleForceBook = async () => {
+    if (!pendingRequestData) return;
+    setForcing(true);
+    try {
+      const response = await createBookingRequestApi({
+        ...pendingRequestData,
+        force: true
+      });
+      setSuccessMessage(response?.data?.message || "Conflict request submitted to admin.");
+      setSuccessOpen(true);
+      handleClose();
+      props.gethall();
+    } catch (err) {
+      const serverMessage =
+        err?.data?.msg ||
+        err?.data?.message ||
+        err?.msg ||
+        "Failed to force book. Please try again.";
+      showFeedback(serverMessage, "error");
+    } finally {
+      setForcing(false);
     }
   };
 
@@ -209,7 +257,7 @@ export default function DepartmentBookingCard(props) {
           severity="success"
           sx={{ width: "100%", background: "#388e3c", color: "white" }}
         >
-          Booking Request Made
+          {successMessage}
         </Alert>
       </Snackbar>
 
@@ -493,6 +541,81 @@ export default function DepartmentBookingCard(props) {
         </Box>
       </Modal>
 
+      <Modal
+        open={conflictModalOpen}
+        onClose={() => setConflictModalOpen(false)}
+        aria-labelledby="conflict-modal-title"
+      >
+        <Box
+          sx={{
+            width: { xs: "92%", sm: "76%", md: "56%" },
+            maxWidth: "760px",
+            maxHeight: "88vh",
+            position: "absolute",
+            overflowY: "auto",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            bgcolor: "background.paper",
+            boxShadow: 24,
+            p: 3,
+            borderRadius: 2
+          }}
+        >
+          <Typography id="conflict-modal-title" variant="h6" sx={{ mb: 1.2, fontWeight: 700 }}>
+            Booking Conflict Detected
+          </Typography>
+          <Typography sx={{ mb: 1.5, color: "text.secondary" }}>
+            The selected hall/time overlaps with an existing booking or a closure notice. You can still send this request to admin.
+          </Typography>
+
+          <Box sx={{ mb: 1.5 }}>
+            <Typography sx={{ fontWeight: 700 }}>Existing Bookings</Typography>
+            {(conflictDetails?.bookings || []).length === 0 ? (
+              <Typography variant="body2" color="text.secondary">No direct booking conflict found.</Typography>
+            ) : (
+              conflictDetails.bookings.map((item, index) => (
+                <Box key={`book-conf-${index}`} sx={{ borderLeft: "3px solid #1976d2", pl: 1, py: 0.5, mb: 0.8, background: "rgba(25,118,210,0.08)" }}>
+                  <Typography sx={{ fontWeight: 700 }}>{item.event || "Booked"}</Typography>
+                  <Typography variant="body2">{formatDateTime(item.startDateTime)} - {formatDateTime(item.endDateTime)}</Typography>
+                  {item.requestedBy && <Typography variant="caption">By: {item.requestedBy}</Typography>}
+                </Box>
+              ))
+            )}
+          </Box>
+
+          <Box sx={{ mb: 1.8 }}>
+            <Typography sx={{ fontWeight: 700 }}>Closure Notices</Typography>
+            {(conflictDetails?.notices || []).length === 0 ? (
+              <Typography variant="body2" color="text.secondary">No closure notice overlap found.</Typography>
+            ) : (
+              conflictDetails.notices.map((item, index) => (
+                <Box key={`notice-conf-${index}`} sx={{ borderLeft: "3px solid #b91c1c", pl: 1, py: 0.5, mb: 0.8, background: "rgba(185,28,28,0.08)" }}>
+                  <Typography sx={{ fontWeight: 700 }}>{item.holidayName || item.title || "Hall Closed"}</Typography>
+                  <Typography variant="body2">{formatDateTime(item.startDateTime)} - {formatDateTime(item.endDateTime)}</Typography>
+                  <Typography variant="caption">
+                    {item.closureAllHalls ? "All halls closed" : `Rooms: ${(item.rooms || []).join(", ") || props.data.name}`}
+                  </Typography>
+                </Box>
+              ))
+            )}
+          </Box>
+
+          <Grid container spacing={1.2}>
+            <Grid item xs={12} sm={6}>
+              <Button fullWidth variant="outlined" onClick={() => setConflictModalOpen(false)}>
+                Cancel
+              </Button>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Button fullWidth variant="contained" color="warning" onClick={handleForceBook} disabled={forcing}>
+                {forcing ? "Submitting..." : "FORCE BOOK"}
+              </Button>
+            </Grid>
+          </Grid>
+        </Box>
+      </Modal>
+
       <Card
         sx={{
           width: "90%",
@@ -534,27 +657,15 @@ export default function DepartmentBookingCard(props) {
 
         <Grid container spacing={2} justifyContent={"center"} sx={{ pb: 1.5, pt: 0.5 }}>
           <Grid item xs={10} sm={6} md={5} lg={5} xl={5}>
-            {props.data.status === "Not Filled" ? (
-              <Button
-                size="small"
-                onClick={bookHall}
-                fullWidth
-                className="btn-admin-hall"
-                sx={{ paddingY: "4px", fontSize: "0.8rem" }}
-              >
-                BOOK
-              </Button>
-            ) : (
-              <Button
-                size="small"
-                fullWidth
-                className="btn-admin-hall"
-                disabled
-                sx={{ opacity: 0.6, cursor: "not-allowed", paddingY: "4px", fontSize: "0.8rem" }}
-              >
-                Filled
-              </Button>
-            )}
+            <Button
+              size="small"
+              onClick={bookHall}
+              fullWidth
+              className="btn-admin-hall"
+              sx={{ paddingY: "4px", fontSize: "0.8rem" }}
+            >
+              {props.data.status === "Filled" ? "BOOK HALL (FILLED NOW)" : "BOOK HALL"}
+            </Button>
           </Grid>
         </Grid>
       </Card>

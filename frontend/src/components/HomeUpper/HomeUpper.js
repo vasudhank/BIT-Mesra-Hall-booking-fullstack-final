@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useRef, useState, useEffect } from "react";
+import React, { Suspense, lazy, useRef, useState, useEffect, useLayoutEffect } from "react";
 import "./HomeUpper.css";
 import Grid from "@mui/material/Grid";
 import Box from "@mui/material/Box";
@@ -140,11 +140,17 @@ export default function HomeUpper({
 
   const sectionRef = useRef(null);
   const videoRef = useRef(null);
+  const navShellRef = useRef(null);
+  const navCoreLinksRef = useRef(null);
+  const navQuickButtonRef = useRef(null);
+  const navQuickCardRef = useRef(null);
 
   // === RESPONSIVE STATE ===
   const [isMobile, setIsMobile] = useState(window.innerWidth <= DESKTOP_BREAKPOINT);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showDeepDiveAnim, setShowDeepDiveAnim] = useState(false);
+  const [navQuickMenuOpen, setNavQuickMenuOpen] = useState(false);
+  const [navQuickMenuStyle, setNavQuickMenuStyle] = useState({ left: 0, width: 420 });
   
   // Scroll & UI States
   const [showArrow, setShowArrow] = useState(true);
@@ -218,8 +224,7 @@ export default function HomeUpper({
   }, []);
 
   // --- Handlers ---
-  const handleWishClick = async (e) => {
-    e.stopPropagation();
+  const openContactsModal = async () => {
     setShowWishModal(true);
     setLoadingContacts(true);
     try {
@@ -231,6 +236,11 @@ export default function HomeUpper({
     } finally {
       setLoadingContacts(false);
     }
+  };
+
+  const handleWishClick = async (e) => {
+    if (e?.stopPropagation) e.stopPropagation();
+    await openContactsModal();
   };
 
   // Search Logic
@@ -258,11 +268,15 @@ export default function HomeUpper({
     if (e.key === 'Enter') handleSearchSubmit();
   };
 
-  const handleAIClick = (e) => {
-    e.stopPropagation();
+  const openAIModal = () => {
     setAiPopupSidebarHidden(false);
     setAiPopupRestoreSignal(0);
     setShowAIModal(true);
+  };
+
+  const handleAIClick = (e) => {
+    if (e?.stopPropagation) e.stopPropagation();
+    openAIModal();
   };
 
   const handlePopupSidebarRestore = () => {
@@ -287,6 +301,26 @@ export default function HomeUpper({
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
+  };
+
+  const handleNavQuickNotices = () => {
+    setNavQuickMenuOpen(false);
+    navigate('/notices');
+  };
+
+  const handleNavQuickContacts = async () => {
+    setNavQuickMenuOpen(false);
+    await openContactsModal();
+  };
+
+  const handleNavQuickAI = () => {
+    setNavQuickMenuOpen(false);
+    openAIModal();
+  };
+
+  const handleNavQuickCalendar = () => {
+    setNavQuickMenuOpen(false);
+    navigate('/calendar');
   };
 
   const copyToClipboard = (text, type) => {
@@ -320,6 +354,39 @@ export default function HomeUpper({
     observer.observe(sectionRef.current);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (!navQuickMenuOpen) return;
+    const onPointerDown = (event) => {
+      const target = event.target;
+      if (navQuickButtonRef.current && navQuickButtonRef.current.contains(target)) return;
+      if (navQuickCardRef.current && navQuickCardRef.current.contains(target)) return;
+      setNavQuickMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [navQuickMenuOpen]);
+
+  useEffect(() => {
+    setNavQuickMenuOpen(false);
+  }, [location.pathname, isMobile]);
+
+  useLayoutEffect(() => {
+    if (isMobile) return;
+    const updateQuickMenuPosition = () => {
+      if (!navShellRef.current || !navCoreLinksRef.current) return;
+      const shellRect = navShellRef.current.getBoundingClientRect();
+      const coreRect = navCoreLinksRef.current.getBoundingClientRect();
+      setNavQuickMenuStyle({
+        left: Math.max(10, coreRect.left - shellRect.left),
+        width: Math.max(280, coreRect.width)
+      });
+    };
+
+    updateQuickMenuPosition();
+    window.addEventListener('resize', updateQuickMenuPosition);
+    return () => window.removeEventListener('resize', updateQuickMenuPosition);
+  }, [isMobile, scrolled, navQuickMenuOpen]);
 
   /* ================= DATE & TIME LOGIC ================= */
   useEffect(() => {
@@ -476,26 +543,53 @@ export default function HomeUpper({
         <Box className={`navbar-wrapper ${scrolled ? "navbar-wrapper--scrolled" : ""}`}>
           <Grid container justifyContent="center">
             <Grid item display="flex" justifyContent="center">
-              <div className={`navbar-shell ${scrolled ? "navbar-shell--scrolled" : ""}`}>
+              <div ref={navShellRef} className={`navbar-shell ${scrolled ? "navbar-shell--scrolled" : ""}`}>
                 <div className="navbar">
                   {/* Date on Navbar (Scrolled Only) */}
                   <div className="nav-date">{timeData.navDateStr}</div>
 
                   <div className="nav-links-container">
-                    <div className="nav-link-item">
-                      <Link to="/" className={location.pathname === "/" ? "active" : ""}>Home</Link>
+                    <div ref={navCoreLinksRef} className="nav-links-core">
+                      <div className="nav-link-item">
+                        <Link to="/" className={location.pathname === "/" ? "active" : ""}>Home</Link>
+                      </div>
+                      <div className="nav-link-item">
+                        <Link to={auth.status === "Authenticated" && auth.user === "Admin" ? "/admin/hall" : "/admin_login"}>Admin</Link>
+                      </div>
+                      <div className="nav-link-item">
+                        <Link to={auth.status === "Authenticated" && auth.user === "Department" ? "/department/booking" : "/department_login"}>Faculty</Link>
+                      </div>
+                      <div className="nav-link-item">
+                        <Link to="/schedule">Schedule</Link>
+                      </div>
                     </div>
-                    <div className="nav-link-item">
-                      <Link to={auth.status === "Authenticated" && auth.user === "Admin" ? "/admin/hall" : "/admin_login"}>Admin</Link>
-                    </div>
-                    <div className="nav-link-item">
-                      <Link to={auth.status === "Authenticated" && auth.user === "Department" ? "/department/booking" : "/department_login"}>Faculty</Link>
-                    </div>
-                    <div className="nav-link-item">
-                      <Link to="/schedule">Schedule</Link>
-                    </div>
+
+                    <button
+                      ref={navQuickButtonRef}
+                      type="button"
+                      className={`nav-quick-toggle ${navQuickMenuOpen ? 'open' : ''}`}
+                      onClick={() => setNavQuickMenuOpen((v) => !v)}
+                      aria-label="Open quick navigation menu"
+                    >
+                      <span />
+                      <span />
+                      <span />
+                    </button>
                   </div>
                 </div>
+
+                {navQuickMenuOpen && (
+                  <div
+                    ref={navQuickCardRef}
+                    className={`nav-quick-card ${scrolled ? 'nav-quick-card--scrolled' : ''}`}
+                    style={{ left: `${navQuickMenuStyle.left}px`, width: `${navQuickMenuStyle.width}px` }}
+                  >
+                    <button type="button" onClick={handleNavQuickNotices}>NOTICES</button>
+                    <button type="button" onClick={handleNavQuickContacts}>CONTACTS</button>
+                    <button type="button" onClick={handleNavQuickAI}>AI MODE</button>
+                    <button type="button" onClick={handleNavQuickCalendar}>CALENDER</button>
+                  </div>
+                )}
               </div>
             </Grid>
           </Grid>
@@ -541,6 +635,8 @@ export default function HomeUpper({
                <Link to={auth.status === "Authenticated" && auth.user === "Admin" ? "/admin/hall" : "/admin_login"} onClick={toggleMobileMenu} className="mobile-nav-item">Admin</Link>
                <Link to={auth.status === "Authenticated" && auth.user === "Department" ? "/department/booking" : "/department_login"} onClick={toggleMobileMenu} className="mobile-nav-item">Department</Link>
                <Link to="/schedule" onClick={toggleMobileMenu} className="mobile-nav-item">Schedule</Link>
+               <Link to="/notices" onClick={toggleMobileMenu} className="mobile-nav-item">Notices</Link>
+               <Link to="/calendar" onClick={toggleMobileMenu} className="mobile-nav-item">Calender</Link>
              </nav>
            </div>
         </div>

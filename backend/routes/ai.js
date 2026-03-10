@@ -1,12 +1,31 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const chrono = require('chrono-node');
+const pdfParse = require('pdf-parse');
 const router = express.Router();
 const Hall = require('../models/hall');
 const Fuse = require('fuse.js');
+const { getProjectSupportContext } = require('../services/projectSupportContextService');
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434/api/generate';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'phi3';
+const OLLAMA_VISION_MODEL = process.env.OLLAMA_VISION_MODEL || process.env.OLLAMA_MODEL || 'phi3';
+
+const MAX_ATTACHMENT_COUNT = 4;
+const MAX_ATTACHMENT_BYTES = 6 * 1024 * 1024;
+const MAX_ATTACHMENT_TEXT_CHARS = 7000;
+const MAX_TOTAL_ATTACHMENT_CHARS = 18000;
+const MAX_ATTACHMENT_IMAGE_CHARS = 2_000_000;
+
+const INTENT_EMOJI = {
+  greeting: ['👋', '🙂', '✨'],
+  success: ['✅', '🎯', '🚀'],
+  caution: ['⚠️', '🧭', '🔎'],
+  booking: ['🏛️', '📅', '🗓️'],
+  admin: ['🛠️', '🧠', '📌'],
+  schedule: ['📊', '📄', '🖼️'],
+  neutral: ['💡', '📘', '📝']
+};
 
 const getISTNow = () => new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
 
@@ -44,6 +63,162 @@ const tokenize = (text) =>
     .replace(/[^a-z0-9\s:-]/g, ' ')
     .split(/\s+/)
     .filter(Boolean);
+
+const isLikelyTextMime = (mime) => {
+  const raw = String(mime || '').toLowerCase().trim();
+  if (!raw) return false;
+  return raw.startsWith('text/')
+    || raw.includes('json')
+    || raw.includes('xml')
+    || raw.includes('yaml')
+    || raw.includes('csv')
+    || raw.includes('javascript');
+};
+
+const decodeBase64Buffer = (contentBase64) => {
+  try {
+    const raw = String(contentBase64 || '').trim();
+    if (!raw) return null;
+    const cleanBase64 = raw.includes(',') ? raw.split(',').pop() : raw;
+    return Buffer.from(cleanBase64, 'base64');
+  } catch (err) {
+    return null;
+  }
+};
+
+const sanitizeAttachmentEntries = (inputLike) => {
+  if (!Array.isArray(inputLike)) return [];
+
+  const sanitized = [];
+  for (const raw of inputLike.slice(0, MAX_ATTACHMENT_COUNT)) {
+    if (!raw || typeof raw !== 'object') continue;
+
+    const name = String(raw.name || 'attachment').trim().slice(0, 120);
+    const type = String(raw.type || '').trim().toLowerCase().slice(0, 120);
+    const base64 = String(raw.contentBase64 || '').trim();
+
+    if (!base64) continue;
+    const buffer = decodeBase64Buffer(base64);
+    if (!buffer || !buffer.length) continue;
+    if (buffer.length > MAX_ATTACHMENT_BYTES) continue;
+
+    sanitized.push({
+      name,
+      type,
+      size: buffer.length,
+      buffer,
+      base64: base64.includes(',') ? base64.split(',').pop() : base64
+    });
+  }
+
+  return sanitized;
+};
+
+const normalizeAttachmentText = (text) =>
+  String(text || '')
+    .replace(/\u0000/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const extractTextFromAttachment = async (attachment) => {
+  if (!attachment || !attachment.buffer) return '';
+
+  const mime = String(attachment.type || '').toLowerCase();
+  const filename = String(attachment.name || '').toLowerCase();
+
+  if (mime.includes('pdf') || filename.endsWith('.pdf')) {
+    try {
+      const parsed = await pdfParse(attachment.buffer);
+      return normalizeAttachmentText(parsed?.text || '');
+    } catch (err) {
+      return '';
+    }
+  }
+
+  if (isLikelyTextMime(mime) || /\.(txt|md|json|csv|tsv|xml|yaml|yml|log|js|ts|jsx|tsx|html|css)$/i.test(filename)) {
+    try {
+      return normalizeAttachmentText(attachment.buffer.toString('utf8'));
+    } catch (err) {
+      return '';
+    }
+  }
+
+  return '';
+};
+
+const buildAttachmentContext = async (rawAttachments) => {
+  const attachments = sanitizeAttachmentEntries(rawAttachments);
+  if (attachments.length === 0) {
+    return {
+      summaries: [],
+      textBlock: 'No attachments provided.',
+      images: [],
+      hasVisionInput: false
+    };
+  }
+
+  const summaries = [];
+  const textSegments = [];
+  const images = [];
+
+  let consumedChars = 0;
+
+  for (const attachment of attachments) {
+    const summary = {
+      name: attachment.name,
+      type: attachment.type || 'application/octet-stream',
+      size: attachment.size
+    };
+
+    const isImage = String(attachment.type || '').startsWith('image/');
+    if (isImage && attachment.base64.length <= MAX_ATTACHMENT_IMAGE_CHARS) {
+      images.push(attachment.base64);
+      summary.imagePassedToModel = true;
+    }
+
+    const extractedText = await extractTextFromAttachment(attachment);
+    if (extractedText) {
+      const remaining = MAX_TOTAL_ATTACHMENT_CHARS - consumedChars;
+      if (remaining > 0) {
+        const clipped = extractedText.slice(0, Math.min(MAX_ATTACHMENT_TEXT_CHARS, remaining));
+        consumedChars += clipped.length;
+        textSegments.push(`Attachment: ${attachment.name}\n${clipped}`);
+        summary.textExtracted = clipped.length;
+      }
+    }
+
+    summaries.push(summary);
+  }
+
+  const textBlock = textSegments.length
+    ? textSegments.join('\n\n---\n\n')
+    : 'No extractable text content found in attachments.';
+
+  return {
+    summaries,
+    textBlock,
+    images,
+    hasVisionInput: images.length > 0
+  };
+};
+
+const pickRandom = (items) => {
+  if (!Array.isArray(items) || items.length === 0) return '';
+  return items[Math.floor(Math.random() * items.length)] || '';
+};
+
+const maybeAddIntentEmoji = (text, intent = 'neutral') => {
+  const value = String(text || '').trim();
+  if (!value) return value;
+  if (Math.random() > 0.4) return value;
+
+  const emojiSet = INTENT_EMOJI[intent] || INTENT_EMOJI.neutral;
+  const emoji = pickRandom(emojiSet);
+  if (!emoji) return value;
+
+  const appendAtEnd = Math.random() > 0.5;
+  return appendAtEnd ? `${value} ${emoji}` : `${emoji} ${value}`;
+};
 
 const hasHindiScript = (text) => /[\u0900-\u097F]/.test(String(text || ''));
 
@@ -164,10 +339,10 @@ const hasConstrainedFuzzyKeyword = (
   return false;
 };
 
-const chatReply = (message) => ({
+const chatReply = (message, intent = 'neutral') => ({
   type: 'CHAT',
   action: null,
-  message
+  message: maybeAddIntentEmoji(message, intent)
 });
 
 const actionReply = (action, payload, reply) => ({
@@ -553,6 +728,35 @@ const inferHallStatusIntent = (message, lower, tokens, allHalls) => {
   return { mode, date, targetHall };
 };
 
+const inferScheduleExportIntent = (message, lower) => {
+  const hasScheduleWord =
+    /\b(schedule|timetable|calendar|time[-\s]?table|today\s+schedule)\b/i.test(lower)
+    || /(à¤¶à¥‡à¤¡à¥à¤¯à¥‚à¤²|à¤¤à¤¾à¤²à¤¿à¤•à¤¾|à¤¸à¤®à¤¯\s*à¤¸à¤¾à¤°à¤£à¥€)/.test(lower);
+  if (!hasScheduleWord) return null;
+
+  const wantsFile =
+    /\b(pdf|file|download|export|report|document|doc)\b/i.test(lower)
+    || /\b(image|img|png|jpg|jpeg|photo|screenshot|svg)\b/i.test(lower)
+    || /\b(csv|excel|sheet|table)\b/i.test(lower);
+  if (!wantsFile) return null;
+
+  const requestedDate = normalizeDateInput(extractDateFromMessage(message)) || null;
+  let format = 'PDF';
+
+  if (/\b(image|img|png|jpg|jpeg|photo|screenshot|svg)\b/i.test(lower)) {
+    format = 'IMAGE';
+  } else if (/\b(csv|excel|sheet)\b/i.test(lower)) {
+    format = 'CSV';
+  } else if (/\btable\b/i.test(lower)) {
+    format = 'TABLE';
+  }
+
+  return {
+    date: requestedDate,
+    format
+  };
+};
+
 const hasHallStatusSignal = (lower, tokens) => {
   const directStatusWord = /\b(status|availability|available|free|occupied|booked|vacant|filled|busy|khali|bhara|mila)\b/i.test(lower) || /(खाली|भरा|बुक|उपलब्ध)/.test(lower);
   const fuzzyStatusWord = hasConstrainedFuzzyKeyword(
@@ -780,7 +984,9 @@ const generateGeneralChatResponse = async ({
   userRole,
   detailReq,
   preferredLanguage = 'auto',
-  history = []
+  history = [],
+  projectContext = '',
+  attachmentContext = null
 }) => {
   const targetHint = detailReq.requestedWords
     ? `around ${detailReq.requestedWords} words`
@@ -792,11 +998,16 @@ const generateGeneralChatResponse = async ({
     ? 'Respond in Hindi (natural, clear Hindi).'
     : 'Respond in English.';
   const historyBlock = buildHistoryPromptBlock(history);
+  const attachmentSummary = Array.isArray(attachmentContext?.summaries) && attachmentContext.summaries.length > 0
+    ? attachmentContext.summaries.map((item, idx) => `${idx + 1}. ${item.name} (${item.type})`).join('\n')
+    : 'No attachments.';
+  const attachmentText = String(attachmentContext?.textBlock || 'No extracted attachment text.');
 
   const prompt = `
 You are a helpful conversational assistant for a hall booking application.
 
 User role: ${userRole}
+Project context: ${projectContext || 'Not available'}
 Task: Reply naturally to the user message.
 
 Guidelines:
@@ -811,6 +1022,12 @@ Guidelines:
 Recent thread context:
 ${historyBlock}
 
+Attachment summary:
+${attachmentSummary}
+
+Attachment extracted text:
+${attachmentText}
+
 User message: "${message}"
 Answer:
 `.trim();
@@ -819,22 +1036,117 @@ Answer:
     ? Math.min(2400, Math.max(900, detailReq.requestedWords * 4))
     : (detailReq.needsDetailed ? 900 : 700);
 
+  const modelToUse = attachmentContext?.hasVisionInput ? OLLAMA_VISION_MODEL : OLLAMA_MODEL;
+  const requestBody = {
+    model: modelToUse,
+    prompt,
+    stream: false,
+    options: {
+      temperature: 0.5,
+      num_predict: numPredict
+    }
+  };
+  if (Array.isArray(attachmentContext?.images) && attachmentContext.images.length > 0) {
+    requestBody.images = attachmentContext.images;
+  }
+
   const response = await fetch(OLLAMA_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: OLLAMA_MODEL,
-      prompt,
-      stream: false,
-      options: {
-        temperature: 0.5,
-        num_predict: numPredict
-      }
-    })
+    body: JSON.stringify(requestBody)
   });
 
   if (!response.ok) {
     throw new Error(`General chat generation failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return cleanLLMText(data.response);
+};
+
+const hasExtractableAttachmentText = (attachmentContext) => {
+  const text = String(attachmentContext?.textBlock || '').trim();
+  if (!text) return false;
+
+  const lower = text.toLowerCase();
+  if (lower === 'no attachments provided.') return false;
+  if (lower === 'no extractable text content found in attachments.') return false;
+  if (lower === 'no extracted attachment text.') return false;
+  return true;
+};
+
+const generateAttachmentAnalysisResponse = async ({
+  message,
+  preferredLanguage = 'auto',
+  history = [],
+  attachmentContext = null
+}) => {
+  const responseLanguage = detectResponseLanguage(message, preferredLanguage);
+  const languageInstruction = responseLanguage === 'hi'
+    ? 'Respond in Hindi.'
+    : 'Respond in English.';
+  const historyBlock = buildHistoryPromptBlock(history);
+
+  const attachmentSummary = Array.isArray(attachmentContext?.summaries) && attachmentContext.summaries.length > 0
+    ? attachmentContext.summaries
+      .map((item, idx) => `${idx + 1}. ${item.name} (${item.type}, ${item.size} bytes)`)
+      .join('\n')
+    : 'No attachments.';
+  const attachmentText = String(attachmentContext?.textBlock || 'No extracted attachment text.');
+
+  const prompt = `
+You are a document assistant. The user has uploaded one or more files.
+
+Task:
+- Read the extracted file content and answer the user question.
+- You are NOT restricted to booking-only topics for this response.
+- If the file appears unrelated to bookings, still explain it clearly.
+- If extracted text is missing/insufficient, say that clearly and ask for a clearer file scan or text-based file.
+
+Output rules:
+- Plain text only (no JSON, no markdown fences).
+- Give a concise, structured response:
+  1) What this file is about
+  2) Key points
+  3) Any useful next steps (if asked)
+- ${languageInstruction}
+
+Recent thread context:
+${historyBlock}
+
+Attachment summary:
+${attachmentSummary}
+
+Attachment extracted text:
+${attachmentText}
+
+User message: "${message}"
+Answer:
+`.trim();
+
+  const modelToUse = attachmentContext?.hasVisionInput ? OLLAMA_VISION_MODEL : OLLAMA_MODEL;
+  const requestBody = {
+    model: modelToUse,
+    prompt,
+    stream: false,
+    options: {
+      temperature: 0.25,
+      num_predict: 1200
+    }
+  };
+
+  if (Array.isArray(attachmentContext?.images) && attachmentContext.images.length > 0) {
+    requestBody.images = attachmentContext.images;
+  }
+
+  const response = await fetch(OLLAMA_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(requestBody)
+  });
+
+  if (!response.ok) {
+    throw new Error(`Attachment analysis failed: ${response.status}`);
   }
 
   const data = await response.json();
@@ -847,7 +1159,8 @@ const expandChatResponse = async ({
   detailReq,
   userRole,
   preferredLanguage = 'auto',
-  history = []
+  history = [],
+  projectContext = ''
 }) => {
   const targetRange = detailReq.requestedWords
     ? `${detailReq.targetMinWords}-${detailReq.targetMaxWords} words`
@@ -867,6 +1180,7 @@ Expand and improve the draft answer for the user question while staying accurate
 Question: "${question}"
 Draft answer: "${draftAnswer}"
 User role: ${userRole}
+Project context: ${projectContext || 'Not available'}
 
 Requirements:
 - Return plain text only (no JSON, no markdown fences).
@@ -955,7 +1269,9 @@ const buildSystemPrompt = ({
   hallNames,
   detailReq,
   preferredLanguage = 'auto',
-  history = []
+  history = [],
+  projectContext = '',
+  attachmentContext = null
 }) => {
   const ist = getISTDateMeta();
   const chatLengthInstruction = getChatLengthInstruction(detailReq);
@@ -964,6 +1280,12 @@ const buildSystemPrompt = ({
     ? 'For CHAT responses, reply in Hindi.'
     : 'For CHAT responses, reply in English.';
   const historyBlock = buildHistoryPromptBlock(history);
+  const attachmentSummaries = Array.isArray(attachmentContext?.summaries) && attachmentContext.summaries.length > 0
+    ? attachmentContext.summaries
+      .map((item, idx) => `${idx + 1}. ${item.name} (${item.type}, ${item.size} bytes)`)
+      .join('\n')
+    : 'No attachment files.';
+  const attachmentTextBlock = String(attachmentContext?.textBlock || 'No attachment text.');
 
   return `
 You are the AI assistant for BIT Mesra hall booking.
@@ -973,6 +1295,7 @@ Current context:
 - Time (IST): ${ist.time}
 - User Role: ${userRole}
 - Available Halls: [${hallNames}]
+- Project support context: ${projectContext || 'Not available'}
 
 Core behavior:
 1) Support normal conversational chat and general knowledge.
@@ -985,11 +1308,17 @@ Core behavior:
 Recent thread context:
 ${historyBlock}
 
+Attachment summary:
+${attachmentSummaries}
+
+Attachment extracted text:
+${attachmentTextBlock}
+
 JSON schema:
 {
   "type": "CHAT" | "ACTION",
   "message": "string or null",
-  "action": "BOOK_REQUEST" | "ADMIN_EXECUTE" | "SHOW_HALL_STATUS" | "LIST_BOOKING_REQUESTS" | null,
+  "action": "BOOK_REQUEST" | "ADMIN_EXECUTE" | "SHOW_HALL_STATUS" | "LIST_BOOKING_REQUESTS" | "EXPORT_SCHEDULE" | null,
   "payload": object,
   "reply": "string or null"
 }
@@ -1018,6 +1347,11 @@ Action guidance:
     "date": "YYYY-MM-DD or null",
     "targetHall": "Hall Name or null"
   }
+- EXPORT_SCHEDULE payload format:
+  {
+    "date": "YYYY-MM-DD or null",
+    "format": "PDF" | "IMAGE" | "CSV" | "TABLE"
+  }
 
 Examples:
 User: "hello"
@@ -1034,6 +1368,9 @@ Response: {"type":"ACTION","message":null,"action":"LIST_BOOKING_REQUESTS","payl
 
 User: "show available halls on 2026-02-16"
 Response: {"type":"ACTION","message":null,"action":"SHOW_HALL_STATUS","payload":{"mode":"AVAILABLE","date":"2026-02-16","targetHall":null},"reply":"Showing available halls."}
+
+User: "send today's schedule in pdf"
+Response: {"type":"ACTION","message":null,"action":"EXPORT_SCHEDULE","payload":{"date":"${ist.fullDate}","format":"PDF"},"reply":"Preparing today's schedule PDF."}
 
 User input: "${message}"
 Output JSON:
@@ -1105,6 +1442,8 @@ router.post('/chat', async (req, res) => {
 
     const history = sanitizeChatHistory(req.body?.history);
     const preferredLanguage = normalizeLanguagePreference(req.body?.language);
+    const attachmentContext = await buildAttachmentContext(req.body?.attachments || []);
+    const projectContext = await getProjectSupportContext();
 
     const userRole = req.isAuthenticated && req.isAuthenticated()
       ? String(req.user?.type || '').toUpperCase()
@@ -1116,6 +1455,20 @@ router.post('/chat', async (req, res) => {
     const lower = normalizeText(message);
     const tokens = tokenize(message);
     const detailReq = getChatDetailRequirement(message);
+
+    const scheduleExportIntent = inferScheduleExportIntent(message, lower);
+    if (scheduleExportIntent) {
+      return res.json({
+        reply: actionReply(
+          'EXPORT_SCHEDULE',
+          {
+            date: scheduleExportIntent.date || null,
+            format: scheduleExportIntent.format || 'PDF'
+          },
+          'Preparing the schedule export now.'
+        )
+      });
+    }
 
     const strongBookingVerb = /\b(book|reserve|request|schedule|allot|buk|bookk)\b/i.test(lower) || /(बुक|आरक्षित|शेड्यूल)/.test(lower);
     const hallMentioned = lower.includes('hall') || /(हॉल|हाल)/.test(lower) || Boolean(detectHallFromMessage(message, halls));
@@ -1221,6 +1574,37 @@ router.post('/chat', async (req, res) => {
       });
     }
 
+    const hasAttachments = Array.isArray(attachmentContext?.summaries) && attachmentContext.summaries.length > 0;
+
+    if (hasAttachments) {
+      try {
+        const attachmentReply = await generateAttachmentAnalysisResponse({
+          message,
+          preferredLanguage,
+          history,
+          attachmentContext
+        });
+
+        if (attachmentReply) {
+          return res.json({ reply: chatReply(attachmentReply) });
+        }
+      } catch (attachmentErr) {
+        console.error('Attachment analysis fallback error:', attachmentErr.message || attachmentErr);
+
+        if (hasExtractableAttachmentText(attachmentContext)) {
+          const attachmentTextPreview = String(attachmentContext.textBlock || '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 1400);
+          return res.json({
+            reply: chatReply(
+              `I could not run full document analysis right now, but I extracted text from your file:\n\n${attachmentTextPreview}`
+            )
+          });
+        }
+      }
+    }
+
     const quickGeneral = getQuickGeneralReply(message);
     if (quickGeneral && !detailReq.needsDetailed && !detailReq.requestedWords) {
       return res.json({ reply: chatReply(quickGeneral) });
@@ -1235,26 +1619,34 @@ router.post('/chat', async (req, res) => {
         hallNames: hallNames.join(', '),
         detailReq,
         preferredLanguage,
-        history
+        history,
+        projectContext,
+        attachmentContext
       });
 
       const jsonNumPredict = detailReq.requestedWords
         ? Math.min(2400, Math.max(900, detailReq.requestedWords * 4))
         : (detailReq.needsDetailed ? 900 : 600);
 
+      const modelToUse = attachmentContext?.hasVisionInput ? OLLAMA_VISION_MODEL : OLLAMA_MODEL;
+      const requestBody = {
+        model: modelToUse,
+        prompt,
+        stream: false,
+        options: {
+          temperature: 0.2,
+          num_predict: jsonNumPredict,
+          stop: ['User input:', 'Output JSON:', '<|end|>']
+        }
+      };
+      if (Array.isArray(attachmentContext?.images) && attachmentContext.images.length > 0) {
+        requestBody.images = attachmentContext.images;
+      }
+
       const response = await fetch(OLLAMA_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: OLLAMA_MODEL,
-          prompt,
-          stream: false,
-          options: {
-            temperature: 0.2,
-            num_predict: jsonNumPredict,
-            stop: ['User input:', 'Output JSON:', '<|end|>']
-          }
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
@@ -1303,7 +1695,9 @@ router.post('/chat', async (req, res) => {
           userRole,
           detailReq,
           preferredLanguage,
-          history
+          history,
+          projectContext,
+          attachmentContext
         });
 
         if (plainChat) {
@@ -1333,7 +1727,8 @@ router.post('/chat', async (req, res) => {
               detailReq,
               userRole,
               preferredLanguage,
-              history
+              history,
+              projectContext
             });
 
             const expandedWords = getWordCount(expanded);
@@ -1366,7 +1761,9 @@ router.post('/chat', async (req, res) => {
             userRole,
             detailReq,
             preferredLanguage,
-            history
+            history,
+            projectContext,
+            attachmentContext
           });
           if (plainChat) messageText = plainChat;
         } catch (plainErr) {
@@ -1518,6 +1915,23 @@ router.post('/chat', async (req, res) => {
       });
     }
 
+    if (action === 'EXPORT_SCHEDULE') {
+      const normalizedDate = normalizeDateInput(payload.date || extractDateFromMessage(message));
+      const rawFormat = String(payload.format || '').toUpperCase().trim();
+      const format = ['PDF', 'IMAGE', 'CSV', 'TABLE'].includes(rawFormat) ? rawFormat : 'PDF';
+
+      return res.json({
+        reply: actionReply(
+          'EXPORT_SCHEDULE',
+          {
+            date: normalizedDate || null,
+            format
+          },
+          'Preparing your schedule export now.'
+        )
+      });
+    }
+
     const quickFallback = getQuickGeneralReply(message);
     if (quickFallback) {
       return res.json({ reply: chatReply(quickFallback) });
@@ -1529,7 +1943,9 @@ router.post('/chat', async (req, res) => {
         userRole,
         detailReq,
         preferredLanguage,
-        history
+        history,
+        projectContext,
+        attachmentContext
       });
       if (plainChat) {
         return res.json({ reply: chatReply(plainChat) });

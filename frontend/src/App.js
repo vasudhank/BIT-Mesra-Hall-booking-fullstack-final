@@ -30,8 +30,12 @@ import QueryDetailPage from './pages/QueryDetailPage';
 import FeedbackPage from './pages/FeedbackPage';
 import AdminAccountPage from './pages/AdminAccountPage';
 import DeveloperAccountPage from './pages/DeveloperAccountPage';
+import NoticesPage from './pages/NoticesPage';
+import NoticeDetailPage from './pages/NoticeDetailPage';
+import CalendarPage from './pages/CalendarPage';
 import DeveloperRoute from './routes/DeveloperRoute';
 import AdminOnlyRoute from './routes/AdminOnlyRoute';
+import TrashPage from './pages/TrashPage';
 
 import { checkauth } from './store/slices/userSlice';
 
@@ -64,6 +68,11 @@ function App() {
         <Route path="/about" element={<About lightMode={lightMode} toggleTheme={toggleTheme} />} />
         <Route path="/faqs" element={<FAQ lightMode={lightMode} toggleTheme={toggleTheme} />} />
         <Route path="/schedule" element={<Schedule />} />
+        <Route path="/notices" element={<NoticesPage />} />
+        <Route path="/notices/:id" element={<NoticeDetailPage />} />
+        <Route path="/calendar" element={<CalendarPage />} />
+        <Route path="/calender" element={<CalendarPage />} />
+        <Route path="/trash" element={<TrashPage />} />
         <Route path="/admin_login" element={<AdminLoginRoute />} />
         <Route path="/department_login" element={<DepartmentLoginRoute />} />
         <Route path="/department_register" element={<DepartmentRegisterRoute />} />
@@ -127,6 +136,14 @@ function App() {
           element={
             <AdminOnlyRoute>
               <AdminAccountPage />
+            </AdminOnlyRoute>
+          }
+        />
+        <Route
+          path="/admin/notices"
+          element={
+            <AdminOnlyRoute>
+              <NoticesPage mode="admin" />
             </AdminOnlyRoute>
           }
         />

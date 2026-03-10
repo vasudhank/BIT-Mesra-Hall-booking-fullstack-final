@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Hall = require('../models/hall');
 const Booking_Requests = require('../models/booking_requests');
+const PDFDocument = require('pdfkit');
 const { safeExecute } = require('../utils/safeNotify');
 const { generateApprovalToken, getTokenExpiry } = require('../utils/token');
 
@@ -122,6 +123,164 @@ const parseDateRange = (dateText) => {
   return { date: raw, start, end };
 };
 
+const getTodayISTDate = () => {
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const formatTimeRange = (startDateTime, endDateTime) => {
+  const formatOne = (value) =>
+    new Date(value).toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+
+  return `${formatOne(startDateTime)} - ${formatOne(endDateTime)}`;
+};
+
+const htmlEscape = (input) =>
+  String(input || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const buildScheduleCsv = (rows) => {
+  const header = ['Hall', 'Status', 'Event', 'Department', 'Time'];
+  const csvRows = [header]
+    .concat(
+      (rows || []).map((row) => [
+        row.hall,
+        row.status,
+        row.event,
+        row.department,
+        row.timeRange
+      ])
+    )
+    .map((cells) => cells.map((cell) => `"${String(cell || '').replace(/"/g, '""')}"`).join(','));
+  return csvRows.join('\n');
+};
+
+const buildScheduleSvg = (rows, date) => {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const rowHeight = 28;
+  const width = 1200;
+  const tableTop = 84;
+  const height = Math.max(220, tableTop + rowHeight * (safeRows.length + 2));
+  const colX = [20, 180, 340, 620, 850];
+
+  const headerCells = ['Hall', 'Status', 'Event', 'Department', 'Time'];
+  const rowLines = safeRows
+    .map((row, idx) => {
+      const y = tableTop + rowHeight * (idx + 1);
+      const values = [row.hall, row.status, row.event, row.department, row.timeRange];
+      const textNodes = values
+        .map((value, colIdx) => `<text x="${colX[colIdx]}" y="${y}" font-size="13" fill="#dbe7ff">${htmlEscape(value)}</text>`)
+        .join('');
+      return textNodes;
+    })
+    .join('');
+
+  const headerNodes = headerCells
+    .map((value, idx) => `<text x="${colX[idx]}" y="${tableTop}" font-size="13" fill="#9ec2ff" font-weight="700">${value}</text>`)
+    .join('');
+
+  return `
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <rect width="${width}" height="${height}" fill="#0b1f44"/>
+  <text x="20" y="34" font-size="24" fill="#ffffff" font-weight="700">Hall Schedule Export</text>
+  <text x="20" y="58" font-size="14" fill="#9ec2ff">Date: ${htmlEscape(date)}</text>
+  <line x1="20" y1="66" x2="${width - 20}" y2="66" stroke="#214a8c"/>
+  ${headerNodes}
+  <line x1="20" y1="${tableTop + 8}" x2="${width - 20}" y2="${tableTop + 8}" stroke="#214a8c"/>
+  ${rowLines}
+</svg>`.trim();
+};
+
+const buildSchedulePdf = (rows, date) =>
+  new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ size: 'A4', margin: 40 });
+      const chunks = [];
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      doc.fontSize(18).text('Hall Schedule Export', { underline: true });
+      doc.moveDown(0.2);
+      doc.fontSize(11).text(`Date: ${date}`);
+      doc.moveDown(0.8);
+
+      const columns = ['Hall', 'Status', 'Event', 'Department', 'Time'];
+      const x = [40, 115, 195, 330, 450];
+      let y = 110;
+
+      doc.fontSize(10).fillColor('#1b3f74');
+      columns.forEach((col, idx) => doc.text(col, x[idx], y));
+      y += 16;
+      doc.moveTo(40, y).lineTo(555, y).stroke('#8aa8d8');
+      y += 6;
+
+      doc.fillColor('#111827').fontSize(9.5);
+      (rows || []).forEach((row) => {
+        if (y > 760) {
+          doc.addPage();
+          y = 50;
+        }
+
+        const values = [row.hall, row.status, row.event, row.department, row.timeRange];
+        values.forEach((value, idx) => {
+          doc.text(String(value || ''), x[idx], y, { width: idx === 2 ? 125 : 100, ellipsis: true });
+        });
+
+        y += 14;
+      });
+
+      doc.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
+
+const buildScheduleRows = async (dateRange) => {
+  const halls = await Hall.find().populate({ path: 'bookings.department', select: 'head department email' });
+  const rows = [];
+
+  for (const hall of halls) {
+    const relevantBookings = (hall.bookings || [])
+      .filter((booking) => overlaps(booking.startDateTime, booking.endDateTime, dateRange.start, dateRange.end))
+      .sort((a, b) => new Date(a.startDateTime).getTime() - new Date(b.startDateTime).getTime());
+
+    if (relevantBookings.length === 0) {
+      rows.push({
+        hall: hall.name,
+        status: 'AVAILABLE',
+        event: 'None',
+        department: 'N/A',
+        timeRange: '-'
+      });
+      continue;
+    }
+
+    for (const booking of relevantBookings) {
+      rows.push({
+        hall: hall.name,
+        status: 'FILLED',
+        event: booking.event || 'Booked',
+        department: booking.department?.head || booking.department?.department || 'N/A',
+        timeRange: formatTimeRange(booking.startDateTime, booking.endDateTime)
+      });
+    }
+  }
+
+  return rows;
+};
+
 const overlaps = (startA, endA, startB, endB) =>
   new Date(startA).getTime() < new Date(endB).getTime() &&
   new Date(endA).getTime() > new Date(startB).getTime();
@@ -216,17 +375,83 @@ const rejectRequest = async (requestDoc) => {
 
 router.post('/execute', async (req, res) => {
   try {
-    if (!req.isAuthenticated()) {
-      return res.json({ status: 'ERROR', msg: 'Please log in first to use booking actions.' });
-    }
-
     const intent = req.body?.intent || {};
-    const user = req.user;
+    const user = req.isAuthenticated && req.isAuthenticated()
+      ? req.user
+      : { type: 'Guest', id: null, email: '' };
     const actionType = String(intent.action || '').toUpperCase();
     const payload = intent.payload || {};
 
     if (!actionType) {
       return res.json({ status: 'ERROR', msg: 'AI action is missing.' });
+    }
+
+    if (actionType === 'EXPORT_SCHEDULE') {
+      const requestedDate = String(payload.date || '').trim();
+      const normalizedDate = /^\d{4}-\d{2}-\d{2}$/.test(requestedDate)
+        ? requestedDate
+        : getTodayISTDate();
+
+      const format = ['PDF', 'IMAGE', 'CSV', 'TABLE'].includes(String(payload.format || '').toUpperCase().trim())
+        ? String(payload.format || '').toUpperCase().trim()
+        : 'PDF';
+
+      const dateRange = parseDateRange(normalizedDate);
+      if (!dateRange) {
+        return res.json({ status: 'ERROR', msg: 'Invalid date format for schedule export. Use YYYY-MM-DD.' });
+      }
+
+      const rows = await buildScheduleRows(dateRange);
+      const summary = {
+        totalRows: rows.length,
+        filledRows: rows.filter((row) => row.status === 'FILLED').length,
+        availableRows: rows.filter((row) => row.status === 'AVAILABLE').length
+      };
+
+      const artifacts = [];
+
+      if (format === 'PDF') {
+        const pdfBuffer = await buildSchedulePdf(rows, normalizedDate);
+        artifacts.push({
+          type: 'PDF',
+          name: `hall-schedule-${normalizedDate}.pdf`,
+          mimeType: 'application/pdf',
+          base64: pdfBuffer.toString('base64')
+        });
+      }
+
+      if (format === 'IMAGE') {
+        const svg = buildScheduleSvg(rows, normalizedDate);
+        artifacts.push({
+          type: 'IMAGE',
+          name: `hall-schedule-${normalizedDate}.svg`,
+          mimeType: 'image/svg+xml',
+          base64: Buffer.from(svg, 'utf8').toString('base64')
+        });
+      }
+
+      if (format === 'CSV') {
+        const csv = buildScheduleCsv(rows);
+        artifacts.push({
+          type: 'CSV',
+          name: `hall-schedule-${normalizedDate}.csv`,
+          mimeType: 'text/csv',
+          base64: Buffer.from(csv, 'utf8').toString('base64')
+        });
+      }
+
+      return res.json({
+        status: 'INFO',
+        data: {
+          kind: 'SCHEDULE_EXPORT',
+          date: normalizedDate,
+          formatRequested: format,
+          summary,
+          columns: ['Hall', 'Status', 'Event', 'Department', 'Time'],
+          rows,
+          artifacts
+        }
+      });
     }
 
     if (actionType === 'BOOK_REQUEST') {

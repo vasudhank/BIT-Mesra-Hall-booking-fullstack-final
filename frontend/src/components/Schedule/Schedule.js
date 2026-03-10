@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useRef, useMemo, useLayoutEffect } from 'react';
 import api from '../../api/axiosInstance';
+import { getNoticesApi } from '../../api/noticesApi';
 import "./Schedule.css";
 import HomeIcon from '@mui/icons-material/Home';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import {
-  Container, Grid, Paper, Typography, TextField, Box, Chip, Button, Stack, IconButton, InputAdornment, useTheme, useMediaQuery
+  Container, Grid, Paper, Typography, TextField, Box, Chip, Button, Stack, IconButton, InputAdornment, useTheme, useMediaQuery, Modal
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import dayjs from 'dayjs';
@@ -33,7 +35,7 @@ function bookingRangeText(start, end) {
   if (s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth() && s.getDate() === e.getDate()) {
     return `${formatTime(s)} - ${formatTime(e)}`;
   }
-  return `${s.toLocaleDateString()} ${formatTime(s)} — ${e.toLocaleDateString()} ${formatTime(e)}`;
+  return `${s.toLocaleDateString()} ${formatTime(s)} - ${e.toLocaleDateString()} ${formatTime(e)}`;
 }
 
 function bookingRequesterName(booking) {
@@ -52,15 +54,83 @@ function colorFromString(str) {
   return `#${'00000'.slice(0, 6 - c.length)}${c}`;
 }
 
+const normalizeRoomKey = (value) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+
+const noticeAppliesToHall = (notice, hallName) => {
+  if (!notice || !hallName) return false;
+  if (notice.closureAllHalls) return true;
+  const hallKey = normalizeRoomKey(hallName);
+  if (!hallKey) return false;
+  const rooms = Array.isArray(notice.rooms) ? notice.rooms : [];
+  return rooms.some((room) => {
+    const roomKey = normalizeRoomKey(room);
+    return roomKey && (hallKey.includes(roomKey) || roomKey.includes(hallKey));
+  });
+};
+
+const noticeOverlapsDay = (notice, dateStr) => {
+  const dayStart = new Date(dateStr);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(dateStr);
+  dayEnd.setHours(23, 59, 59, 999);
+  const start = new Date(notice.startDateTime || notice.createdAt);
+  const end = new Date(notice.endDateTime || notice.startDateTime || notice.createdAt);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return false;
+  return start <= dayEnd && end >= dayStart;
+};
+
+const isClosureNotice = (notice) => String(notice?.kind || '').toUpperCase() === 'HOLIDAY';
+
+const getNoticeTitle = (notice) =>
+  String(notice?.title || notice?.subject || notice?.holidayName || 'Notice').trim();
+
+const getNoticeSummary = (notice) =>
+  String(notice?.summary || notice?.content || '').replace(/\s+/g, ' ').trim();
+
+const noticeDetailPath = (notice) =>
+  notice?._id ? `/notices/${notice._id}` : '/notices';
+
+const hasSpecificRoomTargets = (notice) => {
+  const rooms = Array.isArray(notice?.rooms) ? notice.rooms : [];
+  return rooms.length > 0 && !notice?.closureAllHalls;
+};
+
+const isAllHallsGeneralNotice = (notice) =>
+  !isClosureNotice(notice) && Boolean(notice?.closureAllHalls);
+
+const isUnscopedGeneralNotice = (notice) =>
+  !isClosureNotice(notice) && !hasSpecificRoomTargets(notice) && !notice?.closureAllHalls;
+
+const noticeIdentityKey = (notice) =>
+  String(notice?._id || `${notice?.title || notice?.subject || 'notice'}-${notice?.startDateTime || notice?.createdAt || ''}`);
+
+const noticeTargetsHall = (notice, hallName) => {
+  if (!notice || !hallName) return false;
+  if (notice.closureAllHalls) return true;
+  const rooms = Array.isArray(notice.rooms) ? notice.rooms : [];
+  if (rooms.length > 0) return noticeAppliesToHall(notice, hallName);
+  return true;
+};
+
+const sortNoticesByPriority = (items) =>
+  [...(Array.isArray(items) ? items : [])].sort((a, b) => {
+    const kindDiff = Number(isClosureNotice(b)) - Number(isClosureNotice(a));
+    if (kindDiff !== 0) return kindDiff;
+    return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+  });
+
 // Helper to calculate position and width percentage for the timeline
 // Range: 8:00 AM (480 mins) to 10:00 PM (1320 mins) -> Total 840 mins
 const START_HOUR = 8;
 const END_HOUR = 22;
 const TOTAL_MINUTES = (END_HOUR - START_HOUR) * 60; // 14 hours * 60 = 840
 
-function getBookingPosition(booking, selectedDateStr) {
-  const start = new Date(booking.startDateTime);
-  const end = new Date(booking.endDateTime);
+function getRangePosition(startDateTime, endDateTime, selectedDateStr) {
+  const start = new Date(startDateTime);
+  const end = new Date(endDateTime);
   
   // Normalize dates to the selected day for calculation if they span multiple days
   // (Assuming simple day view logic, clamping to 8am-10pm of selected day)
@@ -86,6 +156,21 @@ function getBookingPosition(booking, selectedDateStr) {
   return { left: `${left}%`, width: `${width}%` };
 }
 
+function getBookingPosition(booking, selectedDateStr) {
+  return getRangePosition(booking.startDateTime, booking.endDateTime, selectedDateStr);
+}
+
+function noticeOverlapsHourSlot(notice, dateStr, hourStart, hourEnd) {
+  const slotStart = new Date(dateStr);
+  slotStart.setHours(hourStart, 0, 0, 0);
+  const slotEnd = new Date(dateStr);
+  slotEnd.setHours(hourEnd, 0, 0, 0);
+  const start = new Date(notice.startDateTime || notice.createdAt);
+  const end = new Date(notice.endDateTime || notice.startDateTime || notice.createdAt);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return false;
+  return start < slotEnd && end > slotStart;
+}
+
 export default function Schedule() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -93,16 +178,20 @@ export default function Schedule() {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const [halls, setHalls] = useState([]);
+  const [allNotices, setAllNotices] = useState([]);
+  const [noticeDialog, setNoticeDialog] = useState({ open: false, date: '', notices: [] });
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
   // Set Default View to 'today'
   const [viewMode, setViewMode] = useState(location.state?.mode || 'today'); 
   const [searchTerm, setSearchTerm] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showHallNoticeBreakdown, setShowHallNoticeBreakdown] = useState(false);
   
   // Refs for scrolling synchronization
   const weekHeaderRef = useRef(null);
   const bodyRef = useRef(null);
+  const todayAlertContentRef = useRef(null);
   
   const topStripRef = useRef(null);
   const [topStripHeight, setTopStripHeight] = useState(0);
@@ -146,9 +235,92 @@ export default function Schedule() {
     setLoading(false);
   };
 
+  useEffect(() => {
+    let active = true;
+    const run = async () => {
+      try {
+        const noticesRes = await getNoticesApi({
+          sort: 'LATEST',
+          limit: 500
+        });
+        if (!active) return;
+        setAllNotices(Array.isArray(noticesRes?.notices) ? noticesRes.notices : []);
+      } catch (_) {
+        if (active) {
+          setAllNotices([]);
+        }
+      }
+    };
+    run();
+    return () => {
+      active = false;
+    };
+  }, [weekDates]);
+
+  const noticesForDate = (dateStr) =>
+    sortNoticesByPriority(
+      allNotices.filter((notice) => noticeOverlapsDay(notice, dateStr))
+    );
+
+  const noticesForHallDate = (hallName, dateStr) =>
+    noticesForDate(dateStr).filter((notice) => noticeTargetsHall(notice, hallName));
+
+  const closuresForHallDate = (hallName, dateStr) =>
+    noticesForHallDate(hallName, dateStr).filter((notice) => isClosureNotice(notice));
+
+  const generalNoticesForHallDate = (hallName, dateStr) =>
+    noticesForHallDate(hallName, dateStr).filter((notice) => !isClosureNotice(notice));
+
+  const hallSpecificGeneralNoticesForHallDate = (hallName, dateStr) =>
+    generalNoticesForHallDate(hallName, dateStr).filter((notice) => hasSpecificRoomTargets(notice));
+
   const bookingsForDate = (hall) => {
     return (hall.bookings || []).filter(b => bookingOverlapsDay(b, selectedDate)).sort((a, b) => new Date(a.startDateTime) - new Date(b.startDateTime));
   };
+
+  const hallHasBookingOnDate = (hall, dateStr) =>
+    (hall?.bookings || []).some((booking) => bookingOverlapsDay(booking, dateStr));
+
+  const hallClosedOnDate = (hall, dateStr) =>
+    closuresForHallDate(hall?.name, dateStr).length > 0 && !hallHasBookingOnDate(hall, dateStr);
+
+  const hallHasSpecificGeneralNoticeOnDate = (hall, dateStr) =>
+    hallSpecificGeneralNoticesForHallDate(hall?.name, dateStr).length > 0 && !hallClosedOnDate(hall, dateStr) && !hallHasBookingOnDate(hall, dateStr);
+
+  const selectedDateNotices = useMemo(
+    () => sortNoticesByPriority(allNotices.filter((notice) => noticeOverlapsDay(notice, selectedDate))),
+    [allNotices, selectedDate]
+  );
+  const selectedDateTopNotice = selectedDateNotices[0] || null;
+  const selectedDateAllHallsGeneralNotices = selectedDateNotices.filter((notice) => isAllHallsGeneralNotice(notice));
+  const selectedDateHallSpecificNotices = selectedDateNotices.filter((notice) => hasSpecificRoomTargets(notice));
+  const selectedDateHallSpecificNoticeGroups = selectedDateHallSpecificNotices.map((notice) => ({
+    notice,
+    key: noticeIdentityKey(notice),
+    halls: (halls || [])
+      .map((hall) => hall.name)
+      .filter((hallName) => noticeTargetsHall(notice, hallName))
+  }));
+  const selectedDateHasMultipleHallSpecificNotices =
+    new Set(selectedDateHallSpecificNoticeGroups.map((group) => group.key)).size > 1;
+  const selectedDateHasAnyClosure = selectedDateNotices.some((notice) => isClosureNotice(notice));
+  const selectedDateCommonGeneralNotice = selectedDateNotices.find(
+    (notice) => isUnscopedGeneralNotice(notice) || isAllHallsGeneralNotice(notice)
+  ) || null;
+  const selectedDateCommonStripNotice =
+    selectedDateCommonGeneralNotice || selectedDateHallSpecificNotices[0] || selectedDateTopNotice || null;
+  const selectedDateCommonStripIsClosure = selectedDateCommonStripNotice ? isClosureNotice(selectedDateCommonStripNotice) : selectedDateHasAnyClosure;
+  const selectedDateStripLabel = selectedDateCommonStripIsClosure ? 'ALERT' : 'NOTICE';
+  const selectedDateCommonStripText = selectedDateCommonStripNotice
+    ? `${getNoticeTitle(selectedDateCommonStripNotice)}${selectedDateCommonStripNotice?.closureAllHalls ? ' | ALL ROOMS CLOSED' : ''}`
+    : '';
+  const selectedDateCommonStripMarquee = selectedDateCommonStripText.length > 70;
+  const hasMultipleHallSpecificNoticesForDate = (dateStr) =>
+    new Set(
+      noticesForDate(dateStr)
+        .filter((notice) => hasSpecificRoomTargets(notice))
+        .map((notice) => noticeIdentityKey(notice))
+    ).size > 1;
 
   // Process data for Grid/List views
   const gridData = useMemo(() => {
@@ -169,23 +341,33 @@ export default function Schedule() {
     return { cols, rows: filteredRows, map };
   }, [halls, weekDates, searchQuery]);
 
-  // Scroll Sync Effect
+  const syncWeekHeaderScroll = (scrollLeft) => {
+    if (weekHeaderRef.current) {
+      weekHeaderRef.current.scrollLeft = scrollLeft;
+    }
+  };
+
+  const onBodyHorizontalScroll = (event) => {
+    const scrollLeft = event.currentTarget.scrollLeft;
+    syncWeekHeaderScroll(scrollLeft);
+    if (viewMode === 'today' && todayAlertContentRef.current) {
+      todayAlertContentRef.current.style.transform = `translateX(${scrollLeft}px)`;
+    }
+  };
+
   useEffect(() => {
-    const bodyEl = bodyRef.current;
-    if (!bodyEl) return;
-    const onScroll = () => {
-      if (weekHeaderRef.current && bodyRef.current) {
-        weekHeaderRef.current.scrollLeft = bodyRef.current.scrollLeft;
-      }
-    };
-    bodyEl.addEventListener('scroll', onScroll, { passive: true });
-    return () => bodyEl.removeEventListener('scroll', onScroll);
-  }, [bodyRef.current, weekHeaderRef.current]);
+    if (weekHeaderRef.current) {
+      weekHeaderRef.current.scrollLeft = bodyRef.current?.scrollLeft || 0;
+    }
+    if (viewMode === 'today' && todayAlertContentRef.current) {
+      todayAlertContentRef.current.style.transform = 'translateX(0px)';
+    }
+  }, [viewMode]);
 
   useEffect(() => {
     const onResize = () => {
-      if (weekHeaderRef.current && bodyRef.current) {
-        weekHeaderRef.current.scrollLeft = bodyRef.current.scrollLeft;
+      if (weekHeaderRef.current) {
+        weekHeaderRef.current.scrollLeft = bodyRef.current?.scrollLeft || 0;
       }
     };
     window.addEventListener('resize', onResize);
@@ -225,6 +407,10 @@ export default function Schedule() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    setShowHallNoticeBreakdown(false);
+  }, [selectedDate, viewMode]);
+
   const rowHeaderWidth = isMobile ? '120px' : '220px';
   const dayColWidth = isMobile ? 'minmax(140px, 1fr)' : 'minmax(180px, 1fr)';
 
@@ -253,7 +439,13 @@ export default function Schedule() {
     return (halls || []).filter(h => {
       if (!searchQuery) return true;
       return (h.name || '').toLowerCase().includes(searchQuery.toLowerCase());
-    });
+    }).map((hall) => ({
+      id: hall._id || hall.name,
+      name: hall.name,
+      capacity: hall.capacity,
+      bookings: hall.bookings || [],
+      status: hall.status
+    }));
   }, [halls, searchQuery]);
 
   // Width for one hour column in Today View
@@ -403,40 +595,207 @@ export default function Schedule() {
       {/* --- LIST VIEW --- */}
       {viewMode === 'list' && (
         <Container sx={{ px: { xs: 2, md: 3 }, pt: 2 }}>
+          {!loading && selectedDateCommonStripNotice && (
+            <Box
+              sx={{
+                mb: 2.2,
+                border: selectedDateCommonStripIsClosure ? '1px solid rgba(185, 28, 28, 0.32)' : '1px solid rgba(30, 64, 175, 0.32)',
+                borderRadius: '10px',
+                overflow: 'hidden',
+                background: selectedDateCommonStripIsClosure ? 'rgba(185, 28, 28, 0.1)' : 'rgba(30, 64, 175, 0.1)'
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'stretch' }}>
+                <Box
+                  sx={{
+                    width: rowHeaderWidth,
+                    minWidth: rowHeaderWidth,
+                    px: 1,
+                    py: 0.9,
+                    borderRight: selectedDateCommonStripIsClosure ? '1px solid rgba(185, 28, 28, 0.24)' : '1px solid rgba(30, 64, 175, 0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 0.7
+                  }}
+                >
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={() => navigate(noticeDetailPath(selectedDateCommonStripNotice))}
+                    sx={{
+                      minWidth: 'auto',
+                      px: 1,
+                      fontSize: '0.68rem',
+                      lineHeight: 1.2,
+                      whiteSpace: 'nowrap',
+                      background: selectedDateCommonStripIsClosure
+                        ? 'linear-gradient(90deg, #991b1b 0%, #b91c1c 100%)'
+                        : 'linear-gradient(90deg, #1d4ed8 0%, #1e40af 100%)'
+                    }}
+                  >
+                    OPEN
+                  </Button>
+                  <Typography
+                    sx={{
+                      fontSize: '0.76rem',
+                      fontWeight: 800,
+                      letterSpacing: '0.08em',
+                      color: selectedDateCommonStripIsClosure ? '#991b1b' : '#1e3a8a'
+                    }}
+                  >
+                    {selectedDateStripLabel}
+                  </Typography>
+                  {selectedDateHasMultipleHallSpecificNotices && (
+                    <Button
+                      size="small"
+                      variant="text"
+                      onClick={() => setShowHallNoticeBreakdown((prev) => !prev)}
+                      sx={{ minWidth: 'auto', px: 0.6, fontWeight: 900 }}
+                    >
+                      {showHallNoticeBreakdown ? '▲' : '▼'}
+                    </Button>
+                  )}
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 0, px: 1.5, py: 1, display: 'flex', alignItems: 'center' }}>
+                  <Box className="schedule-alert-marquee">
+                    {selectedDateCommonStripMarquee ? (
+                      <span className="schedule-alert-marquee-track">
+                        {selectedDateCommonStripText} | {selectedDateCommonStripText}
+                      </span>
+                    ) : (
+                      <Typography
+                        sx={{
+                          fontSize: '0.9rem',
+                          fontWeight: 700,
+                          color: selectedDateCommonStripIsClosure ? '#991b1b' : '#1e3a8a'
+                        }}
+                      >
+                        {selectedDateCommonStripText}
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+              </Box>
+
+              {showHallNoticeBreakdown && selectedDateHasMultipleHallSpecificNotices && (
+                <Box sx={{ borderTop: selectedDateCommonStripIsClosure ? '1px solid rgba(185, 28, 28, 0.24)' : '1px solid rgba(30, 64, 175, 0.25)' }}>
+                  {selectedDateHallSpecificNoticeGroups.map((group) => {
+                    const isAlert = isClosureNotice(group.notice);
+                    return (
+                      <Box
+                        key={`list-group-${group.key}`}
+                        sx={{
+                          px: 1.2,
+                          py: 0.8,
+                          borderBottom: '1px dashed var(--border-color)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 1
+                        }}
+                      >
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography sx={{ fontSize: '0.82rem', fontWeight: 800, color: isAlert ? '#991b1b' : '#1e3a8a' }}>
+                            {isAlert ? 'ALERT' : 'NOTICE'}: {getNoticeTitle(group.notice)}
+                          </Typography>
+                          <Typography sx={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+                            Halls: {group.halls.join(', ') || 'Specific halls'}
+                          </Typography>
+                        </Box>
+                        <Button
+                          size="small"
+                          onClick={() => navigate(noticeDetailPath(group.notice))}
+                          sx={{ minWidth: 'auto', px: 0.8, fontSize: '0.68rem', fontWeight: 800 }}
+                        >
+                          OPEN
+                        </Button>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              )}
+            </Box>
+          )}
+
           <Grid container spacing={3}>
             {loading ? (
               <Grid item xs={12}><Typography>Loading...</Typography></Grid>
             ) : (
               (gridData.rows || []).map((h) => {
                 const bookings = bookingsForDate(h);
+                const hallClosed = hallClosedOnDate(h, selectedDate);
+                const hallGlobalNotice = selectedDateAllHallsGeneralNotices.length > 0 && !hallClosed;
+                const hallSpecificNotice = hallHasSpecificGeneralNoticeOnDate(h, selectedDate);
+                const hallDateNotices = noticesForHallDate(h.name, selectedDate);
+                const hallSpecificDayNotices = hallDateNotices.filter((notice) => hasSpecificRoomTargets(notice));
+                const showHallSpecificNoticeButton = selectedDateHasMultipleHallSpecificNotices && hallSpecificDayNotices.length > 0;
+                const hallSpecificButtonIsAlert = hallSpecificDayNotices.some((notice) => isClosureNotice(notice));
                 return (
                   <Grid item xs={12} sm={6} md={4} key={h.id || h.name}>
-                    <Paper elevation={3} sx={{ padding: 2 }}>
+                    <Paper
+                      elevation={3}
+                      sx={{
+                        padding: 2,
+                        border: hallClosed ? '1px solid rgba(185, 28, 28, 0.44)' : (hallSpecificNotice || hallGlobalNotice) ? '1px solid rgba(30, 64, 175, 0.34)' : '1px solid transparent',
+                        background: hallClosed
+                          ? 'linear-gradient(180deg, rgba(185,28,28,0.11), rgba(185,28,28,0.04))'
+                          : (hallSpecificNotice || hallGlobalNotice)
+                            ? 'linear-gradient(180deg, rgba(30,64,175,0.1), rgba(30,64,175,0.04))'
+                            : undefined
+                      }}
+                    >
                       <Box display="flex" justifyContent="space-between" alignItems="center">
                         <Box>
                           <Typography variant="h6">{h.name}</Typography>
                           <Typography variant="body2" color="text.secondary">{h.capacity} seats </Typography>
                         </Box>
-                        <Chip label={h.status} color={h.status === 'Filled' ? 'error' : 'success'} />
+                        <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          <Chip label={h.status} color={h.status === 'Filled' ? 'error' : 'success'} />
+                          {hallClosed && <Chip label="CLOSED" color="error" variant="outlined" />}
+                          {showHallSpecificNoticeButton && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color={hallSpecificButtonIsAlert ? 'error' : 'primary'}
+                              onClick={() => setNoticeDialog({ open: true, date: selectedDate, notices: hallSpecificDayNotices })}
+                              sx={{ minWidth: 'auto', px: 0.9, fontSize: '0.66rem', fontWeight: 800, lineHeight: 1.1 }}
+                            >
+                              {hallSpecificButtonIsAlert ? 'ALERT' : 'NOTICE'}
+                            </Button>
+                          )}
+                        </Box>
                       </Box>
 
                       <Box mt={2}>
-                        {bookings.length === 0 ? (
+                        {bookings.length === 0 && !hallClosed && !hallSpecificNotice && !hallGlobalNotice ? (
                           <Typography variant="body2" color="text.secondary">No bookings on this date</Typography>
                         ) : (
-                          bookings.map((b) => (
-                            <Box key={b._id || `${b.startDateTime}-${b.endDateTime}`} mb={1} sx={{ borderLeft: '3px solid #1976d2', pl: 1 }}>
-                              <Typography variant="subtitle2">{b.event || 'Booked'}</Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                {bookingRangeText(b.startDateTime, b.endDateTime)}
-                              </Typography>
-                              {bookingRequesterName(b) && (
-                                <Typography variant="caption" color="text.secondary">
-                                  Requested by: {bookingRequesterName(b)}
+                          <>
+                            {bookings.length > 0 && bookings.map((b) => (
+                              <Box key={b._id || `${b.startDateTime}-${b.endDateTime}`} mb={1} sx={{ borderLeft: '3px solid #1976d2', pl: 1 }}>
+                                <Typography variant="subtitle2">{b.event || 'Booked'}</Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {bookingRangeText(b.startDateTime, b.endDateTime)}
                                 </Typography>
-                              )}
-                            </Box>
-                          ))
+                                <Typography variant="caption" sx={{ color: '#1d4ed8', fontWeight: 800, letterSpacing: '0.05em' }}>
+                                  ADMIN APPROVED
+                                </Typography>
+                                {bookingRequesterName(b) && (
+                                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                    Requested by: {bookingRequesterName(b)}
+                                  </Typography>
+                                )}
+                              </Box>
+                            ))}
+
+                            {bookings.length === 0 && hallClosed && (
+                              <Typography variant="body2" sx={{ color: '#b91c1c', fontWeight: 700 }}>
+                                CLOSED for {hallDateNotices[0]?.holidayName || hallDateNotices[0]?.title || 'closure notice'}
+                              </Typography>
+                            )}
+
+                          </>
                         )}
                       </Box>
                     </Paper>
@@ -480,17 +839,53 @@ export default function Schedule() {
               }}>
                 <Typography variant="subtitle2">Room / Day</Typography>
               </Box>
-              {gridData.cols.map(col => (
-                <Box key={col.date} sx={{ borderRight: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)', p: 1, bgcolor: 'var(--bg-default)', textAlign: 'center' }}>
-                  <Typography variant="subtitle2" color="var(--text-primary)">{col.label}</Typography>
-                  <Typography variant="caption" color="text.secondary">{col.longLabel}</Typography>
-                </Box>
-              ))}
+              {gridData.cols.map(col => {
+                const dayNotices = noticesForDate(col.date);
+                const dayHasClosure = dayNotices.some((notice) => isClosureNotice(notice));
+                const dayHasGeneral = dayNotices.some((notice) => !isClosureNotice(notice));
+                const dayHasGlobalGeneral = dayNotices.some((notice) => isAllHallsGeneralNotice(notice));
+                return (
+                  <Box
+                    key={col.date}
+                    sx={{
+                      borderRight: '1px solid var(--border-color)',
+                      borderBottom: '1px solid var(--border-color)',
+                      p: 1,
+                      bgcolor: dayHasClosure
+                        ? 'rgba(185, 28, 28, 0.22)'
+                        : (dayHasGeneral || dayHasGlobalGeneral)
+                          ? 'rgba(30, 64, 175, 0.2)'
+                          : 'var(--bg-default)',
+                      textAlign: 'center'
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.6 }}>
+                      {dayNotices.length > 0 && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color={dayHasClosure ? 'error' : 'primary'}
+                          onClick={() => setNoticeDialog({ open: true, date: col.date, notices: dayNotices })}
+                          aria-label={`Open notices for ${col.longLabel}`}
+                          sx={{ minWidth: 'auto', px: 0.8, py: 0.2, fontWeight: 800, fontSize: '0.66rem', lineHeight: 1.1 }}
+                        >
+                          {dayHasClosure ? 'ALERT' : 'NOTICE'}
+                        </Button>
+                      )}
+                      <Box sx={{ textAlign: 'center' }}>
+                        <Typography variant="subtitle2" color="var(--text-primary)">{col.label}</Typography>
+                        <Typography variant="caption" color="text.secondary">{col.longLabel}</Typography>
+                      </Box>
+                    </Box>
+                  </Box>
+                );
+              })}
             </Box>
           </Box>
 
           <Box
             ref={bodyRef}
+            onScroll={onBodyHorizontalScroll}
             sx={{
               width: '100%',
               overflowX: 'auto',
@@ -523,6 +918,18 @@ export default function Schedule() {
                   {/* day cells */}
                   {gridData.cols.map(col => {
                     const bookings = gridData.map[row.id][col.date] || [];
+                    const dayNotices = noticesForDate(col.date);
+                    const dayHasGlobalGeneral = dayNotices.some((notice) => isAllHallsGeneralNotice(notice));
+                    const closures = closuresForHallDate(row.name, col.date);
+                    const generalNotices = hallSpecificGeneralNoticesForHallDate(row.name, col.date);
+                    const hallSpecificCellNotices = noticesForHallDate(row.name, col.date).filter((notice) => hasSpecificRoomTargets(notice));
+                    const showCellNoticeButton =
+                      bookings.length === 0 &&
+                      hallSpecificCellNotices.length > 0 &&
+                      hasMultipleHallSpecificNoticesForDate(col.date);
+                    const cellButtonIsAlert = hallSpecificCellNotices.some((notice) => isClosureNotice(notice));
+                    const cellClosed = closures.length > 0 && bookings.length === 0;
+                    const cellNotice = !cellClosed && generalNotices.length > 0 && bookings.length === 0;
                     return (
                       <Box key={row.id + col.date} sx={{
                         borderRight: '1px solid var(--border-color)',
@@ -530,42 +937,82 @@ export default function Schedule() {
                         p: 0,
                         minHeight: 70,
                         minWidth: isMobile ? 140 : 180,
-                        bgcolor: bookings.length ? 'var(--bg-default)' : 'var(--bg-paper)',
+                        bgcolor: cellClosed
+                          ? 'rgba(185, 28, 28, 0.2)'
+                          : (cellNotice || dayHasGlobalGeneral)
+                            ? 'rgba(30, 64, 175, 0.18)'
+                            : (bookings.length ? 'var(--bg-default)' : 'var(--bg-paper)'),
+                        position: 'relative',
                         display: 'flex',
                         flexDirection: 'column'
                       }}>
-                        {bookings.length === 0 ? (
-                          <Typography variant="body2" color="text.secondary">—</Typography>
+                        {showCellNoticeButton && (
+                          <Box sx={{ position: 'absolute', top: 4, right: 4, zIndex: 8 }}>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color={cellButtonIsAlert ? 'error' : 'primary'}
+                              onClick={() => setNoticeDialog({ open: true, date: col.date, notices: hallSpecificCellNotices })}
+                              sx={{ minWidth: 'auto', px: 0.75, py: 0.15, fontSize: '0.62rem', fontWeight: 800, lineHeight: 1.1 }}
+                            >
+                              {cellButtonIsAlert ? 'ALERT' : 'NOTICE'}
+                            </Button>
+                          </Box>
+                        )}
+                        {bookings.length === 0 && !cellClosed && !cellNotice ? (
+                          <Typography variant="body2" color="text.secondary">-</Typography>
                         ) : (
-                          bookings.map((b, idx) => {
-                            const color = colorFromString(b._id ? b._id.toString() : (b.event || b.startDateTime));
-                            return (
-                              <Box key={b._id || `${b.startDateTime}-${b.endDateTime}`} sx={{
-                                flex: 1,
-                                minHeight: 70 / Math.max(bookings.length, 1),
-                                p: '6px 8px',
-                                borderRadius: 0,
-                                bgcolor: `${color}33`,
-                                borderLeft: `4px solid ${color}`,
-                                color: 'var(--text-primary)',
-                                boxShadow: 'none',
-                                fontSize: 12,
-                                overflow: 'hidden',
-                                whiteSpace: 'nowrap',
-                                textOverflow: 'ellipsis',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                justifyContent: 'center',
-                                borderBottom: idx < bookings.length - 1 ? '1px solid var(--border-color)' : 'none'
-                              }}>
-                                <strong style={{ fontSize: 12 }}>{b.event || 'Booked'}</strong>
-                                {bookingRequesterName(b) && (
-                                  <div style={{ fontSize: 10, opacity: 0.95, fontWeight: 'bold' }}>{bookingRequesterName(b)}</div>
-                                )}
-                                <div style={{ fontSize: 11 }}>{formatTime(b.startDateTime)} — {formatTime(b.endDateTime)}</div>
+                          <>
+                            {bookings.map((b, idx) => {
+                              const color = colorFromString(b._id ? b._id.toString() : (b.event || b.startDateTime));
+                              return (
+                                <Box key={b._id || `${b.startDateTime}-${b.endDateTime}`} sx={{
+                                  flex: 1,
+                                  minHeight: 70 / Math.max(bookings.length, 1),
+                                  p: '6px 8px',
+                                  borderRadius: 0,
+                                  bgcolor: `${color}33`,
+                                  borderLeft: `4px solid ${color}`,
+                                  color: 'var(--text-primary)',
+                                  boxShadow: 'none',
+                                  fontSize: 12,
+                                  overflow: 'hidden',
+                                  whiteSpace: 'nowrap',
+                                  textOverflow: 'ellipsis',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  justifyContent: 'center',
+                                  borderBottom: idx < bookings.length - 1 ? '1px solid var(--border-color)' : 'none'
+                                }}>
+                                  <strong style={{ fontSize: 12 }}>{b.event || 'Booked'}</strong>
+                                  {bookingRequesterName(b) && (
+                                    <div style={{ fontSize: 10, opacity: 0.95, fontWeight: 'bold' }}>{bookingRequesterName(b)}</div>
+                                  )}
+                                  <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.05em', color: '#1d4ed8' }}>ADMIN APPROVED</div>
+                                  <div style={{ fontSize: 11 }}>{formatTime(b.startDateTime)} - {formatTime(b.endDateTime)}</div>
+                                </Box>
+                              );
+                            })}
+                            {bookings.length === 0 && cellClosed && (
+                              <Box
+                                sx={{
+                                  flex: 1,
+                                  minHeight: 70,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#991b1b',
+                                  fontWeight: 800,
+                                  letterSpacing: '0.04em'
+                                }}
+                              >
+                                CLOSED
                               </Box>
-                            );
-                          })
+                            )}
+                            {bookings.length === 0 && !cellClosed && cellNotice && (
+                              <Box sx={{ flex: 1, minHeight: 70 }} />
+                            )}
+                          </>
                         )}
                       </Box>
                     );
@@ -580,8 +1027,6 @@ export default function Schedule() {
       {/* --- TODAY VIEW (NEW) --- */}
       {viewMode === 'today' && (
         <Box sx={{ width: '100%' }}>
-          {/* Header showing Selected Date */}
-
           <Box
             ref={weekHeaderRef}
             sx={{
@@ -594,12 +1039,10 @@ export default function Schedule() {
               marginTop: '-2px'
             }}
           >
-            {/* Header Row: Room Label + Time Slots */}
             <Box sx={{
               display: 'flex',
               width: 'max-content'
             }}>
-              {/* Sticky Corner */}
               <Box sx={{
                 borderRight: '1px solid var(--border-color)',
                 borderBottom: '1px solid var(--border-color)',
@@ -617,7 +1060,6 @@ export default function Schedule() {
                 <Typography variant="subtitle2">Room / Time</Typography>
               </Box>
 
-              {/* Time Slot Headers */}
               {timeSlots.map((slot, index) => (
                 <Box key={index} sx={{
                   borderRight: '1px solid var(--border-color)',
@@ -632,10 +1074,141 @@ export default function Schedule() {
                 </Box>
               ))}
             </Box>
+
+            {selectedDateCommonStripNotice && (
+              <Box
+                sx={{ display: 'flex', width: '100%' }}
+              >
+                <Box
+                  sx={{
+                    borderRight: '1px solid var(--border-color)',
+                    borderBottom: '1px solid var(--border-color)',
+                    bgcolor: selectedDateCommonStripIsClosure ? '#e9c6c6' : '#d5e2ff',
+                    width: rowHeaderWidth,
+                    minWidth: rowHeaderWidth,
+                    p: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    position: 'sticky',
+                    left: 0,
+                    zIndex: 10
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.8 }}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={() => navigate(noticeDetailPath(selectedDateCommonStripNotice))}
+                      sx={{
+                        minWidth: 'auto',
+                        px: 1,
+                        fontSize: '0.68rem',
+                        lineHeight: 1.2,
+                        whiteSpace: 'nowrap',
+                        background: selectedDateCommonStripIsClosure
+                          ? 'linear-gradient(90deg, #991b1b 0%, #b91c1c 100%)'
+                          : 'linear-gradient(90deg, #1d4ed8 0%, #1e40af 100%)'
+                      }}
+                    >
+                      OPEN
+                    </Button>
+                    <Typography
+                      sx={{
+                        fontSize: '0.76rem',
+                        fontWeight: 800,
+                        letterSpacing: '0.08em',
+                        color: selectedDateCommonStripIsClosure ? '#991b1b' : '#1e3a8a'
+                      }}
+                    >
+                      {selectedDateStripLabel}
+                    </Typography>
+                    {selectedDateHasMultipleHallSpecificNotices && (
+                      <Button
+                        size="small"
+                        variant="text"
+                        onClick={() => setShowHallNoticeBreakdown((prev) => !prev)}
+                        sx={{ minWidth: 'auto', px: 0.6, fontWeight: 900 }}
+                      >
+                        {showHallNoticeBreakdown ? '▲' : '▼'}
+                      </Button>
+                    )}
+                  </Box>
+                </Box>
+                <Box
+                  ref={todayAlertContentRef}
+                  sx={{
+                    borderRight: '1px solid var(--border-color)',
+                    borderBottom: '1px solid var(--border-color)',
+                    flex: 1,
+                    minWidth: 0,
+                    px: 1.5,
+                    py: 0.8,
+                    bgcolor: selectedDateCommonStripIsClosure ? 'rgba(185, 28, 28, 0.14)' : 'rgba(30, 64, 175, 0.12)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.2
+                  }}
+                >
+                  <Box className="schedule-alert-marquee">
+                    {selectedDateCommonStripMarquee ? (
+                      <span className="schedule-alert-marquee-track">
+                        {selectedDateCommonStripText} | {selectedDateCommonStripText}
+                      </span>
+                    ) : (
+                      <Typography
+                        sx={{
+                          fontSize: '0.9rem',
+                          fontWeight: 700,
+                          color: selectedDateCommonStripIsClosure ? '#991b1b' : '#1e3a8a'
+                        }}
+                      >
+                        {selectedDateCommonStripText}
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+              </Box>
+            )}
+            {showHallNoticeBreakdown && selectedDateHasMultipleHallSpecificNotices && (
+              <Box sx={{ borderBottom: '1px solid var(--border-color)', background: 'var(--bg-paper)' }}>
+                {selectedDateHallSpecificNoticeGroups.map((group) => {
+                  const isAlert = isClosureNotice(group.notice);
+                  return (
+                    <Box
+                      key={`today-group-${group.key}`}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        px: 1.2,
+                        py: 0.6,
+                        borderTop: '1px dashed var(--border-color)'
+                      }}
+                    >
+                      <Typography sx={{ fontSize: '0.78rem', fontWeight: 800, color: isAlert ? '#991b1b' : '#1e3a8a', minWidth: rowHeaderWidth - 30 }}>
+                        {isAlert ? 'ALERT' : 'NOTICE'}: {getNoticeTitle(group.notice)}
+                      </Typography>
+                      <Typography sx={{ fontSize: '0.74rem', color: 'var(--text-secondary)', flex: 1 }}>
+                        Halls: {group.halls.join(', ') || 'Specific halls'}
+                      </Typography>
+                      <Button
+                        size="small"
+                        onClick={() => navigate(noticeDetailPath(group.notice))}
+                        sx={{ minWidth: 'auto', px: 0.8, fontSize: '0.66rem', fontWeight: 800 }}
+                      >
+                        OPEN
+                      </Button>
+                    </Box>
+                  );
+                })}
+              </Box>
+            )}
           </Box>
 
           <Box
             ref={bodyRef}
+            onScroll={onBodyHorizontalScroll}
             sx={{
               width: '100%',
               overflowX: 'auto',
@@ -644,90 +1217,158 @@ export default function Schedule() {
           >
             <Box>
               {todayRows.map(row => (
-                <Box key={row.id} sx={{
+                <Box key={row.id || row.name} sx={{
                   display: 'flex',
                   width: 'max-content',
-                  position: 'relative' // Needed for absolute positioning context if we wanted, but we put bookings inside the time track
+                  position: 'relative'
                 }}>
-                  {/* Left Sticky Room Cell */}
-                  <Box sx={{
-                    borderRight: '1px solid var(--border-color)',
-                    borderBottom: '1px solid var(--border-color)',
-                    p: 1,
-                    bgcolor: 'var(--bg-paper)',
-                    width: rowHeaderWidth,
-                    minWidth: rowHeaderWidth,
-                    position: 'sticky',
-                    left: 0,
-                    zIndex: 10,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center'
-                  }}>
-                    <Typography variant="subtitle2">{row.name}</Typography>
-                    <Typography variant="caption" color="text.secondary">{row.capacity} seats</Typography>
-                    <Chip label={row.status} size="small" sx={{ mt: 0.5, width: 'fit-content' }} color={row.status === 'Filled' ? 'error' : 'success'} />
-                  </Box>
+                  {(() => {
+                    const rowBookings = bookingsForDate(row);
+                    const rowClosures = closuresForHallDate(row.name, selectedDate);
+                    const rowGeneralNotices = hallSpecificGeneralNoticesForHallDate(row.name, selectedDate);
+                    const rowGlobalSlotNoticeAt = (slotIndex) => {
+                      const slotStartHour = START_HOUR + slotIndex;
+                      const slotEndHour = slotStartHour + 1;
+                      return selectedDateAllHallsGeneralNotices.some((notice) =>
+                        noticeOverlapsHourSlot(notice, selectedDate, slotStartHour, slotEndHour)
+                      );
+                    };
+                    const rowSpecificDayNotices = noticesForHallDate(row.name, selectedDate).filter((notice) => hasSpecificRoomTargets(notice));
+                    const showRowSpecificNoticeButton = selectedDateHasMultipleHallSpecificNotices && rowSpecificDayNotices.length > 0;
+                    const rowButtonIsAlert = rowSpecificDayNotices.some((notice) => isClosureNotice(notice));
+                    const rowClosed = rowClosures.length > 0 && rowBookings.length === 0;
+                    const rowAllHallsNotice = selectedDateAllHallsGeneralNotices.length > 0 && !rowClosed;
+                    const rowNotice = !rowClosed && rowGeneralNotices.length > 0 && rowBookings.length === 0;
 
-                  {/* The Timeline Track for this Hall */}
-                  <Box sx={{ position: 'relative', display: 'flex' }}>
-                    
-                    {/* Background Grid Cells (1 hour each) */}
-                    {timeSlots.map((slot, index) => (
-                      <Box key={index} sx={{
-                        borderRight: '1px solid var(--border-color)',
-                        borderBottom: '1px solid var(--border-color)',
-                        width: hourColumnWidth,
-                        minWidth: hourColumnWidth,
-                        minHeight: 80, 
-                        bgcolor: 'var(--bg-paper)'
-                      }} />
-                    ))}
-
-                    {/* Foreground Bookings */}
-                    {bookingsForDate(row).map(b => {
-                       const pos = getBookingPosition(b, selectedDate);
-                       if (!pos) return null; // Outside 8am-10pm range
-                       
-                       const baseColor = colorFromString(b._id ? b._id.toString() : (b.event || b.startDateTime));
-                       
-                       return (
-                         <Box 
-                           key={b._id || `${b.startDateTime}`}
-                           sx={{
-                             position: 'absolute',
-                             top: 0,
-                             bottom: 0,
-                             left: pos.left,
-                             width: pos.width,
-                             backgroundColor: `${baseColor}44`, // Low opacity background (hex + 44)
-                             borderLeft: `4px solid ${baseColor}`,
-                             borderRadius: 0,
-                             padding: '2px 6px',
-                             overflow: 'visible', // <--- FIXED: Changed from 'hidden' to 'visible'
-                             whiteSpace: 'nowrap',
-                             zIndex: 5,
-                             display: 'flex',
-                             flexDirection: 'column',
-                             justifyContent: 'center'
-                           }}
-                         >
-                            <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'var(--text-primary)', lineHeight: 1.2 }}>
-                              {formatTime(b.startDateTime)} - {formatTime(b.endDateTime)}
-                            </Typography>
-                            <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'var(--text-primary)', fontSize: '0.85rem' }}>
-                              {b.event || 'Booked'}
-                            </Typography>
-                            {bookingRequesterName(b) && (
-                              <Typography variant="caption" sx={{ color: 'var(--text-primary)', fontSize: '0.72rem', opacity: 0.95, fontWeight: 'bold'}}>
-                                {bookingRequesterName(b)}
-                              </Typography>
+                    return (
+                      <>
+                        <Box sx={{
+                          borderRight: '1px solid var(--border-color)',
+                          borderBottom: '1px solid var(--border-color)',
+                          p: 1,
+                          bgcolor: rowClosed
+                            ? '#e9c6c6'
+                            : (rowAllHallsNotice || rowNotice)
+                              ? '#d5e2ff'
+                              : 'var(--bg-paper)',
+                          width: rowHeaderWidth,
+                          minWidth: rowHeaderWidth,
+                          position: 'sticky',
+                          left: 0,
+                          zIndex: 10,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'center',
+                          boxShadow: '2px 0 0 0 var(--border-color)'
+                        }}>
+                          <Typography variant="subtitle2">{row.name}</Typography>
+                          <Typography variant="caption" color="text.secondary">{row.capacity} seats</Typography>
+                          <Box sx={{ mt: 0.5, display: 'flex', gap: 0.6, flexWrap: 'wrap' }}>
+                            <Chip
+                              label={row.status}
+                              size="small"
+                              color={row.status === 'Filled' ? 'error' : 'success'}
+                            />
+                            {rowClosed && <Chip label="CLOSED" size="small" color="error" variant="outlined" />}
+                            {showRowSpecificNoticeButton && (
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color={rowButtonIsAlert ? 'error' : 'primary'}
+                                onClick={() => setNoticeDialog({ open: true, date: selectedDate, notices: rowSpecificDayNotices })}
+                                sx={{ minWidth: 'auto', px: 0.8, fontSize: '0.62rem', fontWeight: 800, lineHeight: 1.1 }}
+                              >
+                                {rowButtonIsAlert ? 'ALERT' : 'NOTICE'}
+                              </Button>
                             )}
-                         </Box>
-                       );
-                    })}
+                          </Box>
+                        </Box>
 
-                  </Box>
+                        <Box sx={{ position: 'relative', display: 'flex' }}>
+                          {timeSlots.map((slot, index) => (
+                            <Box key={index} sx={{
+                              borderRight: '1px solid var(--border-color)',
+                              borderBottom: '1px solid var(--border-color)',
+                              width: hourColumnWidth,
+                              minWidth: hourColumnWidth,
+                              minHeight: 80,
+                              bgcolor: rowClosed
+                                ? 'rgba(185, 28, 28, 0.11)'
+                                : rowGlobalSlotNoticeAt(index)
+                                  ? 'rgba(30, 64, 175, 0.1)'
+                                : rowNotice
+                                  ? 'rgba(30, 64, 175, 0.1)'
+                                  : 'var(--bg-paper)'
+                            }} />
+                          ))}
+
+                          {rowBookings.map((booking) => {
+                            const pos = getBookingPosition(booking, selectedDate);
+                            if (!pos) return null;
+                            const baseColor = colorFromString(booking._id ? booking._id.toString() : (booking.event || booking.startDateTime));
+                            return (
+                              <Box
+                                key={booking._id || `${booking.startDateTime}`}
+                                sx={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  bottom: 0,
+                                  left: pos.left,
+                                  width: pos.width,
+                                  backgroundColor: `${baseColor}44`,
+                                  borderLeft: `4px solid ${baseColor}`,
+                                  borderRadius: 0,
+                                  padding: '2px 6px',
+                                  overflow: 'visible',
+                                  whiteSpace: 'nowrap',
+                                  zIndex: 6,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  justifyContent: 'center'
+                                }}
+                              >
+                                <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'var(--text-primary)', lineHeight: 1.2 }}>
+                                  {formatTime(booking.startDateTime)} - {formatTime(booking.endDateTime)}
+                                </Typography>
+                                <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'var(--text-primary)', fontSize: '0.85rem' }}>
+                                  {booking.event || 'Booked'}
+                                </Typography>
+                                {bookingRequesterName(booking) && (
+                                  <Typography variant="caption" sx={{ color: 'var(--text-primary)', fontSize: '0.72rem', opacity: 0.95, fontWeight: 'bold' }}>
+                                    {bookingRequesterName(booking)}
+                                  </Typography>
+                                )}
+                                <Typography variant="caption" sx={{ color: '#1d4ed8', fontSize: '0.66rem', fontWeight: 900, letterSpacing: '0.06em' }}>
+                                  ADMIN APPROVED
+                                </Typography>
+                              </Box>
+                            );
+                          })}
+
+                          {rowBookings.length === 0 && rowClosed && (
+                            <Box
+                              sx={{
+                                position: 'absolute',
+                                inset: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                zIndex: 5
+                              }}
+                            >
+                              <Typography sx={{ color: '#991b1b', fontWeight: 800, letterSpacing: '0.08em' }}>
+                                CLOSED
+                              </Typography>
+                            </Box>
+                          )}
+
+                          {rowBookings.length === 0 && !rowClosed && rowNotice && (
+                            <Box sx={{ position: 'absolute', inset: 0, zIndex: 5 }} />
+                          )}
+                        </Box>
+                      </>
+                    );
+                  })()}
                 </Box>
               ))}
               
@@ -742,6 +1383,73 @@ export default function Schedule() {
         </Box>
       )}
 
+      <Modal
+        open={Boolean(noticeDialog.open)}
+        onClose={() => setNoticeDialog({ open: false, date: '', notices: [] })}
+        aria-labelledby="schedule-day-notice-modal-title"
+        sx={{ zIndex: 2600, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2 }}
+      >
+        <Box className="schedule-notice-modal-shell">
+          <Box className="schedule-notice-modal-card">
+            <Typography id="schedule-day-notice-modal-title" variant="h6" sx={{ fontWeight: 700 }}>
+              Notices for {noticeDialog.date ? dayjs(noticeDialog.date).format('DD MMM YYYY') : 'selected day'}
+            </Typography>
+            <Box sx={{ mt: 1.5, display: 'grid', gap: 1.1 }}>
+              {noticeDialog.notices.length === 0 && (
+                <Typography variant="body2" color="text.secondary">No notices found.</Typography>
+              )}
+              {noticeDialog.notices.map((notice) => {
+                const closure = isClosureNotice(notice);
+                return (
+                  <Box
+                    key={notice._id || `${notice.title}-${notice.createdAt}`}
+                    sx={{
+                      border: closure ? '1px solid rgba(185, 28, 28, 0.34)' : '1px solid rgba(30, 64, 175, 0.3)',
+                      background: closure
+                        ? 'linear-gradient(180deg, rgba(185, 28, 28, 0.11), rgba(185, 28, 28, 0.04))'
+                        : 'linear-gradient(180deg, rgba(30, 64, 175, 0.1), rgba(30, 64, 175, 0.04))',
+                      borderRadius: 2,
+                      p: 1.25
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                      <Typography sx={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {getNoticeTitle(notice)}
+                      </Typography>
+                      <Chip
+                        label={closure ? 'CLOSURE' : 'UPDATE'}
+                        size="small"
+                        color={closure ? 'error' : 'primary'}
+                        variant="outlined"
+                      />
+                    </Box>
+                    <Typography sx={{ mt: 0.5, fontSize: '0.86rem', color: 'var(--text-secondary)' }}>
+                      {getNoticeSummary(notice) || 'Open this notice to read full details.'}
+                    </Typography>
+                    <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>
+                      <Button
+                        size="small"
+                        onClick={() => {
+                          setNoticeDialog({ open: false, date: '', notices: [] });
+                          navigate(noticeDetailPath(notice));
+                        }}
+                        endIcon={<OpenInNewIcon sx={{ fontSize: 15 }} />}
+                      >
+                        View Notice
+                      </Button>
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Box>
+          </Box>
+        </Box>
+      </Modal>
+
     </Container>
   );
 }
+
+
+
+

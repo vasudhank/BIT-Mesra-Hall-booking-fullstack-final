@@ -36,6 +36,16 @@ const bookingrequestSchema = new mongoose.Schema({
     default: 'PENDING'
   },
 
+  forceRequested: {
+    type: Boolean,
+    default: false
+  },
+
+  conflictDetails: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
+  },
+
   approvalToken: { type: String },
   tokenExpiry: { type: Date },
 

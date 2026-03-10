@@ -21,6 +21,10 @@ import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import TranslateRoundedIcon from "@mui/icons-material/TranslateRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
+import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
+import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
+import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 
 import {
   playElevenLabsSpeech,
@@ -31,6 +35,8 @@ const STORAGE_PREFIX = "bit_booking_ai_threads_v1";
 const MAX_THREADS = Number.POSITIVE_INFINITY;
 const MAX_MESSAGES_PER_THREAD = Number.POSITIVE_INFINITY;
 const MAX_INPUT_HEIGHT = 140;
+const MAX_ATTACHMENT_COUNT = 4;
+const MAX_ATTACHMENT_BYTES = 6 * 1024 * 1024;
 const WELCOME_HEADLINE = "How can I help you today?";
 const WELCOME_SUBTITLE = "Chat, ask in Hindi or English, or run booking actions.";
 
@@ -42,11 +48,13 @@ const LANGUAGE_OPTIONS = [
 
 const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
-const createMessage = (role, text) => ({
+const createMessage = (role, text, extra = {}) => ({
   id: createId(),
   role,
   text: String(text || ""),
-  createdAt: Date.now()
+  createdAt: Date.now(),
+  data: extra.data && typeof extra.data === "object" ? extra.data : null,
+  attachments: Array.isArray(extra.attachments) ? extra.attachments : []
 });
 
 const truncateText = (text, limit = 42) => {
@@ -78,7 +86,18 @@ const sanitizeStoredMessages = (rawMessages) => {
       id: msg.id || createId(),
       role: msg.role,
       text: String(msg.text || ""),
-      createdAt: Number(msg.createdAt) || Date.now()
+      createdAt: Number(msg.createdAt) || Date.now(),
+      data: msg.data && typeof msg.data === "object" ? msg.data : null,
+      attachments: Array.isArray(msg.attachments)
+        ? msg.attachments
+          .map((item) => ({
+            id: item.id || createId(),
+            name: String(item.name || "attachment"),
+            type: String(item.type || ""),
+            size: Number(item.size) || 0
+          }))
+          .slice(0, MAX_ATTACHMENT_COUNT)
+        : []
     }))
     .slice(-MAX_MESSAGES_PER_THREAD);
 };
@@ -206,6 +225,35 @@ const renderHighlightedText = (text, query) => {
   return nodes.length ? nodes : source;
 };
 
+const formatBytes = (bytes) => {
+  const size = Number(bytes) || 0;
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const downloadBase64Artifact = (artifact) => {
+  if (!artifact || !artifact.base64) return;
+  try {
+    const binary = window.atob(String(artifact.base64));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: artifact.mimeType || "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = artifact.name || "download";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    // Ignore download errors.
+  }
+};
+
 const SidebarCollapseArrowIcon = ({ direction = "right" }) => (
   <span
     className={`ai-sidebar-collapse-icon ${direction === "left" ? "left" : "right"}`.trim()}
@@ -261,11 +309,13 @@ export default function AIChatWidget({
   const [isChatsSectionOpen, setIsChatsSectionOpen] = useState(true);
   const [pendingSearchJump, setPendingSearchJump] = useState(null);
   const [searchHighlight, setSearchHighlight] = useState(null);
+  const [pendingAttachments, setPendingAttachments] = useState([]);
 
   const chatShellRef = useRef(null);
   const sidebarRef = useRef(null);
   const messagesEndRef = useRef(null);
   const inputFieldRef = useRef(null);
+  const fileInputRef = useRef(null);
   const recognitionRef = useRef(null);
   const isLiveModeRef = useRef(isLiveMode);
   const activeChatRequestRef = useRef(null);
@@ -856,23 +906,101 @@ export default function AIChatWidget({
     }
   };
 
+  const openAttachmentPicker = () => {
+    if (isLoading) return;
+    fileInputRef.current?.click();
+  };
+
+  const removePendingAttachment = (attachmentId) => {
+    setPendingAttachments((prev) => prev.filter((item) => item.id !== attachmentId));
+  };
+
+  const handleAttachmentInputChange = async (event) => {
+    const selectedFiles = Array.from(event.target.files || []);
+    if (selectedFiles.length === 0) return;
+
+    const availableSlots = Math.max(0, MAX_ATTACHMENT_COUNT - pendingAttachments.length);
+    if (availableSlots <= 0) {
+      event.target.value = "";
+      return;
+    }
+
+    const filesToRead = selectedFiles.slice(0, availableSlots);
+    const attachmentEntries = await Promise.all(
+      filesToRead.map(
+        (file) =>
+          new Promise((resolve) => {
+            if (!file || file.size > MAX_ATTACHMENT_BYTES) {
+              resolve(null);
+              return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = () => {
+              const dataUrl = String(reader.result || "");
+              if (!dataUrl) {
+                resolve(null);
+                return;
+              }
+
+              resolve({
+                id: createId(),
+                name: file.name || "attachment",
+                type: file.type || "application/octet-stream",
+                size: file.size || 0,
+                contentBase64: dataUrl
+              });
+            };
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(file);
+          })
+      )
+    );
+
+    const validEntries = attachmentEntries.filter(Boolean);
+    if (validEntries.length > 0) {
+      setPendingAttachments((prev) => [...prev, ...validEntries].slice(0, MAX_ATTACHMENT_COUNT));
+    }
+
+    event.target.value = "";
+  };
+
   const formatInfoPayload = (data) => {
     if (Array.isArray(data)) {
       const sorted = [...data].sort((a, b) => (a.status === "FREE" ? -1 : 1));
-      let text = "Hall Status Report\n\n";
-      text += sorted
-        .map((hall) => {
+      return {
+        kind: "TABLE",
+        title: "Hall Status Report",
+        summary: `Total halls: ${sorted.length}`,
+        columns: ["Hall", "Status", "Event"],
+        rows: sorted.map((hall) => {
           const normalized = String(hall.status || "").toUpperCase();
-          const detail = normalized === "FREE" || normalized === "AVAILABLE"
-            ? "Available"
-            : `Filled (${hall.currentEvent || "None"})`;
-          return `- ${hall.hall}: ${detail}`;
-        })
-        .join("\n");
-      return text;
+          const status = normalized === "FREE" || normalized === "AVAILABLE" ? "AVAILABLE" : "FILLED";
+          return [
+            hall.hall || "",
+            status,
+            status === "AVAILABLE" ? "-" : (hall.currentEvent || "None")
+          ];
+        }),
+        plainText: sorted
+          .map((hall) => {
+            const normalized = String(hall.status || "").toUpperCase();
+            const detail = normalized === "FREE" || normalized === "AVAILABLE"
+              ? "Available"
+              : `Filled (${hall.currentEvent || "None"})`;
+            return `- ${hall.hall}: ${detail}`;
+          })
+          .join("\n")
+      };
     }
 
-    if (!data || typeof data !== "object") return JSON.stringify(data);
+    if (!data || typeof data !== "object") {
+      return {
+        kind: "TEXT",
+        title: "AI Result",
+        plainText: JSON.stringify(data)
+      };
+    }
 
     if (data.kind === "HALL_STATUS") {
       const items = Array.isArray(data.items) ? data.items : [];
@@ -881,7 +1009,16 @@ export default function AIChatWidget({
       const hallLine = data.targetHall ? `Hall: ${data.targetHall}\n` : "";
       const header = `Hall Status${dateTitle}\n${modeLine}${hallLine}`.trim();
 
-      if (items.length === 0) return `${header}\n\nNo halls matched this query.`;
+      if (items.length === 0) {
+        return {
+          kind: "TABLE",
+          title: `Hall Status${dateTitle}`,
+          summary: `${modeLine}${hallLine}`.trim(),
+          columns: ["Hall", "Status", "Event"],
+          rows: [],
+          plainText: `${header}\n\nNo halls matched this query.`
+        };
+      }
 
       const lines = items.map((item) => {
         const isAvailable = String(item.status || "").toUpperCase() === "AVAILABLE";
@@ -889,7 +1026,21 @@ export default function AIChatWidget({
         return `- ${item.hall}: ${suffix}`;
       });
 
-      return `${header}\n\n${lines.join("\n")}`;
+      return {
+        kind: "TABLE",
+        title: `Hall Status${dateTitle}`,
+        summary: `${modeLine}${hallLine}`.trim(),
+        columns: ["Hall", "Status", "Event"],
+        rows: items.map((item) => {
+          const isAvailable = String(item.status || "").toUpperCase() === "AVAILABLE";
+          return [
+            item.hall || "",
+            isAvailable ? "AVAILABLE" : "FILLED",
+            isAvailable ? "-" : (item.currentEvent || "None")
+          ];
+        }),
+        plainText: `${header}\n\n${lines.join("\n")}`
+      };
     }
 
     if (data.kind === "BOOKING_REQUESTS") {
@@ -902,24 +1053,71 @@ export default function AIChatWidget({
       let text = `Pending Booking Requests${dateTitle}\n${filterLine}${hallLine}\n`;
       text += `Total: ${summary.total || 0}, Conflicting: ${summary.conflicting || 0}, Non-conflicting: ${summary.nonConflicting || 0}`;
 
-      if (items.length === 0) return `${text}\n\nNo requests matched this query.`;
+      if (items.length === 0) {
+        return {
+          kind: "TABLE",
+          title: `Pending Booking Requests${dateTitle}`,
+          summary: `${filterLine}${hallLine} | Total: ${summary.total || 0}, Conflicting: ${summary.conflicting || 0}, Non-conflicting: ${summary.nonConflicting || 0}`,
+          columns: ["Hall", "Date", "Time", "Event", "Requested By", "Conflict"],
+          rows: [],
+          plainText: `${text}\n\nNo requests matched this query.`
+        };
+      }
 
       const lines = items.map((item, idx) => {
         const label = item.conflict === "CONFLICTING" ? "CONFLICTING" : "NON-CONFLICTING";
         return `${idx + 1}. [${label}] ${item.hall} | ${item.date} ${item.start} - ${item.end}\n   Event: ${item.event}\n   By: ${item.requestedBy} (${item.requestedEmail})`;
       });
 
-      return `${text}\n\n${lines.join("\n")}`;
+      return {
+        kind: "TABLE",
+        title: `Pending Booking Requests${dateTitle}`,
+        summary: `${filterLine}${hallLine} | Total: ${summary.total || 0}, Conflicting: ${summary.conflicting || 0}, Non-conflicting: ${summary.nonConflicting || 0}`,
+        columns: ["Hall", "Date", "Time", "Event", "Requested By", "Conflict"],
+        rows: items.map((item) => [
+          item.hall || "",
+          item.date || "",
+          `${item.start || ""} - ${item.end || ""}`.trim(),
+          item.event || "",
+          `${item.requestedBy || ""} (${item.requestedEmail || ""})`.trim(),
+          item.conflict === "CONFLICTING" ? "CONFLICTING" : "NON-CONFLICTING"
+        ]),
+        plainText: `${text}\n\n${lines.join("\n")}`
+      };
     }
 
-    return JSON.stringify(data, null, 2);
+    if (data.kind === "SCHEDULE_EXPORT") {
+      const rows = Array.isArray(data.rows) ? data.rows : [];
+      const artifacts = Array.isArray(data.artifacts) ? data.artifacts : [];
+      return {
+        kind: "SCHEDULE_EXPORT",
+        title: `Schedule Export (${data.date || "Selected date"})`,
+        summary: `Requested format: ${data.formatRequested || "PDF"} | Rows: ${rows.length}`,
+        columns: Array.isArray(data.columns) && data.columns.length ? data.columns : ["Hall", "Status", "Event", "Department", "Time"],
+        rows: rows.map((row) => [
+          row.hall || "",
+          row.status || "",
+          row.event || "",
+          row.department || "",
+          row.timeRange || ""
+        ]),
+        artifacts,
+        plainText: `Prepared schedule export for ${data.date || "selected date"} with ${rows.length} row(s).`
+      };
+    }
+
+    return {
+      kind: "TEXT",
+      title: "AI Result",
+      plainText: JSON.stringify(data, null, 2)
+    };
   };
 
   const sendMessage = async (textOverride = null, options = {}) => {
     const rawText = textOverride == null ? input : textOverride;
     const textToSend = String(rawText || "").trim();
 
-    if (!textToSend || !activeThreadId || isLoading) return;
+    if ((!textToSend && pendingAttachments.length === 0) || !activeThreadId || isLoading) return;
 
     const replaceFromIndex = Number.isInteger(options.replaceFromIndex)
       ? Math.max(0, options.replaceFromIndex)
@@ -930,19 +1128,41 @@ export default function AIChatWidget({
       ? currentMessages
       : currentMessages.slice(0, replaceFromIndex);
 
-    const userMessage = createMessage("user", textToSend);
+    const requestAttachments = pendingAttachments.map((item) => ({
+      name: item.name,
+      type: item.type,
+      contentBase64: item.contentBase64
+    }));
+
+    const userAttachmentMeta = pendingAttachments.map((item) => ({
+      id: item.id,
+      name: item.name,
+      type: item.type,
+      size: item.size
+    }));
+
+    const composedUserText = textToSend || (userAttachmentMeta.length > 0
+      ? `Uploaded ${userAttachmentMeta.length} attachment(s).`
+      : "");
+
+    const userMessage = createMessage("user", composedUserText, {
+      attachments: userAttachmentMeta
+    });
 
     updateActiveThreadMessages(() => [...historyMessages, userMessage]);
     setInput("");
+    setPendingAttachments([]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
     setIsLoading(true);
     const requestController = new AbortController();
     activeChatRequestRef.current = requestController;
 
     try {
       const res = await api.post("/ai/chat", {
-        message: textToSend,
+        message: composedUserText,
         history: toServerHistory(historyMessages),
-        language: selectedLanguage
+        language: selectedLanguage,
+        attachments: requestAttachments
       }, { signal: requestController.signal });
 
       if (requestController.signal.aborted) return;
@@ -981,33 +1201,44 @@ export default function AIChatWidget({
         if (requestController.signal.aborted) return;
 
         let execResultText = "";
+        let execResultData = null;
+        let execSpeechText = "";
         if (exec.data.status === "DONE") {
           execResultText = `[SUCCESS] ${exec.data.message}`;
+          execSpeechText = execResultText;
         } else if (exec.data.status === "INFO") {
-          execResultText = formatInfoPayload(exec.data.data);
+          const infoPayload = formatInfoPayload(exec.data.data);
+          execResultText = infoPayload?.plainText || "Here is the generated result.";
+          execResultData = infoPayload;
+          execSpeechText = [infoPayload?.title, infoPayload?.summary].filter(Boolean).join(". ") || execResultText;
         } else if (exec.data.status === "ERROR") {
           execResultText = `[ERROR] ${exec.data.msg}`;
+          execSpeechText = execResultText;
         } else if (exec.data.status === "READY") {
           try {
             await api.post(exec.data.call, exec.data.payload, { signal: requestController.signal });
             if (requestController.signal.aborted) return;
             execResultText = "[SUCCESS] Booking request sent successfully.";
+            execSpeechText = execResultText;
           } catch (executionErr) {
             const executionCancelled = executionErr?.code === "ERR_CANCELED"
               || executionErr?.name === "CanceledError";
             if (executionCancelled) return;
             execResultText = `[ERROR] ${executionErr.response?.data?.msg || executionErr.message}`;
+            execSpeechText = execResultText;
           }
         }
 
         if (execResultText) {
           updateActiveThreadMessages((existingMessages) => [
             ...existingMessages,
-            createMessage("ai", execResultText)
+            createMessage("ai", execResultText, {
+              data: execResultData
+            })
           ]);
 
           if (isLiveModeRef.current) {
-            speak(execResultText);
+            speak(execSpeechText || execResultText);
           }
         }
       }
@@ -1069,6 +1300,78 @@ export default function AIChatWidget({
     }
 
     setAiSpeaking(false);
+  };
+
+  const renderAttachmentIcon = (mimeType) => {
+    const raw = String(mimeType || "").toLowerCase();
+    if (raw.startsWith("image/")) {
+      return <ImageRoundedIcon fontSize="inherit" />;
+    }
+    return <DescriptionRoundedIcon fontSize="inherit" />;
+  };
+
+  const renderStructuredData = (data) => {
+    if (!data || typeof data !== "object") return null;
+
+    const columns = Array.isArray(data.columns) ? data.columns : [];
+    const rows = Array.isArray(data.rows) ? data.rows : [];
+    const artifacts = Array.isArray(data.artifacts) ? data.artifacts : [];
+
+    if (data.kind === "TABLE" || data.kind === "SCHEDULE_EXPORT") {
+      return (
+        <div className="ai-structured-block">
+          {data.title && <div className="ai-structured-title">{data.title}</div>}
+          {data.summary && <div className="ai-structured-summary">{data.summary}</div>}
+
+          {columns.length > 0 && (
+            <div className="ai-table-wrap">
+              <table className="ai-table">
+                <thead>
+                  <tr>
+                    {columns.map((column, index) => (
+                      <th key={`${column}-${index}`}>{column}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={columns.length}>No rows.</td>
+                    </tr>
+                  ) : (
+                    rows.map((row, rowIndex) => (
+                      <tr key={`row-${rowIndex}`}>
+                        {(Array.isArray(row) ? row : []).map((cell, cellIndex) => (
+                          <td key={`cell-${rowIndex}-${cellIndex}`}>{String(cell || "")}</td>
+                        ))}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {artifacts.length > 0 && (
+            <div className="ai-artifact-list">
+              {artifacts.map((artifact, index) => (
+                <button
+                  key={`${artifact.name || artifact.type || "artifact"}-${index}`}
+                  type="button"
+                  className="ai-artifact-btn"
+                  onClick={() => downloadBase64Artifact(artifact)}
+                >
+                  <DownloadRoundedIcon fontSize="inherit" />
+                  <span>{artifact.name || artifact.type || "Download"}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return null;
   };
 
   useEffect(
@@ -1450,9 +1753,27 @@ export default function AIChatWidget({
                         rows={3}
                       />
                     ) : (
-                      <pre className="msg-text-pre">
-                        {isSearchHit ? renderHighlightedText(message.text, searchHighlight?.query) : message.text}
-                      </pre>
+                      <>
+                        {message.text ? (
+                          <pre className="msg-text-pre">
+                            {isSearchHit ? renderHighlightedText(message.text, searchHighlight?.query) : message.text}
+                          </pre>
+                        ) : null}
+
+                        {renderStructuredData(message.data)}
+
+                        {Array.isArray(message.attachments) && message.attachments.length > 0 && (
+                          <div className="msg-attachment-list">
+                            {message.attachments.map((attachment) => (
+                              <span key={attachment.id || attachment.name} className="msg-attachment-chip">
+                                <span className="msg-attachment-icon">{renderAttachmentIcon(attachment.type)}</span>
+                                <span className="msg-attachment-name">{attachment.name}</span>
+                                <span className="msg-attachment-size">{formatBytes(attachment.size)}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
 
@@ -1517,6 +1838,34 @@ export default function AIChatWidget({
         </div>
 
         <div className="gemini-input-wrapper">
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="ai-hidden-file-input"
+            onChange={handleAttachmentInputChange}
+            multiple
+          />
+
+          {pendingAttachments.length > 0 && (
+            <div className="pending-attachment-list">
+              {pendingAttachments.map((attachment) => (
+                <span key={attachment.id} className="pending-attachment-chip">
+                  <span className="pending-attachment-icon">{renderAttachmentIcon(attachment.type)}</span>
+                  <span className="pending-attachment-name">{attachment.name}</span>
+                  <span className="pending-attachment-size">{formatBytes(attachment.size)}</span>
+                  <button
+                    type="button"
+                    className="pending-attachment-remove"
+                    onClick={() => removePendingAttachment(attachment.id)}
+                    aria-label={`Remove ${attachment.name}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
           <div className={`gemini-input-pill ${isInputExpanded ? "expanded" : ""}`.trim()}>
             <textarea
               ref={inputFieldRef}
@@ -1539,6 +1888,17 @@ export default function AIChatWidget({
             />
 
             <div className="pill-actions">
+              <Tooltip title="Attach files or images">
+                <IconButton
+                  size="small"
+                  onClick={openAttachmentPicker}
+                  disabled={isLoading || pendingAttachments.length >= MAX_ATTACHMENT_COUNT}
+                  aria-label="Attach files or images"
+                >
+                  <AttachFileRoundedIcon />
+                </IconButton>
+              </Tooltip>
+
               {showInputLiveButton && (
                 <Tooltip title={isLiveMode ? "End live chat" : "Start live chat"}>
                   <IconButton
@@ -1562,7 +1922,7 @@ export default function AIChatWidget({
                 </IconButton>
               </Tooltip>
 
-              {(isLoading || input.trim()) && (
+              {(isLoading || input.trim() || pendingAttachments.length > 0) && (
                 <Tooltip title={isLoading ? "Stop generating" : "Send"}>
                   <IconButton
                     size="small"

@@ -170,6 +170,12 @@ export default function Appbar({
               <MenuItem onClick={() => { handleCloseUserMenu(); navigate('/admin/contacts'); }} sx={{ color: 'black' }}>
                 <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>CONTACTS</Typography>
               </MenuItem>
+              <MenuItem onClick={() => { handleCloseUserMenu(); navigate('/admin/notices'); }} sx={{ color: 'black' }}>
+                <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>POST NOTICE</Typography>
+              </MenuItem>
+              <MenuItem onClick={() => { handleCloseUserMenu(); navigate('/calendar'); }} sx={{ color: 'black' }}>
+                <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>CALENDER</Typography>
+              </MenuItem>
               <MenuItem onClick={() => { handleCloseUserMenu(); navigate('/admin/complaints'); }} sx={{ color: 'black' }}>
                 <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>COMPLAINTS</Typography>
               </MenuItem>
@@ -296,6 +302,12 @@ export default function Appbar({
                   </MenuItem>
                   <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/admin/contacts'); }}>
                     <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>CONTACTS</Typography>
+                  </MenuItem>
+                  <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/admin/notices'); }}>
+                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>POST NOTICE</Typography>
+                  </MenuItem>
+                  <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/calendar'); }}>
+                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>CALENDER</Typography>
                   </MenuItem>
                   <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/admin/complaints'); }}>
                     <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>COMPLAINTS</Typography>

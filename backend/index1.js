@@ -9,6 +9,7 @@ const Admin = require('./models/admin');
 const Department = require('./models/department');
 const Developer = require('./models/developer');
 const Department_Requests = require('./models/department_requests');
+const Contact = require('./models/Contact');
 
 const passport = require('./config/passport');
 
@@ -355,13 +356,26 @@ const ACCOUNT_ROLE_MAP = {
 
 const getAccountRoleConfig = (roleParam) => ACCOUNT_ROLE_MAP[String(roleParam || '').toLowerCase()] || null;
 
-const getAccountDisplayName = (cfg, account) => {
+const getAccountDisplayName = (cfg, account, fallbackName = '') => {
+  if (cfg?.roleName === 'department') {
+    return String(
+      account?.head ||
+      account?.name ||
+      fallbackName ||
+      account?.department ||
+      cfg?.defaultName ||
+      ''
+    ).trim();
+  }
+
   const primaryField = cfg?.nameField || 'name';
-  return String(account?.[primaryField] || account?.name || cfg?.defaultName || '').trim();
+  return String(account?.[primaryField] || account?.name || fallbackName || cfg?.defaultName || '').trim();
 };
 
-const toAccountPayload = (cfg, account) => ({
-  name: getAccountDisplayName(cfg, account),
+const toAccountPayload = (cfg, account, fallbackName = '') => ({
+  name: getAccountDisplayName(cfg, account, fallbackName),
+  head: String(account?.head || '').trim(),
+  department: String(account?.department || '').trim(),
   email: account?.email || '',
   phone: account?.phone || '',
   type: account?.type || cfg?.defaultName || ''
@@ -377,7 +391,17 @@ router.get('/account/:role', async (req, res) => {
 
     const account = await cfg.model.findById(req.user.id);
     if (!account) return res.status(404).json({ error: 'Account not found' });
-    res.json({ account: toAccountPayload(cfg, account) });
+
+    let fallbackName = '';
+    if (cfg.roleName === 'department' && account.email) {
+      const contact = await Contact.findOne({ email: account.email })
+        .sort({ createdAt: -1 })
+        .select('name')
+        .lean();
+      fallbackName = String(contact?.name || '').trim();
+    }
+
+    res.json({ account: toAccountPayload(cfg, account, fallbackName) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -547,4 +571,6 @@ router.use('/complaints', require('./routes/complaints'));
 router.use('/queries', require('./routes/queries'));
 router.use('/feedback', require('./routes/feedback'));
 router.use('/faq', require('./routes/faq'));
+router.use('/notices', require('./routes/notices'));
+router.use('/calendar', require('./routes/calendar'));
 module.exports = router;

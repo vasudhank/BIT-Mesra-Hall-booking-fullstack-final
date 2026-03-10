@@ -1,0 +1,464 @@
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500&display=swap');
+
+.trash-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  font-family: 'Roboto', Helvetica, Arial, sans-serif;
+  color: #3c4043;
+}
+
+.trash-header {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid #dadce0;
+  box-sizing: border-box;
+}
+
+.trash-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.trash-header-left h2 {
+  font-family: 'Google Sans', sans-serif;
+  font-size: 22px;
+  font-weight: 400;
+  margin: 0;
+}
+
+.trash-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.trash-search-form {
+  height: 40px;
+  min-width: 320px;
+  border: 1px solid #dadce0;
+  border-radius: 24px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  padding: 0 4px 0 12px;
+  box-sizing: border-box;
+}
+
+.trash-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #202124;
+  font-size: 14px;
+  box-shadow: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.trash-search-input::placeholder {
+  color: #80868b;
+}
+
+.trash-search-input:focus,
+.trash-search-input:focus-visible {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.trash-search-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #5f6368;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.trash-search-btn:hover {
+  background: #f1f3f4;
+}
+
+.trash-search-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.trash-sort-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #dadce0;
+  border-radius: 22px;
+  padding: 0 10px;
+  height: 40px;
+  background: #fff;
+}
+
+.trash-sort-label {
+  font-size: 12px;
+  color: #5f6368;
+  font-weight: 500;
+}
+
+.trash-sort-select {
+  border: none;
+  background: transparent;
+  outline: none;
+  color: #202124;
+  font-size: 13px;
+  font-weight: 500;
+  min-width: 190px;
+  cursor: pointer;
+}
+
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #5f6368;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.icon-btn:hover {
+  background: #f1f3f4;
+  color: #5f6368;
+}
+
+.icon-btn svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #000;
+  cursor: pointer;
+}
+
+.trash-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.trash-sidebar {
+  width: 256px;
+  padding: 24px 0;
+}
+
+.sidebar-title {
+  font-size: 14px;
+  font-weight: 500;
+  padding: 0 24px;
+  margin: 0 0 16px 0;
+}
+
+.calendar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.calendar-list li {
+  display: flex;
+  align-items: center;
+  padding: 8px 24px;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 0 24px 24px 0;
+  margin-right: 16px;
+}
+
+.calendar-list li:hover {
+  background: #f1f3f4;
+}
+
+.calendar-list li.active {
+  background: #e8f0fe;
+  color: #1a73e8;
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 12px;
+}
+
+.dot.blue { background-color: #1a73e8; }
+.dot.yellow { background-color: #fbbc04; }
+
+.trash-main {
+  flex: 1;
+  padding: 24px;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.empty-trash-message {
+  font-size: 14px;
+  color: #3c4043;
+  margin-bottom: 12px;
+}
+
+.trash-error {
+  color: #b3261e;
+}
+
+.trash-info {
+  color: #137333;
+}
+
+.trash-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.trash-item {
+  border: 1px solid #dadce0;
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: #fff;
+}
+
+.trash-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.trash-item-head-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.trash-item-head h3 {
+  margin: 0;
+  font-family: 'Google Sans', sans-serif;
+  font-size: 17px;
+  font-weight: 500;
+  color: #202124;
+}
+
+.trash-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 4px 10px;
+}
+
+.trash-badge.general {
+  background: rgba(26, 115, 232, 0.1);
+  color: #1967d2;
+}
+
+.trash-badge.holiday {
+  background: rgba(217, 48, 37, 0.12);
+  color: #b3261e;
+}
+
+.trash-item p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #3c4043;
+}
+
+.trash-item-meta {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  color: #5f6368;
+  font-size: 12px;
+}
+
+.trash-item-actions-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.trash-restore-btn {
+  border: 1px solid #1a73e8;
+  border-radius: 999px;
+  background: #e8f0fe;
+  color: #1a73e8;
+  font-family: 'Google Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.trash-restore-btn:hover {
+  background: #1a73e8;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.25);
+}
+
+.trash-restore-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.trash-delete-btn {
+  border: 1px solid #d93025;
+  border-radius: 999px;
+  background: rgba(217, 48, 37, 0.1);
+  color: #b3261e;
+  font-family: 'Google Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.trash-delete-btn:hover {
+  background: #d93025;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(217, 48, 37, 0.28);
+}
+
+.trash-delete-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Theme sync with Calendar page */
+.trash-page.theme-dark {
+  background: #202124;
+  color: #e8eaed;
+}
+
+.trash-page.theme-dark .trash-header {
+  background: #202124;
+  border-bottom-color: #5f6368;
+}
+
+.trash-page.theme-dark .trash-header-left h2 {
+  color: #e8eaed;
+}
+
+.trash-page.theme-dark .icon-btn {
+  color: #e8eaed;
+}
+
+.trash-page.theme-dark .icon-btn:hover {
+  background: #3c4043;
+  color: #e8eaed;
+}
+
+.trash-page.theme-dark .trash-search-form,
+.trash-page.theme-dark .trash-sort-wrap {
+  background: #2a2b2f;
+  border-color: #5f6368;
+}
+
+.trash-page.theme-dark .trash-search-input,
+.trash-page.theme-dark .trash-sort-select {
+  color: #e8eaed;
+}
+
+.trash-page.theme-dark .trash-search-input::placeholder,
+.trash-page.theme-dark .trash-sort-label {
+  color: #9aa0a6;
+}
+
+.trash-page.theme-dark .trash-search-btn {
+  color: #9aa0a6;
+}
+
+.trash-page.theme-dark .trash-search-btn:hover {
+  background: #3c4043;
+  color: #e8eaed;
+}
+
+.trash-page.theme-dark .empty-trash-message {
+  color: #e8eaed;
+}
+
+.trash-page.theme-dark .trash-error {
+  color: #f28b82;
+}
+
+.trash-page.theme-dark .trash-info {
+  color: #81c995;
+}
+
+.trash-page.theme-dark .trash-item {
+  background: #202124;
+  border-color: #5f6368;
+}
+
+.trash-page.theme-dark .trash-item-head h3,
+.trash-page.theme-dark .trash-item p {
+  color: #e8eaed;
+}
+
+.trash-page.theme-dark .trash-item-meta {
+  color: #9aa0a6;
+}
+
+.trash-page.theme-dark .trash-restore-btn {
+  background: #303134;
+  color: #8ab4f8;
+  border-color: #8ab4f8;
+}
+
+.trash-page.theme-dark .trash-restore-btn:hover {
+  background: #8ab4f8;
+  color: #202124;
+  box-shadow: 0 2px 8px rgba(138, 180, 248, 0.3);
+}
+
+.trash-page.theme-dark .trash-delete-btn {
+  background: rgba(242, 139, 130, 0.12);
+  color: #f28b82;
+  border-color: #f28b82;
+}
+
+.trash-page.theme-dark .trash-delete-btn:hover {
+  background: #f28b82;
+  color: #202124;
+  box-shadow: 0 2px 8px rgba(242, 139, 130, 0.28);
+}

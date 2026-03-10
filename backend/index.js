@@ -14,6 +14,7 @@ const passport = require('./config/passport');
 const Developer = require('./models/developer');
 const { startFaqAutoPromotion } = require('./services/faqAutoPromotionService');
 const { startBookingCleanupSchedule } = require('./services/bookingCleanupService');
+const { startNoticeMailSync } = require('./services/noticeMailSyncService');
 
 const PORT = process.env.PORT || 8000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -22,7 +23,7 @@ console.log('ENV:', NODE_ENV);
 console.log('EMAIL:', process.env.EMAIL ? 'SET' : 'NOT SET');
 console.log('MONGO_URI:', process.env.MONGO_URI ? 'SET' : 'NOT SET');
 
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 app.use(
@@ -95,6 +96,7 @@ const server = app.listen(PORT, () => {
   }
   startFaqAutoPromotion();
   startBookingCleanupSchedule();
+  startNoticeMailSync();
 });
 
 server.on('error', (err) => {

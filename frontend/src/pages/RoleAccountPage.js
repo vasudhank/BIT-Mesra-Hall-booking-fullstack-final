@@ -62,7 +62,8 @@ export default function RoleAccountPage({ role = 'admin', backPath = '/', title 
       const res = await getAccount(role);
       const acc = res?.account || {};
       setAccount(acc);
-      setProfile({ name: acc.name || '', phone: acc.phone || '' });
+      const resolvedName = String(acc.head || acc.name || '').trim();
+      setProfile({ name: resolvedName, phone: acc.phone || '' });
     } catch (err) {
       alert(err?.response?.data?.error || 'Failed to load account');
     } finally {

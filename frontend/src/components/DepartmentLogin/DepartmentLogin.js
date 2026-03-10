@@ -85,21 +85,21 @@ export default function DepartmentLogin() {
     try {
       const response = await departmentLoginApi({ email: normalizedEmail, password: loginPassword });
 
-      if (!response?.data?.error) {
-        lastAutoFailedKeyRef.current = '';
-        dispatch(addStatus("Department"))
-        navigate("/department/booking")
-        return true;
-      } else {
+      if (!response || response.error || response.data?.error) {
         lastAutoFailedKeyRef.current = attemptKey;
-        if (showError) setOpen(true)
-        if (clearPasswordOnFail) setPassword('')
+        if (showError) setOpen(true);
+        if (clearPasswordOnFail) setPassword('');
         return false;
       }
+
+      lastAutoFailedKeyRef.current = '';
+      dispatch(addStatus("Department"));
+      navigate("/department/booking");
+      return true;
     } catch (_) {
       lastAutoFailedKeyRef.current = attemptKey;
-      if (showError) setOpen(true)
-      if (clearPasswordOnFail) setPassword('')
+      if (showError) setOpen(true);
+      if (clearPasswordOnFail) setPassword('');
       return false;
     } finally {
       loginInFlightRef.current = false;

@@ -3,6 +3,7 @@ const router = express.Router();
 
 const Booking_Requests = require('../models/booking_requests');
 const Hall = require('../models/hall');
+const Department = require('../models/department');
 const { safeExecute } = require('../utils/safeNotify');
 require('dotenv').config();
 
@@ -18,12 +19,38 @@ const {
   sendDecisionToDepartment
 } = require('../services/emailService');
 const { runBookingCleanup } = require('../services/bookingCleanupService');
+const { getNoticeConflictsForRange } = require('../services/noticeService');
 
 const { generateApprovalToken, getTokenExpiry } = require('../utils/token');
 
 const isTimeOverlap = (startA, endA, startB, endB) =>
   new Date(startA).getTime() < new Date(endB).getTime() &&
   new Date(endA).getTime() > new Date(startB).getTime();
+
+const serializeBookingConflicts = async (bookings) => {
+  const deptIds = Array.from(
+    new Set(
+      (bookings || [])
+        .map((b) => (b.department ? String(b.department) : ''))
+        .filter(Boolean)
+    )
+  );
+  const departments = deptIds.length
+    ? await Department.find({ _id: { $in: deptIds } }).select('head department email').lean()
+    : [];
+  const deptMap = new Map(departments.map((d) => [String(d._id), d]));
+
+  return (bookings || []).map((booking) => {
+    const dept = booking.department ? deptMap.get(String(booking.department)) : null;
+    return {
+      bookingRequestId: booking.bookingRequest || null,
+      event: booking.event || 'Booked',
+      startDateTime: booking.startDateTime,
+      endDateTime: booking.endDateTime,
+      requestedBy: dept?.head || dept?.department || dept?.email || ''
+    };
+  });
+};
 
 const buildHallBooking = (requestDoc, departmentId) => ({
   bookingRequest: requestDoc._id,
@@ -96,7 +123,8 @@ router.post('/create_booking', async (req, res) => {
       startTime24,
       endTime24,
       startDateTime,
-      endDateTime
+      endDateTime,
+      force
     } = req.body;
 
     if (!hall || !event || !startDateTime || !endDateTime) {
@@ -125,7 +153,31 @@ router.post('/create_booking', async (req, res) => {
     const conflictBookings = (hallDoc.bookings || []).filter((booking) =>
       isTimeOverlap(startDT, endDT, booking.startDateTime, booking.endDateTime)
     );
-    const hasConflict = conflictBookings.length > 0;
+
+    const noticeConflicts = await getNoticeConflictsForRange({
+      hallName: hallDoc.name,
+      startDateTime: startDT,
+      endDateTime: endDT
+    });
+
+    const hasBookingConflict = conflictBookings.length > 0;
+    const hasNoticeConflict = noticeConflicts.length > 0;
+    const hasConflict = hasBookingConflict || hasNoticeConflict;
+    const serializedBookingConflicts = hasBookingConflict
+      ? await serializeBookingConflicts(conflictBookings)
+      : [];
+
+    if (hasConflict && !Boolean(force)) {
+      return res.status(409).json({
+        canForce: true,
+        message: 'This hall has a scheduling conflict for the selected time range.',
+        conflicts: {
+          hall: hallDoc.name,
+          bookings: serializedBookingConflicts,
+          notices: noticeConflicts
+        }
+      });
+    }
 
     const approvalToken = generateApprovalToken();
     const tokenExpiry = getTokenExpiry(15);
@@ -145,7 +197,14 @@ router.post('/create_booking', async (req, res) => {
       endDate,
       approvalToken,
       tokenExpiry,
-      status: hasConflict ? 'PENDING' : 'AUTO_BOOKED'
+      status: hasConflict ? 'PENDING' : 'AUTO_BOOKED',
+      forceRequested: Boolean(force && hasConflict),
+      conflictDetails: hasConflict
+        ? {
+            bookings: serializedBookingConflicts,
+            notices: noticeConflicts
+          }
+        : {}
     });
 
     const saved = await newRequest.save();
@@ -230,7 +289,7 @@ router.post('/create_booking', async (req, res) => {
     );
 
     return res.status(201).json({
-      message: 'Time conflict found. Booking request sent to admin for accept/reject.',
+      message: 'Conflict found (existing booking and/or closure notice). Booking request sent to admin for accept/reject.',
       bookingRequest: saved
     });
   } catch (err) {

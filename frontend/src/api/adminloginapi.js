@@ -8,13 +8,11 @@ export const adminloginApi = async (inputData) => {
     const response = await api.post('/admin_login', inputData);
     return response;
   } catch (error) {
-    if (error.response) {
-      console.error(error.response.data);
-      throw error.response;
-    } else {
-      console.error('Network or server error:', error.message);
-      throw error;
-    }
+    return {
+      error: true,
+      status: error?.response?.status || 0,
+      data: error?.response?.data || { error: 'Network or server error' }
+    };
   }
 };
 
