@@ -147,6 +147,8 @@
 .department-register-home-wrap {
   display: flex;
   justify-content: flex-start;
+  align-items: center;
+  gap: 10px;
   margin-top: 14px;
 }
 
@@ -165,6 +167,24 @@
 .department-register-home-btn:hover {
   background: rgba(30, 41, 59, 0.7) !important;
   border-color: rgba(56, 189, 248, 0.45) !important;
+}
+
+.department-register-menu-btn {
+  min-height: 40px !important;
+}
+
+.department-register-menu-panel {
+  border-color: rgba(255, 255, 255, 0.24) !important;
+  background: rgba(15, 23, 42, 0.95) !important;
+  color: #e2e8f0 !important;
+}
+
+.department-register-menu-item {
+  color: #e2e8f0 !important;
+}
+
+.department-register-menu-item:hover {
+  background: rgba(56, 189, 248, 0.18) !important;
 }
 
 @media only screen and (max-width: 768px) {

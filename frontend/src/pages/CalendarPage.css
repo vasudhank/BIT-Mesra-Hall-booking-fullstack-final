@@ -457,6 +457,33 @@
   font-weight: 700;
 }
 
+.gcal-user-menu-quick-btn {
+  justify-content: flex-start;
+  gap: 8px;
+  border: 1px solid #dadce0;
+}
+
+.gcal-user-menu-quick-btn:hover {
+  border-color: #aecbfa;
+}
+
+.gcal-user-menu-quick-panel {
+  border: 1px solid #dadce0 !important;
+  background: #ffffff !important;
+  color: #3c4043 !important;
+  box-shadow: none !important;
+  margin-top: 6px !important;
+}
+
+.gcal-user-menu-quick-item {
+  font-family: 'Google Sans', sans-serif;
+  color: #3c4043 !important;
+}
+
+.gcal-user-menu-quick-item:hover {
+  background: #f1f3f4 !important;
+}
+
 /* --- LAYOUT --- */
 .gcal-layout {
   display: flex;
@@ -4428,6 +4455,23 @@ al-search-result-date span,
 }
 .theme-dark .gcal-user-menu-item:hover {
   background: #3c4043;
+}
+.theme-dark .gcal-user-menu-quick-btn {
+  border-color: #5f6368;
+}
+.theme-dark .gcal-user-menu-quick-btn:hover {
+  border-color: #8ab4f8;
+}
+.theme-dark .gcal-user-menu-quick-panel {
+  background: #202124 !important;
+  border-color: #5f6368 !important;
+  color: #e8eaed !important;
+}
+.theme-dark .gcal-user-menu-quick-item {
+  color: #e8eaed !important;
+}
+.theme-dark .gcal-user-menu-quick-item:hover {
+  background: #3c4043 !important;
 }
 .theme-dark .gcal-user-menu-item.logout {
   color: #f28b82;

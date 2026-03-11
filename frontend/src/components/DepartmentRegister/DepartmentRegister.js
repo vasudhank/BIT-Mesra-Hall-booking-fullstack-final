@@ -20,6 +20,7 @@ import Snackbar from '@mui/material/Snackbar';
 import CircularProgress from '@mui/material/CircularProgress';
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
 import { useNavigate } from 'react-router-dom';
+import QuickPageMenu from '../Navigation/QuickPageMenu';
 
 export default function DepartmentRegister() {
   const navigate = useNavigate();
@@ -217,6 +218,14 @@ export default function DepartmentRegister() {
               >
                 Home
               </Button>
+              <QuickPageMenu
+                buttonLabel="Menu"
+                buttonClassName="department-register-home-btn department-register-menu-btn"
+                panelClassName="department-register-menu-panel"
+                itemClassName="department-register-menu-item"
+                excludeKeys={['faculty']}
+                align="left"
+              />
             </div>
           </Grid>
         </Grid>

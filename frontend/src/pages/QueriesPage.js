@@ -9,6 +9,7 @@ import {
   postQueryQuickSolution,
   updateQueryStatus
 } from '../api/queriesApi';
+import QuickPageMenu from '../components/Navigation/QuickPageMenu';
 import './ComplaintsPage.css';
 import './QueriesPage.css';
 
@@ -56,8 +57,8 @@ export default function QueriesPage({ mode = 'public' }) {
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 960px)').matches : false
   );
-  const [isComposerCompact, setIsComposerCompact] = useState(false);
   const [isHeaderStripCollapsed, setIsHeaderStripCollapsed] = useState(false);
+  const [isComposeModalOpen, setIsComposeModalOpen] = useState(false);
 
   const [form, setForm] = useState({
     email: '',
@@ -141,34 +142,10 @@ export default function QueriesPage({ mode = 'public' }) {
   }, [isMobile]);
 
   useEffect(() => {
-    if (hideComposer || !isMobile || !isComposerCompact) {
+    if (hideComposer || !isMobile) {
       setIsHeaderStripCollapsed(false);
     }
-  }, [hideComposer, isMobile, isComposerCompact]);
-
-  useEffect(() => {
-    if (hideComposer || !isMobile || !composeCardRef.current) {
-      setIsComposerCompact(false);
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsComposerCompact(entry.intersectionRatio < 0.2);
-      },
-      {
-        threshold: [0, 0.2, 0.5, 1],
-        rootMargin: '-64px 0px 0px 0px'
-      }
-    );
-
-    observer.observe(composeCardRef.current);
-    return () => observer.disconnect();
   }, [hideComposer, isMobile]);
-
-  const scrollToComposerCard = () => {
-    composeCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -210,13 +187,13 @@ export default function QueriesPage({ mode = 'public' }) {
     }
   };
 
-  const showMobileCompactControls = !hideComposer && isMobile && isComposerCompact;
+  const showMobileCompactControls = !hideComposer && isMobile;
   const isStripCollapsedOnMobile = showMobileCompactControls && isHeaderStripCollapsed;
 
   return (
     <div className="support-page queries-page">
       <div className={`support-layout ${hideComposer ? 'support-layout--no-left' : ''}`}>
-        {!hideComposer && (
+        {!hideComposer && !isMobile && (
           <aside className="support-left-panel">
             <div className="support-sort-box">
               <label>SORT QUERIES</label>
@@ -266,10 +243,20 @@ export default function QueriesPage({ mode = 'public' }) {
               </button>
             </form>
 
-            <Link className="support-home-btn" to="/">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-              Back to Home
-            </Link>
+            <div className="support-home-menu-row">
+              <Link className="support-home-btn" to="/">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                Back to Home
+              </Link>
+              <QuickPageMenu
+                buttonLabel="Menu"
+                buttonClassName="support-home-btn support-menu-btn"
+                panelClassName="support-menu-panel"
+                itemClassName="support-menu-item"
+                align="left"
+                preferLeftWhenTight
+              />
+            </div>
           </aside>
         )}
 
@@ -285,37 +272,46 @@ export default function QueriesPage({ mode = 'public' }) {
                     <Link to="/developer/queries" className="dev-action-btn">Queries</Link>
                     <Link to="/developer/feedback" className="dev-action-btn">Feedback</Link>
                     <button className="dev-action-btn" onClick={logoutDeveloper}>Logout</button>
+                    <QuickPageMenu
+                      buttonLabel="Menu"
+                      buttonClassName="dev-action-btn support-dev-menu-btn"
+                      panelClassName="support-dev-menu-panel"
+                      itemClassName="support-dev-menu-item"
+                      excludeKeys={['complaints', 'queries', 'feedback']}
+                      align="left"
+                      preferLeftWhenTight
+                    />
                   </div>
                 )}
                 <div className="support-top-grid">
-                  <div className={`support-top-left ${showMobileCompactControls ? 'mobile-controls-visible' : ''}`}>
-                    {(hideComposer || showMobileCompactControls) && (
-                      <div className={`support-inline-mobile-tools ${showMobileCompactControls ? 'visible' : ''}`}>
-                        <div className="support-sort-box inline">
-                          <label>SORT QUERIES</label>
-                          <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                            {SORT_OPTIONS.map((opt) => (
-                              <option key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        {showMobileCompactControls && (
-                          <button type="button" className="support-inline-compose-btn" onClick={scrollToComposerCard}>
-                            Ask a Query
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <div className={`support-top-left ${showMobileCompactControls ? 'mobile-controls-visible' : ''}`} />
                   <div className={`support-top-center ${showMobileCompactControls ? 'compact-mode' : ''}`}>
                     <div className="support-title-row">
                       <h1>Queries</h1>
                       {showMobileCompactControls && (
-                        <Link className="support-header-home-btn" to="/">
-                          Home
-                        </Link>
+                        <div className="support-title-mobile-tools">
+                          <div className="support-sort-box inline support-mobile-title-sort">
+                            <label>SORT QUERIES</label>
+                            <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                              {SORT_OPTIONS.map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <QuickPageMenu
+                            iconOnly
+                            buttonClassName="support-header-home-btn support-header-menu-btn"
+                            panelClassName="support-menu-panel"
+                            itemClassName="support-menu-item"
+                            align="right"
+                            extraItems={[
+                              { key: 'mobile-home', label: 'Home', path: '/' },
+                              { key: 'mobile-compose-query', label: 'Ask a Query', onClick: () => setIsComposeModalOpen(true) }
+                            ]}
+                          />
+                        </div>
                       )}
                     </div>
                     <p>Ask project-specific questions, get AI/community help, and mark accepted answers.</p>
@@ -465,6 +461,52 @@ export default function QueriesPage({ mode = 'public' }) {
           </div>
         </section>
       </div>
+
+      {showMobileCompactControls && isComposeModalOpen && (
+        <div className="support-mobile-compose-backdrop" onClick={() => setIsComposeModalOpen(false)}>
+          <form className="support-raise-card support-mobile-compose-card" onSubmit={onSubmit} onClick={(e) => e.stopPropagation()}>
+            <h2>Ask a Query</h2>
+            <p>Your email helps trusted responders follow up accurately.</p>
+            <label className="support-input-label">
+              <span>Your Email *</span>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                placeholder="name@example.com"
+                required
+              />
+            </label>
+            <label className="support-input-label">
+              <span>Query Title *</span>
+              <input
+                type="text"
+                value={form.title}
+                onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+                placeholder="What is your question?"
+                required
+              />
+            </label>
+            <label className="support-input-label">
+              <span>Describe your question *</span>
+              <textarea
+                value={form.message}
+                onChange={(e) => setForm((prev) => ({ ...prev, message: e.target.value }))}
+                placeholder="Elaborate on your question here..."
+                required
+              />
+            </label>
+            <div className="support-mobile-compose-actions">
+              <button type="button" className="support-secondary-btn" onClick={() => setIsComposeModalOpen(false)}>
+                Cancel
+              </button>
+              <button className="support-primary-btn" type="submit" disabled={submitting}>
+                {submitting ? 'Submitting...' : 'Submit Query'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

@@ -24,6 +24,7 @@ import { createNoticeApi, deleteNoticeApi, getNoticeByIdApi, updateNoticeApi } f
 import api from '../api/axiosInstance';
 import { removeStatus } from '../store/slices/userSlice';
 import { fuzzyFilterAndRank } from '../utils/fuzzySearch';
+import QuickPageMenu from '../components/Navigation/QuickPageMenu';
 import './CalendarPage.css';
 
 const WEEK_DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -6685,12 +6686,31 @@ export default function CalendarPage() {
               <button type="button" className="gcal-user-menu-item" onClick={() => { closeUserMenu(); navigate('/'); }}>HOME</button>
               <button type="button" className="gcal-user-menu-item" onClick={goProfileDashboard}>PROFILE</button>
               <button type="button" className="gcal-user-menu-item logout" onClick={logoutCurrentUser}>LOGOUT</button>
+              <QuickPageMenu
+                buttonLabel="MENU"
+                buttonClassName="gcal-user-menu-item gcal-user-menu-quick-btn"
+                panelClassName="gcal-user-menu-quick-panel"
+                itemClassName="gcal-user-menu-quick-item"
+                inlinePanel
+                align="left"
+                closeParentMenu={closeUserMenu}
+              />
             </>
           ) : (
             <>
               <button type="button" className="gcal-user-menu-item" onClick={() => { closeUserMenu(); navigate('/department_login'); }}>FACULTY LOGIN</button>
               <button type="button" className="gcal-user-menu-item" onClick={() => { closeUserMenu(); navigate('/admin_login'); }}>ADMIN LOGIN</button>
               <button type="button" className="gcal-user-menu-item" onClick={() => { closeUserMenu(); navigate('/'); }}>HOME</button>
+              <QuickPageMenu
+                buttonLabel="MENU"
+                buttonClassName="gcal-user-menu-item gcal-user-menu-quick-btn"
+                panelClassName="gcal-user-menu-quick-panel"
+                itemClassName="gcal-user-menu-quick-item"
+                inlinePanel
+                align="left"
+                excludeKeys={['admin', 'faculty']}
+                closeParentMenu={closeUserMenu}
+              />
             </>
           )}
         </div>

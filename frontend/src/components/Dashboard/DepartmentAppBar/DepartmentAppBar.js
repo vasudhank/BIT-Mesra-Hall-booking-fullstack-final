@@ -13,10 +13,19 @@ import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import InputAdornment from '@mui/material/InputAdornment';
 import SearchIcon from '@mui/icons-material/Search';
-import { Link, useNavigate } from "react-router-dom";
+import Divider from '@mui/material/Divider';
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import api from '../../../api/axiosInstance';
 import { removeStatus } from "../../../store/slices/userSlice";
+import QuickPageMenu from '../../Navigation/QuickPageMenu';
+import {
+  THEME_SYNC_EVENT,
+  applyThemeToBody,
+  readGlobalThemeMode,
+  resolveEffectiveThemeMode,
+  setPageThemeMode
+} from '../../../utils/themeModeScope';
 
 export default function DepartmentAppBar({
   showSearch = false,
@@ -30,10 +39,14 @@ export default function DepartmentAppBar({
 }) {
 
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch();
 
   const [anchorElUser, setAnchorElUser] = React.useState(null);
   const [dateTime, setDateTime] = React.useState("");
+  const [effectiveMode, setEffectiveMode] = React.useState(() =>
+    resolveEffectiveThemeMode(location.pathname, readGlobalThemeMode())
+  );
 
   const logout = async () => {
     try {
@@ -61,6 +74,33 @@ export default function DepartmentAppBar({
     const i = setInterval(updateTime, 1000);
     return () => clearInterval(i);
   }, []);
+
+  const syncEffectiveMode = React.useCallback(() => {
+    setEffectiveMode(resolveEffectiveThemeMode(location.pathname, readGlobalThemeMode()));
+  }, [location.pathname]);
+
+  React.useEffect(() => {
+    syncEffectiveMode();
+  }, [syncEffectiveMode]);
+
+  React.useEffect(() => {
+    const handleThemeSync = () => {
+      syncEffectiveMode();
+    };
+    window.addEventListener(THEME_SYNC_EVENT, handleThemeSync);
+    return () => {
+      window.removeEventListener(THEME_SYNC_EVENT, handleThemeSync);
+    };
+  }, [syncEffectiveMode]);
+
+  const togglePageTheme = () => {
+    const nextMode = effectiveMode === 'dark' ? 'light' : 'dark';
+    setPageThemeMode(location.pathname, nextMode);
+    applyThemeToBody(nextMode);
+    setEffectiveMode(nextMode);
+  };
+  const themeActionLabel = effectiveMode === 'dark' ? 'LIGHT' : 'DARK';
+  const themeShortcutLabel = effectiveMode === 'dark' ? 'Ctrl+L' : 'Ctrl+D';
 
   return (
     <AppBar position="fixed" className="appbar">
@@ -255,26 +295,35 @@ export default function DepartmentAppBar({
                  <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}> ACCOUNTS </Typography> 
                </Link> 
             </MenuItem>
-            <MenuItem onClick={() => { setAnchorElUser(null); navigate('/department/complaints'); }}>
-              <Typography className="dropdown-text">COMPLAINTS</Typography>
-            </MenuItem>
-            <MenuItem onClick={() => { setAnchorElUser(null); navigate('/department/queries'); }}>
-              <Typography className="dropdown-text">QUERIES</Typography>
-            </MenuItem>
-            <MenuItem onClick={() => { setAnchorElUser(null); navigate('/department/feedback'); }}>
-              <Typography className="dropdown-text">FEEDBACK</Typography>
-            </MenuItem>
-            <MenuItem onClick={() => { setAnchorElUser(null); navigate('/notices'); }}>
-              <Typography className="dropdown-text">NOTICES</Typography>
-            </MenuItem>
-            <MenuItem onClick={() => { setAnchorElUser(null); navigate('/calendar'); }}>
-              <Typography className="dropdown-text">CALENDER</Typography>
-            </MenuItem>
             <MenuItem onClick={() => setAnchorElUser(null)}>
               <Typography className="dropdown-text" 
   style={{ color: "red", fontWeight: "bold" }} onClick={logout}>
                 LOGOUT
               </Typography>
+            </MenuItem>
+            <MenuItem disableRipple sx={{ px: 1.25, py: 0.8 }}>
+              <QuickPageMenu
+                buttonLabel="MENU"
+                buttonClassName="appbar-user-menu-btn"
+                panelClassName="appbar-user-submenu-panel"
+                itemClassName="appbar-user-submenu-item"
+                align="left"
+                includeKeys={['schedule', 'ai', 'notices', 'calendar', 'complaints', 'queries', 'feedback']}
+                matchParentMenuWidth
+                panelOffsetX={-10}
+                closeParentMenu={() => setAnchorElUser(null)}
+              />
+            </MenuItem>
+            <Divider sx={{ my: 0.3 }} />
+            <MenuItem onClick={togglePageTheme} sx={{ color: 'black' }}>
+              <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.2 }}>
+                <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>
+                  {themeActionLabel}
+                </Typography>
+                <Typography sx={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.02em' }}>
+                  {themeShortcutLabel}
+                </Typography>
+              </Box>
             </MenuItem>
           </Menu>
 

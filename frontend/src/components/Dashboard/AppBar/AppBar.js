@@ -20,6 +20,14 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import api from '../../../api/axiosInstance';
 import { useDispatch } from "react-redux";
 import { removeStatus } from "../../../store/slices/userSlice";
+import QuickPageMenu from '../../Navigation/QuickPageMenu';
+import {
+  THEME_SYNC_EVENT,
+  applyThemeToBody,
+  readGlobalThemeMode,
+  resolveEffectiveThemeMode,
+  setPageThemeMode
+} from '../../../utils/themeModeScope';
 
 const pages = [
   ['Dashboard', '/admin/hall'],
@@ -39,12 +47,14 @@ export default function Appbar({
 }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  // eslint-disable-next-line no-unused-vars
   const location = useLocation();
 
   const [anchorElNav, setAnchorElNav] = React.useState(null);
   const [anchorElUser, setAnchorElUser] = React.useState(null);
   const [dateTime, setDateTime] = React.useState("");
+  const [effectiveMode, setEffectiveMode] = React.useState(() =>
+    resolveEffectiveThemeMode(location.pathname, readGlobalThemeMode())
+  );
 
   const searchInputSx = {
     '& .MuiOutlinedInput-root': {
@@ -92,10 +102,36 @@ export default function Appbar({
     return () => clearInterval(i);
   }, []);
 
+  const syncEffectiveMode = React.useCallback(() => {
+    setEffectiveMode(resolveEffectiveThemeMode(location.pathname, readGlobalThemeMode()));
+  }, [location.pathname]);
+
+  React.useEffect(() => {
+    syncEffectiveMode();
+  }, [syncEffectiveMode]);
+
+  React.useEffect(() => {
+    const handleThemeSync = () => {
+      syncEffectiveMode();
+    };
+    window.addEventListener(THEME_SYNC_EVENT, handleThemeSync);
+    return () => {
+      window.removeEventListener(THEME_SYNC_EVENT, handleThemeSync);
+    };
+  }, [syncEffectiveMode]);
+
   const handleOpenNavMenu = (event) => { setAnchorElNav(event.currentTarget); };
   const handleOpenUserMenu = (event) => { setAnchorElUser(event.currentTarget); };
   const handleCloseNavMenu = () => { setAnchorElNav(null); };
   const handleCloseUserMenu = () => { setAnchorElUser(null); };
+  const togglePageTheme = () => {
+    const nextMode = effectiveMode === 'dark' ? 'light' : 'dark';
+    setPageThemeMode(location.pathname, nextMode);
+    applyThemeToBody(nextMode);
+    setEffectiveMode(nextMode);
+  };
+  const themeActionLabel = effectiveMode === 'dark' ? 'LIGHT' : 'DARK';
+  const themeShortcutLabel = effectiveMode === 'dark' ? 'Ctrl+L' : 'Ctrl+D';
 
   return (
     <AppBar position="fixed" className="appbar">
@@ -167,29 +203,35 @@ export default function Appbar({
               onClose={handleCloseUserMenu}
             >
               <MenuItem onClick={handleCloseUserMenu} sx={{ color: 'black' }}><Link to="/"><Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>HOME</Typography></Link></MenuItem>
-              <MenuItem onClick={() => { handleCloseUserMenu(); navigate('/admin/contacts'); }} sx={{ color: 'black' }}>
-                <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>CONTACTS</Typography>
-              </MenuItem>
-              <MenuItem onClick={() => { handleCloseUserMenu(); navigate('/admin/notices'); }} sx={{ color: 'black' }}>
-                <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>POST NOTICE</Typography>
-              </MenuItem>
-              <MenuItem onClick={() => { handleCloseUserMenu(); navigate('/calendar'); }} sx={{ color: 'black' }}>
-                <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>CALENDER</Typography>
-              </MenuItem>
-              <MenuItem onClick={() => { handleCloseUserMenu(); navigate('/admin/complaints'); }} sx={{ color: 'black' }}>
-                <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>COMPLAINTS</Typography>
-              </MenuItem>
-              <MenuItem onClick={() => { handleCloseUserMenu(); navigate('/admin/queries'); }} sx={{ color: 'black' }}>
-                <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>QUERIES</Typography>
-              </MenuItem>
-              <MenuItem onClick={() => { handleCloseUserMenu(); navigate('/admin/feedback'); }} sx={{ color: 'black' }}>
-                <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>FEEDBACK</Typography>
-              </MenuItem>
               <MenuItem onClick={() => { handleCloseUserMenu(); navigate('/admin/account'); }} sx={{ color: 'black' }}>
                 <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>ACCOUNTS</Typography>
               </MenuItem>
               <MenuItem onClick={handleCloseUserMenu} sx={{ color: 'black' }}><Typography textAlign="center" className="dropdown-text" onClick={logout} 
   style={{ color: "red", fontWeight: "bold" }} sx={{ color: 'black' }}>LOGOUT</Typography></MenuItem>
+              <MenuItem disableRipple sx={{ px: 1.25, py: 0.8 }}>
+                <QuickPageMenu
+                  buttonLabel="MENU"
+                  buttonClassName="appbar-user-menu-btn"
+                  panelClassName="appbar-user-submenu-panel"
+                  itemClassName="appbar-user-submenu-item"
+                  align="left"
+                  includeKeys={['schedule', 'ai', 'contacts', 'notices', 'calendar', 'complaints', 'queries', 'feedback']}
+                  matchParentMenuWidth
+                  panelOffsetX={-10}
+                  closeParentMenu={handleCloseUserMenu}
+                />
+              </MenuItem>
+              <Divider sx={{ my: 0.3 }} />
+              <MenuItem onClick={togglePageTheme} sx={{ color: 'black' }}>
+                <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.2 }}>
+                  <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>
+                    {themeActionLabel}
+                  </Typography>
+                  <Typography sx={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.02em' }}>
+                    {themeShortcutLabel}
+                  </Typography>
+                </Box>
+              </MenuItem>
             </Menu>
           </Box>
 

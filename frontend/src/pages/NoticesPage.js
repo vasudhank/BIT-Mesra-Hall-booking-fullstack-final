@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import { createNoticeApi, deleteNoticeApi, getNoticesApi, updateNoticeApi } from '../api/noticesApi';
 import api from '../api/axiosInstance';
 import HallMultiSelectDropdown from '../components/Notices/HallMultiSelectDropdown';
+import QuickPageMenu from '../components/Navigation/QuickPageMenu';
 import { fuzzyFilterAndRank } from '../utils/fuzzySearch';
 import './NoticesPage.css';
 
@@ -143,6 +144,13 @@ export default function NoticesPage({ mode = 'public' }) {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, notice: null });
   const [deleteSaving, setDeleteSaving] = useState(false);
   const [actionMessage, setActionMessage] = useState({ type: '', text: '' });
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 960px)').matches : false
+  );
+  const [isMobileHeaderCollapsed, setIsMobileHeaderCollapsed] = useState(false);
+  const [isMobileComposeOpen, setIsMobileComposeOpen] = useState(false);
+  const mobileSearchInputHeight = 40;
+  const mobileFontControlWidth = 132;
 
   useEffect(() => {
     saveReadingPrefs(reading);
@@ -201,6 +209,26 @@ export default function NoticesPage({ mode = 'public' }) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isComposerMaximized]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mediaQuery = window.matchMedia('(max-width: 960px)');
+    const onChange = (event) => setIsMobile(event.matches);
+    setIsMobile(mediaQuery.matches);
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', onChange);
+      return () => mediaQuery.removeEventListener('change', onChange);
+    }
+    mediaQuery.addListener(onChange);
+    return () => mediaQuery.removeListener(onChange);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setIsMobileHeaderCollapsed(false);
+      setIsMobileComposeOpen(false);
+    }
+  }, [isMobile]);
 
   const onSearchSubmit = (e) => {
     e?.preventDefault?.();
@@ -372,13 +400,114 @@ export default function NoticesPage({ mode = 'public' }) {
 
   // Dynamic CSS custom property mapping
   const themeClasses = `notices-theme-root reader-theme-${reading.theme} reader-font-${reading.font}`;
+  const showMobileNoticesControls = isMobile;
+  const noticesMenuPanelClass = `notices-hero-menu-panel notices-menu-theme-${reading.theme}`;
+  const mobileHeaderExtraMenuItems = [
+    { key: 'mobile-home', label: 'Home', path: '/' },
+    ...(allowAdminComposer ? [{ key: 'mobile-compose', label: 'Compose', onClick: () => setIsMobileComposeOpen(true) }] : []),
+    { key: 'mobile-trash', label: 'Trash', path: '/trash' }
+  ];
+
+  const renderComposerCard = ({ mobilePopup = false } = {}) => (
+    <section
+      className={`notice-composer-card ${isComposerMaximized && !mobilePopup ? 'maximized' : ''} ${mobilePopup ? 'mobile-compose-popup-card' : ''}`}
+      onClick={mobilePopup ? (event) => event.stopPropagation() : undefined}
+    >
+      <div className="composer-card-header">
+        <h2><Icons.Pen /> Compose Update</h2>
+        {!mobilePopup ? (
+          <button type="button" className="btn-icon" onClick={() => setIsComposerMaximized(!isComposerMaximized)} title={isComposerMaximized ? "Minimize" : "Maximize"}>
+            {isComposerMaximized ? <Icons.Minimize /> : <Icons.Maximize />}
+          </button>
+        ) : (
+          <button type="button" className="btn-icon" onClick={() => setIsMobileComposeOpen(false)} title="Close compose popup">
+            <Icons.Close />
+          </button>
+        )}
+      </div>
+
+      <form onSubmit={submitNotice} className={`notice-composer-grid ${mobilePopup ? 'mobile-compose-grid' : ''}`}>
+        <div className="input-group">
+          <label>Title</label>
+          <input className="premium-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Enter brief subject" maxLength={240} />
+        </div>
+        
+        <div className="input-group" style={{ flex: !mobilePopup && isComposerMaximized ? '1' : 'none' }}>
+          <label>Full Content</label>
+          <textarea className="premium-input" style={{ height: !mobilePopup && isComposerMaximized ? '100%' : '120px' }} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Type the detailed announcement..." />
+        </div>
+        
+        <div className={!mobilePopup && isComposerMaximized ? "composer-row-2" : ""}>
+          <div className="input-group">
+            <label>Classification</label>
+            <select className="premium-input" value={manualKind} onChange={(e) => setManualKind(e.target.value)}>
+              <option value="AUTO">Auto Detect Context</option>
+              <option value="GENERAL">General Notice</option>
+              <option value="HOLIDAY">Holiday / Closure</option>
+            </select>
+          </div>
+
+          <div className="input-group">
+            <label>Holiday Event Name (Optional)</label>
+            <input className="premium-input" value={holidayName} onChange={(e) => setHolidayName(e.target.value)} placeholder="e.g., Diwali Break" maxLength={120} />
+          </div>
+        </div>
+
+        <div className={!mobilePopup && isComposerMaximized ? "composer-row-2" : ""}>
+          <div className="input-group">
+            <label>Start Timeline</label>
+            <input className="premium-input" type="datetime-local" value={startDateTime} onChange={(e) => setStartDateTime(e.target.value)} />
+          </div>
+
+          <div className="input-group">
+            <label>End Timeline</label>
+            <input className="premium-input" type="datetime-local" value={endDateTime} onChange={(e) => setEndDateTime(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="input-group">
+          <label>Affected Rooms (Comma Separated)</label>
+          <HallMultiSelectDropdown
+            halls={halls}
+            selectedHalls={selectedComposeHalls}
+            onChange={setSelectedComposeHalls}
+            disabled={closureAllHalls}
+            startDateTime={startDateTime}
+            endDateTime={endDateTime}
+            fieldHeight={35}
+            fieldPlaceholderOffsetY={5}
+            fieldInputOffsetY={2}
+            hallRowNameOffsetY={-1}
+          />
+        </div>
+
+        <label className="notice-checkbox-label">
+          <input
+            type="checkbox"
+            checked={closureAllHalls}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              setClosureAllHalls(checked);
+              if (checked) setSelectedComposeHalls([]);
+            }}
+          />
+          Campus-wide closure applies
+        </label>
+
+        <button type="submit" className="btn-primary" disabled={posting}>
+          {posting ? 'Publishing securely...' : 'Publish to Board'}
+        </button>
+        {postMessage && <p className="notice-post-message" style={{textAlign:'center', fontSize:'0.9rem', color:'var(--notice-accent)'}}>{postMessage}</p>}
+      </form>
+    </section>
+  );
 
   return (
     <div className={themeClasses} style={{ '--font-base': `${reading.textSize}px` }}>
       <div className={allowAdminComposer ? "notices-layout-grid" : "notices-layout-center"}>
         
         {/* LEFT SIDEBAR */}
-        {allowAdminComposer && (
+        {allowAdminComposer && !isMobile && (
           <aside className={`notices-sidebar ${isComposerMaximized ? 'sidebar-maximized' : ''}`}>
             <header className="notices-hero notices-hero-sidebar">
               <h1>Notice Board</h1>
@@ -389,6 +518,14 @@ export default function NoticesPage({ mode = 'public' }) {
                   <Icons.Trash />
                   <span>Trash</span>
                 </Link>
+                <QuickPageMenu
+                  buttonLabel="Menu"
+                  buttonClassName="notices-hero-menu-btn"
+                  panelClassName={noticesMenuPanelClass}
+                  itemClassName="notices-hero-menu-item"
+                  hideThemeToggle
+                  align="right"
+                />
               </div>
             </header>
 
@@ -396,88 +533,7 @@ export default function NoticesPage({ mode = 'public' }) {
               <div className="composer-backdrop" onClick={() => setIsComposerMaximized(false)} />
             )}
 
-            <section className={`notice-composer-card ${isComposerMaximized ? 'maximized' : ''}`}>
-              <div className="composer-card-header">
-                <h2><Icons.Pen /> Compose Update</h2>
-                <button type="button" className="btn-icon" onClick={() => setIsComposerMaximized(!isComposerMaximized)} title={isComposerMaximized ? "Minimize" : "Maximize"}>
-                  {isComposerMaximized ? <Icons.Minimize /> : <Icons.Maximize />}
-                </button>
-              </div>
-
-              <form onSubmit={submitNotice} className="notice-composer-grid">
-                <div className="input-group">
-                  <label>Title</label>
-                  <input className="premium-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Enter brief subject" maxLength={240} />
-                </div>
-                
-                <div className="input-group" style={{ flex: isComposerMaximized ? '1' : 'none' }}>
-                  <label>Full Content</label>
-                  <textarea className="premium-input" style={{ height: isComposerMaximized ? '100%' : '120px' }} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Type the detailed announcement..." />
-                </div>
-                
-                <div className={isComposerMaximized ? "composer-row-2" : ""}>
-                  <div className="input-group">
-                    <label>Classification</label>
-                    <select className="premium-input" value={manualKind} onChange={(e) => setManualKind(e.target.value)}>
-                      <option value="AUTO">Auto Detect Context</option>
-                      <option value="GENERAL">General Notice</option>
-                      <option value="HOLIDAY">Holiday / Closure</option>
-                    </select>
-                  </div>
-
-                  <div className="input-group">
-                    <label>Holiday Event Name (Optional)</label>
-                    <input className="premium-input" value={holidayName} onChange={(e) => setHolidayName(e.target.value)} placeholder="e.g., Diwali Break" maxLength={120} />
-                  </div>
-                </div>
-
-                <div className={isComposerMaximized ? "composer-row-2" : ""}>
-                  <div className="input-group">
-                    <label>Start Timeline</label>
-                    <input className="premium-input" type="datetime-local" value={startDateTime} onChange={(e) => setStartDateTime(e.target.value)} />
-                  </div>
-
-                  <div className="input-group">
-                    <label>End Timeline</label>
-                    <input className="premium-input" type="datetime-local" value={endDateTime} onChange={(e) => setEndDateTime(e.target.value)} />
-                  </div>
-                </div>
-
-                <div className="input-group">
-                  <label>Affected Rooms (Comma Separated)</label>
-                  <HallMultiSelectDropdown
-                    halls={halls}
-                    selectedHalls={selectedComposeHalls}
-                    onChange={setSelectedComposeHalls}
-                    disabled={closureAllHalls}
-                    startDateTime={startDateTime}
-                    endDateTime={endDateTime}
-                    fieldHeight={35}
-                    fieldPlaceholderOffsetY={5}
-                    fieldInputOffsetY={2}
-                    hallRowNameOffsetY={-1}
-                  />
-                </div>
-
-                <label className="notice-checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={closureAllHalls}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setClosureAllHalls(checked);
-                      if (checked) setSelectedComposeHalls([]);
-                    }}
-                  />
-                  Campus-wide closure applies
-                </label>
-
-                <button type="submit" className="btn-primary" disabled={posting}>
-                  {posting ? 'Publishing securely...' : 'Publish to Board'}
-                </button>
-                {postMessage && <p className="notice-post-message" style={{textAlign:'center', fontSize:'0.9rem', color:'var(--notice-accent)'}}>{postMessage}</p>}
-              </form>
-            </section>
+            {renderComposerCard()}
           </aside>
         )}
 
@@ -494,69 +550,181 @@ export default function NoticesPage({ mode = 'public' }) {
                   <Icons.Trash />
                   <span>Trash</span>
                 </Link>
+                <QuickPageMenu
+                  buttonLabel="Menu"
+                  buttonClassName="notices-hero-menu-btn"
+                  panelClassName={noticesMenuPanelClass}
+                  itemClassName="notices-hero-menu-item"
+                  hideThemeToggle
+                  align="right"
+                />
               </div>
             </header>
           )}
 
-          <section className="notices-sticky-strip">
-            <form onSubmit={onSearchSubmit} className="strip-search-row">
-              <div className="search-wrapper">
-                <Icons.Search />
-                <input
-                  className="premium-input"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search keywords, events, or rooms..."
-                />
-              </div>
-              <button type="submit" className="btn-primary" style={{padding: '12px 20px'}}>Search</button>
-              <select className="premium-input" style={{width: 'auto'}} value={sort} onChange={(e) => setSort(e.target.value)}>
-                <option value="LATEST">Latest First</option>
-                <option value="OLDEST">Oldest First</option>
-                <option value="HOLIDAY_FIRST">Holidays First</option>
-              </select>
-              <select className="premium-input" style={{width: 'auto'}} value={kind} onChange={(e) => setKind(e.target.value)}>
-                <option value="ALL">All Categories</option>
-                <option value="GENERAL">General</option>
-                <option value="HOLIDAY">Closures</option>
-              </select>
-            </form>
+          <section
+            className={`notices-sticky-strip ${showMobileNoticesControls ? 'mobile-compact' : ''} ${showMobileNoticesControls && isMobileHeaderCollapsed ? 'strip-collapsed-mobile' : ''}`}
+            style={
+              showMobileNoticesControls
+                ? {
+                    '--notice-mobile-search-height': `${mobileSearchInputHeight}px`,
+                    '--notice-mobile-font-control-width': `${mobileFontControlWidth}px`
+                  }
+                : undefined
+            }
+          >
+            {!(showMobileNoticesControls && isMobileHeaderCollapsed) && (
+              <>
+                <form onSubmit={onSearchSubmit} className={`strip-search-row ${showMobileNoticesControls ? 'mobile-search-row' : ''}`}>
+                  <div className="search-wrapper">
+                    <button type="submit" className="search-inline-btn" aria-label="Search notices">
+                      <Icons.Search />
+                    </button>
+                    <input
+                      className="premium-input"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search keywords, events, or rooms..."
+                    />
+                  </div>
+                  {showMobileNoticesControls && (
+                    <QuickPageMenu
+                      iconOnly
+                      buttonClassName="notices-mobile-menu-btn"
+                      panelClassName={noticesMenuPanelClass}
+                      itemClassName="notices-hero-menu-item"
+                      hideThemeToggle
+                      align="right"
+                      extraItems={mobileHeaderExtraMenuItems}
+                    />
+                  )}
+                  {!showMobileNoticesControls && (
+                    <button type="submit" className="btn-primary" style={{padding: '12px 20px'}}>Search</button>
+                  )}
+                  {!showMobileNoticesControls && (
+                    <>
+                      <select className="premium-input" style={{width: 'auto'}} value={sort} onChange={(e) => setSort(e.target.value)}>
+                        <option value="LATEST">Latest First</option>
+                        <option value="OLDEST">Oldest First</option>
+                        <option value="HOLIDAY_FIRST">Holidays First</option>
+                      </select>
+                      <select className="premium-input" style={{width: 'auto'}} value={kind} onChange={(e) => setKind(e.target.value)}>
+                        <option value="ALL">All Categories</option>
+                        <option value="GENERAL">General</option>
+                        <option value="HOLIDAY">Closures</option>
+                      </select>
+                    </>
+                  )}
+                </form>
 
-            <div className="strip-controls-row">
-              {/* Theme Selector */}
-              <div className="readability-group">
-                <button type="button" onClick={() => updateReading('theme', 'classic')} className={`readability-btn ${reading.theme === 'classic' ? 'active' : ''}`}><Icons.Sun/> Light</button>
-                <button type="button" onClick={() => updateReading('theme', 'paper')} className={`readability-btn ${reading.theme === 'paper' ? 'active' : ''}`}><Icons.Book/> Sepia</button>
-                <button type="button" onClick={() => updateReading('theme', 'night')} className={`readability-btn ${reading.theme === 'night' ? 'active' : ''}`}><Icons.Moon/> Dark</button>
-              </div>
+                {showMobileNoticesControls && (
+                  <div className="strip-mobile-sort-row">
+                    <select className="premium-input" value={kind} onChange={(e) => setKind(e.target.value)}>
+                      <option value="ALL">All Categories</option>
+                      <option value="GENERAL">General</option>
+                      <option value="HOLIDAY">Closures</option>
+                    </select>
+                    <select className="premium-input" value={sort} onChange={(e) => setSort(e.target.value)}>
+                      <option value="LATEST">Latest First</option>
+                      <option value="OLDEST">Oldest First</option>
+                      <option value="HOLIDAY_FIRST">Holidays First</option>
+                    </select>
+                  </div>
+                )}
 
-              {/* Incremental Font Size Controls */}
-              <div className="readability-group">
-                <button type="button" onClick={() => updateReading('textSize', Math.max(12, reading.textSize - 1))} className="readability-btn">A-</button>
-                <span className="readability-val">{reading.textSize}px</span>
-                <button type="button" onClick={() => updateReading('textSize', Math.min(40, reading.textSize + 1))} className="readability-btn">A+</button>
-              </div>
+                {!showMobileNoticesControls ? (
+                  <div className="strip-controls-row">
+                    <div className="readability-group theme-readability-group">
+                      <button type="button" onClick={() => updateReading('theme', 'classic')} className={`readability-btn ${reading.theme === 'classic' ? 'active' : ''}`}><Icons.Sun/><span className="readability-text">Light</span></button>
+                      <button type="button" onClick={() => updateReading('theme', 'paper')} className={`readability-btn ${reading.theme === 'paper' ? 'active' : ''}`}><Icons.Book/><span className="readability-text">Sepia</span></button>
+                      <button type="button" onClick={() => updateReading('theme', 'night')} className={`readability-btn ${reading.theme === 'night' ? 'active' : ''}`}><Icons.Moon/><span className="readability-text">Dark</span></button>
+                    </div>
+                    <div className="readability-group">
+                      <button type="button" onClick={() => updateReading('textSize', Math.max(12, reading.textSize - 1))} className="readability-btn">A-</button>
+                      <span className="readability-val">{reading.textSize}px</span>
+                      <button type="button" onClick={() => updateReading('textSize', Math.min(40, reading.textSize + 1))} className="readability-btn">A+</button>
+                    </div>
+                    <div className="readability-group">
+                      <select 
+                        className="readability-select"
+                        value={reading.font}
+                        onChange={(e) => updateReading('font', e.target.value)}
+                      >
+                        <option value="outfit">Outfit (Sans)</option>
+                        <option value="roboto">Roboto (Sans)</option>
+                        <option value="nunito">Nunito (Sans)</option>
+                        <option value="space">Space Grotesk (Sans)</option>
+                        <option value="oswald">Oswald (Sans)</option>
+                        <option value="lora">Lora (Serif)</option>
+                        <option value="merriweather">Merriweather (Serif)</option>
+                        <option value="playfair">Playfair Display (Serif)</option>
+                        <option value="mono">Fira Code (Mono)</option>
+                        <option value="courgette">Courgette (Cursive)</option>
+                      </select>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="strip-controls-row mobile-controls-row-one">
+                      <div className="readability-group theme-readability-group mobile-theme-group">
+                        <button type="button" onClick={() => updateReading('theme', 'classic')} className={`readability-btn ${reading.theme === 'classic' ? 'active' : ''}`}><Icons.Sun/><span className="readability-text">Light</span></button>
+                        <button type="button" onClick={() => updateReading('theme', 'paper')} className={`readability-btn ${reading.theme === 'paper' ? 'active' : ''}`}><Icons.Book/><span className="readability-text">Sepia</span></button>
+                        <button type="button" onClick={() => updateReading('theme', 'night')} className={`readability-btn ${reading.theme === 'night' ? 'active' : ''}`}><Icons.Moon/><span className="readability-text">Dark</span></button>
+                      </div>
+                      <div className="readability-group mobile-size-group">
+                        <button type="button" onClick={() => updateReading('textSize', Math.max(12, reading.textSize - 1))} className="readability-btn">A-</button>
+                        <span className="readability-val">{reading.textSize}px</span>
+                        <button type="button" onClick={() => updateReading('textSize', Math.min(40, reading.textSize + 1))} className="readability-btn">A+</button>
+                      </div>
+                      <div className="readability-group mobile-font-group">
+                        <select 
+                          className="readability-select"
+                          value={reading.font}
+                          onChange={(e) => updateReading('font', e.target.value)}
+                        >
+                          <option value="outfit">Outfit</option>
+                          <option value="roboto">Roboto</option>
+                          <option value="nunito">Nunito</option>
+                          <option value="space">Space Grotesk</option>
+                          <option value="oswald">Oswald</option>
+                          <option value="lora">Lora</option>
+                          <option value="merriweather">Merriweather</option>
+                          <option value="playfair">Playfair</option>
+                          <option value="mono">Fira Code</option>
+                          <option value="courgette">Courgette</option>
+                        </select>
+                      </div>
+                    </div>
+                  </>
+                )}
 
-              {/* Font Dropdown Selection */}
-              <div className="readability-group">
-                <select 
-                  className="readability-select"
-                  value={reading.font}
-                  onChange={(e) => updateReading('font', e.target.value)}
-                >
-                  <option value="outfit">Outfit (Sans)</option>
-                  <option value="roboto">Roboto (Sans)</option>
-                  <option value="nunito">Nunito (Sans)</option>
-                  <option value="space">Space Grotesk (Sans)</option>
-                  <option value="oswald">Oswald (Sans)</option>
-                  <option value="lora">Lora (Serif)</option>
-                  <option value="merriweather">Merriweather (Serif)</option>
-                  <option value="playfair">Playfair Display (Serif)</option>
-                  <option value="mono">Fira Code (Mono)</option>
-                  <option value="courgette">Courgette (Cursive)</option>
-                </select>
-              </div>
-            </div>
+                {showMobileNoticesControls && (
+                  <button
+                    type="button"
+                    className="notices-strip-toggle notices-strip-toggle--bottom"
+                    onClick={() => setIsMobileHeaderCollapsed(true)}
+                    aria-label="Collapse notices header"
+                  >
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="18 15 12 9 6 15"></polyline>
+                    </svg>
+                  </button>
+                )}
+              </>
+            )}
+
+            {showMobileNoticesControls && isMobileHeaderCollapsed && (
+              <button
+                type="button"
+                className="notices-strip-toggle notices-strip-toggle--floating"
+                onClick={() => setIsMobileHeaderCollapsed(false)}
+                aria-label="Expand notices header"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+            )}
           </section>
 
           {/* Scrollable Notices List */}
@@ -624,6 +792,12 @@ export default function NoticesPage({ mode = 'public' }) {
           </section>
         </main>
       </div>
+
+      {showMobileNoticesControls && allowAdminComposer && isMobileComposeOpen && (
+        <div className="notice-admin-modal-backdrop notice-mobile-compose-backdrop" onClick={() => setIsMobileComposeOpen(false)}>
+          {renderComposerCard({ mobilePopup: true })}
+        </div>
+      )}
 
       {editOpen && (
         <div className="notice-admin-modal-backdrop" onClick={closeEditModal}>

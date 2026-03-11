@@ -35,6 +35,7 @@ import { addStatus } from '../../store/slices/userSlice';
 import Alert from '@mui/material/Alert';
 
 import Snackbar from '@mui/material/Snackbar';
+import QuickPageMenu from '../Navigation/QuickPageMenu';
 
 
 export default function DepartmentLogin() {
@@ -168,6 +169,16 @@ export default function DepartmentLogin() {
 
 
       <div className='department-login-body'>
+        <div className="department-login-menu-anchor">
+          <QuickPageMenu
+            iconOnly
+            buttonClassName="department-login-menu-btn"
+            panelClassName="department-login-menu-panel"
+            itemClassName="department-login-menu-item"
+            excludeKeys={['faculty']}
+            align="right"
+          />
+        </div>
 
         <Grid container justifyContent="center" alignItems="center" style={{ height: "100%" }}>
 

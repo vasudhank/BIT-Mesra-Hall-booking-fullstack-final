@@ -17,6 +17,7 @@ import { addStatus } from '../../store/slices/userSlice';
 import { useDispatch, useSelector } from 'react-redux';
 import Alert from '@mui/material/Alert';
 import Snackbar from '@mui/material/Snackbar';
+import QuickPageMenu from '../Navigation/QuickPageMenu';
 
 export default function AdminLogin() {
 
@@ -136,6 +137,16 @@ export default function AdminLogin() {
       </Snackbar>
 
       <div className='admin-login-body'>
+        <div className="admin-login-menu-anchor">
+          <QuickPageMenu
+            iconOnly
+            buttonClassName="admin-login-menu-btn"
+            panelClassName="admin-login-menu-panel"
+            itemClassName="admin-login-menu-item"
+            excludeKeys={['admin']}
+            align="right"
+          />
+        </div>
         <Grid container justifyContent="center" alignItems="center" style={{ height: "100%" }}>
           <Grid item xs={11} sm={8} md={6} lg={5} xl={4}>
 

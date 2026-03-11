@@ -30,6 +30,7 @@ import {
   playElevenLabsSpeech,
   stopElevenLabsPlayback
 } from "../../utils/elevenLabsTts";
+import QuickPageMenu from "../Navigation/QuickPageMenu";
 
 const STORAGE_PREFIX = "bit_booking_ai_threads_v1";
 const MAX_THREADS = Number.POSITIVE_INFINITY;
@@ -1615,6 +1616,17 @@ export default function AIChatWidget({
         <div className="sidebar-bottom-row">
           {sidebarOpen ? (
             <div className="sidebar-bottom-actions">
+              <button type="button" className="sidebar-hide-btn" onClick={hideSidebarCompletely}>
+                <SidebarCollapseArrowIcon direction="left" /> Hide
+              </button>
+              <QuickPageMenu
+                buttonLabel="Menu"
+                buttonClassName="sidebar-menu-btn"
+                panelClassName="ai-sidebar-menu-panel"
+                itemClassName="ai-sidebar-menu-item"
+                align="left"
+                openDirection="up"
+              />
               <button type="button" className="sidebar-settings-btn" onClick={() => setShowSettings((prev) => !prev)}>
                 <SettingsIcon fontSize="small" /> Settings
               </button>
@@ -1633,6 +1645,15 @@ export default function AIChatWidget({
                   <SidebarCollapseArrowIcon direction="left" />
                 </IconButton>
               </Tooltip>
+              <QuickPageMenu
+                iconOnly
+                buttonClassName="sidebar-menu-icon-btn"
+                panelClassName="ai-sidebar-menu-panel"
+                itemClassName="ai-sidebar-menu-item"
+                align="left"
+                openDirection="up"
+                ariaLabel="Open page menu"
+              />
               <Tooltip title="Voice settings">
                 <IconButton
                   size="small"

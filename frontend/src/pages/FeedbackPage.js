@@ -6,6 +6,7 @@ import CloseFullscreenIcon from '@mui/icons-material/CloseFullscreen';
 import { useSelector } from 'react-redux';
 import { createFeedback, listFeedback, updateFeedbackStatus } from '../api/feedbackApi';
 import api from '../api/axiosInstance';
+import QuickPageMenu from '../components/Navigation/QuickPageMenu';
 import './FeedbackPage.css';
 
 const SORT_OPTIONS = [
@@ -44,8 +45,8 @@ export default function FeedbackPage({ mode = 'public' }) {
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 960px)').matches : false
   );
-  const [isComposerCompact, setIsComposerCompact] = useState(false);
   const [isHeaderStripCollapsed, setIsHeaderStripCollapsed] = useState(false);
+  const [isComposeModalOpen, setIsComposeModalOpen] = useState(false);
   const [form, setForm] = useState({
     type: 'SUGGESTION',
     message: '',
@@ -108,30 +109,10 @@ export default function FeedbackPage({ mode = 'public' }) {
   }, []);
 
   useEffect(() => {
-    if (isDeveloperView || !isMobile || !composeCardRef.current) {
-      setIsComposerCompact(false);
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsComposerCompact(entry.intersectionRatio < 0.2);
-      },
-      {
-        threshold: [0, 0.2, 0.5, 1],
-        rootMargin: '-64px 0px 0px 0px'
-      }
-    );
-
-    observer.observe(composeCardRef.current);
-    return () => observer.disconnect();
-  }, [isDeveloperView, isMobile]);
-
-  useEffect(() => {
-    if (isDeveloperView || !isMobile || !isComposerCompact) {
+    if (isDeveloperView || !isMobile) {
       setIsHeaderStripCollapsed(false);
     }
-  }, [isDeveloperView, isMobile, isComposerCompact]);
+  }, [isDeveloperView, isMobile]);
 
   const submitFeedback = async (e) => {
     e.preventDefault();
@@ -170,17 +151,13 @@ export default function FeedbackPage({ mode = 'public' }) {
     }
   };
 
-  const scrollToComposeCard = () => {
-    composeCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
-  const showMobileCompactControls = !isDeveloperView && isMobile && isComposerCompact;
+  const showMobileCompactControls = !isDeveloperView && isMobile;
   const isStripCollapsedOnMobile = showMobileCompactControls && isHeaderStripCollapsed;
 
   return (
     <div className={`feedback-page ${fullscreenComposer ? 'composer-fullscreen' : ''}`}>
       <div className="feedback-layout">
-        {!isDeveloperView && (
+        {!isDeveloperView && !isMobile && (
           <aside className={`feedback-left ${fullscreenComposer ? 'fullscreen' : ''}`}>
             <form className="feedback-compose-card" onSubmit={submitFeedback} ref={composeCardRef}>
               <div className="feedback-compose-head">
@@ -245,9 +222,19 @@ export default function FeedbackPage({ mode = 'public' }) {
             </form>
 
             {!fullscreenComposer && (
-              <Link className="feedback-home-btn" to="/">
-                Home
-              </Link>
+              <div className="feedback-home-menu-row">
+                <Link className="feedback-home-btn" to="/">
+                  Home
+                </Link>
+                <QuickPageMenu
+                  buttonLabel="Menu"
+                  buttonClassName="feedback-home-btn feedback-menu-btn"
+                  panelClassName="feedback-menu-panel"
+                  itemClassName="feedback-menu-item"
+                  align="left"
+                  preferLeftWhenTight
+                />
+              </div>
             )}
           </aside>
         )}
@@ -267,24 +254,14 @@ export default function FeedbackPage({ mode = 'public' }) {
                     <button className="dev-action-btn" onClick={logoutDeveloper}>
                       Logout
                     </button>
-                  </div>
-                )}
-
-                {showMobileCompactControls && (
-                  <div className="feedback-inline-mobile-tools">
-                    <div className="feedback-sort-wrap inline">
-                      <label>SORT FEEDBACK</label>
-                      <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                        {SORT_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <button type="button" className="feedback-inline-compose-btn" onClick={scrollToComposeCard}>
-                      Share Feedback
-                    </button>
+                    <QuickPageMenu
+                      buttonLabel="Menu"
+                      buttonClassName="dev-action-btn feedback-dev-menu-btn"
+                      panelClassName="feedback-dev-menu-panel"
+                      itemClassName="feedback-dev-menu-item"
+                      align="left"
+                      preferLeftWhenTight
+                    />
                   </div>
                 )}
 
@@ -293,9 +270,29 @@ export default function FeedbackPage({ mode = 'public' }) {
                     <div className="feedback-title-row">
                       <h1>FEEDBACK</h1>
                       {showMobileCompactControls && (
-                        <Link className="feedback-header-home-btn" to="/">
-                          Home
-                        </Link>
+                        <div className="feedback-title-mobile-tools">
+                          <div className="feedback-sort-wrap inline feedback-mobile-title-sort">
+                            <label>SORT FEEDBACK</label>
+                            <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                              {SORT_OPTIONS.map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <QuickPageMenu
+                            iconOnly
+                            buttonClassName="feedback-header-home-btn feedback-header-menu-btn"
+                            panelClassName="feedback-menu-panel"
+                            itemClassName="feedback-menu-item"
+                            align="right"
+                            extraItems={[
+                              { key: 'mobile-home', label: 'Home', path: '/' },
+                              { key: 'mobile-compose-feedback', label: 'Share Feedback', onClick: () => setIsComposeModalOpen(true) }
+                            ]}
+                          />
+                        </div>
                       )}
                     </div>
                     <p>Help us improve with bugs, ideas, and appreciation.</p>
@@ -419,6 +416,70 @@ export default function FeedbackPage({ mode = 'public' }) {
           </div>
         </section>
       </div>
+
+      {showMobileCompactControls && isComposeModalOpen && (
+        <div className="feedback-mobile-compose-backdrop" onClick={() => setIsComposeModalOpen(false)}>
+          <form className="feedback-compose-card feedback-mobile-compose-card" onSubmit={submitFeedback} onClick={(e) => e.stopPropagation()}>
+            <div className="feedback-compose-head">
+              <h2>Share Feedback</h2>
+            </div>
+            <p>Help us improve with bugs, ideas, and appreciation.</p>
+            <label>
+              <span>Type</span>
+              <select
+                value={form.type}
+                onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))}
+              >
+                {TYPE_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Your Email (Optional)</span>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                placeholder="Your Email (Optional)"
+              />
+            </label>
+            <label>
+              <span>Rating (Optional)</span>
+              <select
+                value={form.rating}
+                onChange={(e) => setForm((prev) => ({ ...prev, rating: e.target.value }))}
+              >
+                <option value="">Select Rating</option>
+                <option value="5">5 - Excellent</option>
+                <option value="4">4 - Good</option>
+                <option value="3">3 - Average</option>
+                <option value="2">2 - Poor</option>
+                <option value="1">1 - Bad</option>
+              </select>
+            </label>
+            <label>
+              <span>Your Message *</span>
+              <textarea
+                value={form.message}
+                onChange={(e) => setForm((prev) => ({ ...prev, message: e.target.value }))}
+                placeholder="Your Message *"
+                required
+              />
+            </label>
+            <div className="feedback-mobile-compose-actions">
+              <button type="button" className="feedback-home-btn" onClick={() => setIsComposeModalOpen(false)}>
+                Cancel
+              </button>
+              <button className="feedback-submit-btn" type="submit">
+                Submit Feedback
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,6 +4,8 @@ import { getNoticesApi } from '../../api/noticesApi';
 import "./Schedule.css";
 import HomeIcon from '@mui/icons-material/Home';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
+import KeyboardArrowUpRoundedIcon from '@mui/icons-material/KeyboardArrowUpRounded';
 import {
   Container, Grid, Paper, Typography, TextField, Box, Chip, Button, Stack, IconButton, InputAdornment, useTheme, useMediaQuery, Modal
 } from '@mui/material';
@@ -12,6 +14,7 @@ import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { fuzzyFilterHallLike } from '../../utils/fuzzySearch';
+import QuickPageMenu from '../Navigation/QuickPageMenu';
 
 dayjs.extend(isoWeek);
 
@@ -88,8 +91,15 @@ const isClosureNotice = (notice) => String(notice?.kind || '').toUpperCase() ===
 const getNoticeTitle = (notice) =>
   String(notice?.title || notice?.subject || notice?.holidayName || 'Notice').trim();
 
-const getNoticeSummary = (notice) =>
-  String(notice?.summary || notice?.content || '').replace(/\s+/g, ' ').trim();
+const getNoticeDateTimeLabel = (notice) => {
+  const start = dayjs(notice?.startDateTime || notice?.createdAt);
+  const end = dayjs(notice?.endDateTime || notice?.startDateTime || notice?.createdAt);
+  if (!start.isValid() || !end.isValid()) return 'Date & time unavailable';
+  if (start.isSame(end, 'day')) {
+    return `${start.format('DD MMM YYYY')} | ${start.format('hh:mm A')} - ${end.format('hh:mm A')}`;
+  }
+  return `${start.format('DD MMM YYYY, hh:mm A')} - ${end.format('DD MMM YYYY, hh:mm A')}`;
+};
 
 const noticeDetailPath = (notice) =>
   notice?._id ? `/notices/${notice._id}` : '/notices';
@@ -187,7 +197,9 @@ export default function Schedule() {
   const [viewMode, setViewMode] = useState(location.state?.mode || 'today'); 
   const [searchTerm, setSearchTerm] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [showHallNoticeBreakdown, setShowHallNoticeBreakdown] = useState(false);
+  const [listNoticeListExpanded, setListNoticeListExpanded] = useState(false);
+  const [todayNoticeListExpanded, setTodayNoticeListExpanded] = useState(false);
+  const [closureHallDropdownByKey, setClosureHallDropdownByKey] = useState({});
   
   // Refs for scrolling synchronization
   const weekHeaderRef = useRef(null);
@@ -295,15 +307,6 @@ export default function Schedule() {
   const selectedDateTopNotice = selectedDateNotices[0] || null;
   const selectedDateAllHallsGeneralNotices = selectedDateNotices.filter((notice) => isAllHallsGeneralNotice(notice));
   const selectedDateHallSpecificNotices = selectedDateNotices.filter((notice) => hasSpecificRoomTargets(notice));
-  const selectedDateHallSpecificNoticeGroups = selectedDateHallSpecificNotices.map((notice) => ({
-    notice,
-    key: noticeIdentityKey(notice),
-    halls: (halls || [])
-      .map((hall) => hall.name)
-      .filter((hallName) => noticeTargetsHall(notice, hallName))
-  }));
-  const selectedDateHasMultipleHallSpecificNotices =
-    new Set(selectedDateHallSpecificNoticeGroups.map((group) => group.key)).size > 1;
   const selectedDateHasAnyClosure = selectedDateNotices.some((notice) => isClosureNotice(notice));
   const selectedDateCommonGeneralNotice = selectedDateNotices.find(
     (notice) => isUnscopedGeneralNotice(notice) || isAllHallsGeneralNotice(notice)
@@ -313,15 +316,105 @@ export default function Schedule() {
   const selectedDateCommonStripIsClosure = selectedDateCommonStripNotice ? isClosureNotice(selectedDateCommonStripNotice) : selectedDateHasAnyClosure;
   const selectedDateStripLabel = selectedDateCommonStripIsClosure ? 'ALERT' : 'NOTICE';
   const selectedDateCommonStripText = selectedDateCommonStripNotice
-    ? `${getNoticeTitle(selectedDateCommonStripNotice)}${selectedDateCommonStripNotice?.closureAllHalls ? ' | ALL ROOMS CLOSED' : ''}`
+    ? `${getNoticeTitle(selectedDateCommonStripNotice)} | ${getNoticeDateTimeLabel(selectedDateCommonStripNotice)}`
     : '';
   const selectedDateCommonStripMarquee = selectedDateCommonStripText.length > 70;
-  const hasMultipleHallSpecificNoticesForDate = (dateStr) =>
-    new Set(
-      noticesForDate(dateStr)
-        .filter((notice) => hasSpecificRoomTargets(notice))
-        .map((notice) => noticeIdentityKey(notice))
-    ).size > 1;
+  const getClosedHallsForNotice = (notice) => {
+    const matchedHallNames = (halls || [])
+      .map((hall) => String(hall?.name || '').trim())
+      .filter(Boolean)
+      .filter((hallName) => noticeTargetsHall(notice, hallName));
+    const explicitRooms = Array.isArray(notice?.rooms)
+      ? notice.rooms.map((room) => String(room || '').trim()).filter(Boolean)
+      : [];
+    const source = matchedHallNames.length > 0 ? matchedHallNames : explicitRooms;
+    const seen = new Set();
+    return source.filter((name) => {
+      const key = normalizeRoomKey(name);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
+  const getClosureBadgeMeta = (notice) => {
+    if (!notice) return null;
+    const tone = isClosureNotice(notice) ? 'closure' : 'applies';
+    const explicitRooms = Array.isArray(notice?.rooms)
+      ? notice.rooms.map((room) => String(room || '').trim()).filter(Boolean)
+      : [];
+    const appliesAll = Boolean(notice?.closureAllHalls) || explicitRooms.length === 0;
+    if (appliesAll) {
+      return { type: 'all', halls: [], tone };
+    }
+    const hallsClosed = getClosedHallsForNotice(notice);
+    if (hallsClosed.length === 0) {
+      return { type: 'all', halls: [], tone };
+    }
+    return { type: 'some', halls: hallsClosed, tone };
+  };
+
+  const toggleClosureHallDropdown = (key) => {
+    setClosureHallDropdownByKey((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const renderClosureIndicator = (meta, key) => {
+    if (!meta) return null;
+    const isClosureTone = meta.tone === 'closure';
+    if (meta.type === 'all') {
+      return (
+        <Typography className={`schedule-closure-indicator-text ${isClosureTone ? 'scope-closure' : 'scope-applies'}`}>
+          {isClosureTone ? 'All halls Closed' : 'Applies on all halls'}
+        </Typography>
+      );
+    }
+    const open = Boolean(closureHallDropdownByKey[key]);
+    return (
+      <Box className="schedule-closure-indicator-box">
+        <button
+          type="button"
+          className={`schedule-closure-toggle ${isClosureTone ? 'scope-closure' : 'scope-applies'}`}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            toggleClosureHallDropdown(key);
+          }}
+          aria-expanded={open}
+          aria-label="Toggle hall list"
+        >
+          <span>{isClosureTone ? 'Hall closed:' : 'Applies on halls:'}</span>
+          {open ? <KeyboardArrowUpRoundedIcon fontSize="small" /> : <KeyboardArrowDownRoundedIcon fontSize="small" />}
+        </button>
+        {open && (
+          <Box className={`schedule-closure-dropdown ${isClosureTone ? 'scope-closure' : 'scope-applies'}`}>
+            {meta.halls.map((hallName) => (
+              <Typography
+                key={`${key}-${normalizeRoomKey(hallName)}`}
+                className={`schedule-closure-dropdown-item ${isClosureTone ? 'scope-closure' : 'scope-applies'}`}
+              >
+                {hallName}
+              </Typography>
+            ))}
+          </Box>
+        )}
+      </Box>
+    );
+  };
+
+  const selectedDateCommonStripClosureMeta = selectedDateCommonStripNotice
+    ? getClosureBadgeMeta(selectedDateCommonStripNotice)
+    : null;
+  const selectedDateHasMultipleNotices = selectedDateNotices.length > 1;
+  const selectedDateExpandedNoticeItems = selectedDateNotices.map((notice, index) => {
+    return {
+      key: `${noticeIdentityKey(notice)}-${index}`,
+      notice,
+      isAlert: isClosureNotice(notice),
+      title: getNoticeTitle(notice),
+      dateTimeLabel: getNoticeDateTimeLabel(notice),
+      closureMeta: getClosureBadgeMeta(notice)
+    };
+  });
 
   const filteredScheduleHalls = useMemo(() => {
     const source = Array.isArray(halls) ? halls : [];
@@ -420,7 +513,9 @@ export default function Schedule() {
   }, []);
 
   useEffect(() => {
-    setShowHallNoticeBreakdown(false);
+    setListNoticeListExpanded(false);
+    setTodayNoticeListExpanded(false);
+    setClosureHallDropdownByKey({});
   }, [selectedDate, viewMode]);
 
   const rowHeaderWidth = isMobile ? '120px' : '220px';
@@ -587,8 +682,16 @@ export default function Schedule() {
                 Grid
               </Button>
             </Stack>
+            <QuickPageMenu
+              iconOnly
+              buttonClassName="schedule-top-icon-btn"
+              panelClassName="schedule-menu-panel"
+              itemClassName="schedule-menu-item"
+              align="right"
+            />
             <IconButton
               size="small"
+              className="schedule-top-icon-btn"
               onClick={() => navigate('/')}
               aria-label="go home"
             >
@@ -610,8 +713,8 @@ export default function Schedule() {
                 mb: 2.2,
                 border: selectedDateCommonStripIsClosure ? '1px solid rgba(185, 28, 28, 0.32)' : '1px solid rgba(30, 64, 175, 0.32)',
                 borderRadius: '10px',
-                overflow: 'hidden',
-                background: selectedDateCommonStripIsClosure ? 'rgba(185, 28, 28, 0.1)' : 'rgba(30, 64, 175, 0.1)'
+                overflow: 'visible',
+                background: selectedDateCommonStripIsClosure ? 'var(--schedule-strip-closure-soft)' : 'var(--schedule-strip-applies-soft)'
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'stretch' }}>
@@ -628,6 +731,20 @@ export default function Schedule() {
                     gap: 0.7
                   }}
                 >
+                  {selectedDateHasMultipleNotices && (
+                    <IconButton
+                      size="small"
+                      className="schedule-strip-toggle-btn"
+                      onClick={() => setListNoticeListExpanded((prev) => !prev)}
+                      aria-label={listNoticeListExpanded ? 'Collapse notice list' : 'Expand notice list'}
+                    >
+                      {listNoticeListExpanded ? (
+                        <KeyboardArrowUpRoundedIcon fontSize="small" />
+                      ) : (
+                        <KeyboardArrowDownRoundedIcon fontSize="small" />
+                      )}
+                    </IconButton>
+                  )}
                   <Button
                     size="small"
                     variant="contained"
@@ -655,78 +772,71 @@ export default function Schedule() {
                   >
                     {selectedDateStripLabel}
                   </Typography>
-                  {selectedDateHasMultipleHallSpecificNotices && (
-                    <Button
-                      size="small"
-                      variant="text"
-                      onClick={() => setShowHallNoticeBreakdown((prev) => !prev)}
-                      sx={{ minWidth: 'auto', px: 0.6, fontWeight: 900 }}
-                    >
-                      {showHallNoticeBreakdown ? '▲' : '▼'}
-                    </Button>
-                  )}
                 </Box>
-                <Box sx={{ flex: 1, minWidth: 0, px: 1.5, py: 1, display: 'flex', alignItems: 'center' }}>
-                  <Box className="schedule-alert-marquee">
-                    {selectedDateCommonStripMarquee ? (
-                      <span className="schedule-alert-marquee-track">
-                        {selectedDateCommonStripText} | {selectedDateCommonStripText}
-                      </span>
-                    ) : (
-                      <Typography
-                        sx={{
-                          fontSize: '0.9rem',
-                          fontWeight: 700,
-                          color: selectedDateCommonStripIsClosure ? '#991b1b' : '#1e3a8a'
-                        }}
-                      >
-                        {selectedDateCommonStripText}
-                      </Typography>
-                    )}
+                <Box sx={{ flex: 1, minWidth: 0, px: 1.5, py: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
+                  <Box sx={{ flex: 1, minWidth: 0, alignSelf: 'center' }}>
+                    <Box className="schedule-alert-marquee">
+                      {selectedDateCommonStripMarquee ? (
+                        <span className="schedule-alert-marquee-track">
+                          {selectedDateCommonStripText} | {selectedDateCommonStripText}
+                        </span>
+                      ) : (
+                        <Typography
+                          sx={{
+                            fontSize: '0.9rem',
+                            fontWeight: 700,
+                            color: selectedDateCommonStripIsClosure ? '#991b1b' : '#1e3a8a'
+                          }}
+                        >
+                          {selectedDateCommonStripText}
+                        </Typography>
+                      )}
+                    </Box>
                   </Box>
+                  {selectedDateCommonStripClosureMeta ? (
+                    <Box sx={{ flexShrink: 0 }}>
+                      {renderClosureIndicator(
+                        selectedDateCommonStripClosureMeta,
+                        `list-top-${noticeIdentityKey(selectedDateCommonStripNotice)}`
+                      )}
+                    </Box>
+                  ) : null}
                 </Box>
               </Box>
 
-              {showHallNoticeBreakdown && selectedDateHasMultipleHallSpecificNotices && (
+              {listNoticeListExpanded && selectedDateHasMultipleNotices && (
                 <Box sx={{ borderTop: selectedDateCommonStripIsClosure ? '1px solid rgba(185, 28, 28, 0.24)' : '1px solid rgba(30, 64, 175, 0.25)' }}>
-                  {selectedDateHallSpecificNoticeGroups.map((group) => {
-                    const isAlert = isClosureNotice(group.notice);
-                    return (
-                      <Box
-                        key={`list-group-${group.key}`}
-                        sx={{
-                          px: 1.2,
-                          py: 0.8,
-                          borderBottom: '1px dashed var(--border-color)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 1
-                        }}
-                      >
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography sx={{ fontSize: '0.82rem', fontWeight: 800, color: isAlert ? '#991b1b' : '#1e3a8a' }}>
-                            {isAlert ? 'ALERT' : 'NOTICE'}: {getNoticeTitle(group.notice)}
+                  <Box className="schedule-expanded-strip-list">
+                    {selectedDateExpandedNoticeItems.map((item) => (
+                      <Box key={`list-expanded-${item.key}`} className="schedule-expanded-strip-row">
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <Typography sx={{ fontSize: '0.74rem', fontWeight: 800, letterSpacing: '0.08em', color: item.isAlert ? '#991b1b' : '#1e3a8a' }}>
+                            {item.isAlert ? 'ALERT' : 'NOTICE'}
                           </Typography>
-                          <Typography sx={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
-                            Halls: {group.halls.join(', ') || 'Specific halls'}
+                          <Typography sx={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                            {item.title}
+                          </Typography>
+                          <Typography sx={{ fontSize: '0.74rem', color: 'var(--text-secondary)', wordBreak: 'break-word' }}>
+                            {item.dateTimeLabel}
                           </Typography>
                         </Box>
-                        <Button
-                          size="small"
-                          onClick={() => navigate(noticeDetailPath(group.notice))}
-                          sx={{ minWidth: 'auto', px: 0.8, fontSize: '0.68rem', fontWeight: 800 }}
-                        >
-                          OPEN
-                        </Button>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.6, flexShrink: 0 }}>
+                          {item.closureMeta ? renderClosureIndicator(item.closureMeta, `list-expanded-closure-${item.key}`) : null}
+                          <Button
+                            size="small"
+                            onClick={() => navigate(noticeDetailPath(item.notice))}
+                            sx={{ minWidth: 'auto', px: 0.8, fontSize: '0.68rem', fontWeight: 800 }}
+                          >
+                            OPEN
+                          </Button>
+                        </Box>
                       </Box>
-                    );
-                  })}
+                    ))}
+                  </Box>
                 </Box>
               )}
             </Box>
           )}
-
           <Grid container spacing={3}>
             {loading ? (
               <Grid item xs={12}><Typography>Loading...</Typography></Grid>
@@ -736,10 +846,6 @@ export default function Schedule() {
                 const hallClosed = hallClosedOnDate(h, selectedDate);
                 const hallGlobalNotice = selectedDateAllHallsGeneralNotices.length > 0 && !hallClosed;
                 const hallSpecificNotice = hallHasSpecificGeneralNoticeOnDate(h, selectedDate);
-                const hallDateNotices = noticesForHallDate(h.name, selectedDate);
-                const hallSpecificDayNotices = hallDateNotices.filter((notice) => hasSpecificRoomTargets(notice));
-                const showHallSpecificNoticeButton = selectedDateHasMultipleHallSpecificNotices && hallSpecificDayNotices.length > 0;
-                const hallSpecificButtonIsAlert = hallSpecificDayNotices.some((notice) => isClosureNotice(notice));
                 return (
                   <Grid item xs={12} sm={6} md={4} key={h.id || h.name}>
                     <Paper
@@ -762,17 +868,6 @@ export default function Schedule() {
                         <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                           <Chip label={h.status} color={h.status === 'Filled' ? 'error' : 'success'} />
                           {hallClosed && <Chip label="CLOSED" color="error" variant="outlined" />}
-                          {showHallSpecificNoticeButton && (
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              color={hallSpecificButtonIsAlert ? 'error' : 'primary'}
-                              onClick={() => setNoticeDialog({ open: true, date: selectedDate, notices: hallSpecificDayNotices })}
-                              sx={{ minWidth: 'auto', px: 0.9, fontSize: '0.66rem', fontWeight: 800, lineHeight: 1.1 }}
-                            >
-                              {hallSpecificButtonIsAlert ? 'ALERT' : 'NOTICE'}
-                            </Button>
-                          )}
                         </Box>
                       </Box>
 
@@ -797,12 +892,6 @@ export default function Schedule() {
                                 )}
                               </Box>
                             ))}
-
-                            {bookings.length === 0 && hallClosed && (
-                              <Typography variant="body2" sx={{ color: '#b91c1c', fontWeight: 700 }}>
-                                CLOSED for {hallDateNotices[0]?.holidayName || hallDateNotices[0]?.title || 'closure notice'}
-                              </Typography>
-                            )}
 
                           </>
                         )}
@@ -931,12 +1020,6 @@ export default function Schedule() {
                     const dayHasGlobalGeneral = dayNotices.some((notice) => isAllHallsGeneralNotice(notice));
                     const closures = closuresForHallDate(row.name, col.date);
                     const generalNotices = hallSpecificGeneralNoticesForHallDate(row.name, col.date);
-                    const hallSpecificCellNotices = noticesForHallDate(row.name, col.date).filter((notice) => hasSpecificRoomTargets(notice));
-                    const showCellNoticeButton =
-                      bookings.length === 0 &&
-                      hallSpecificCellNotices.length > 0 &&
-                      hasMultipleHallSpecificNoticesForDate(col.date);
-                    const cellButtonIsAlert = hallSpecificCellNotices.some((notice) => isClosureNotice(notice));
                     const cellClosed = closures.length > 0 && bookings.length === 0;
                     const cellNotice = !cellClosed && generalNotices.length > 0 && bookings.length === 0;
                     return (
@@ -955,19 +1038,6 @@ export default function Schedule() {
                         display: 'flex',
                         flexDirection: 'column'
                       }}>
-                        {showCellNoticeButton && (
-                          <Box sx={{ position: 'absolute', top: 4, right: 4, zIndex: 8 }}>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              color={cellButtonIsAlert ? 'error' : 'primary'}
-                              onClick={() => setNoticeDialog({ open: true, date: col.date, notices: hallSpecificCellNotices })}
-                              sx={{ minWidth: 'auto', px: 0.75, py: 0.15, fontSize: '0.62rem', fontWeight: 800, lineHeight: 1.1 }}
-                            >
-                              {cellButtonIsAlert ? 'ALERT' : 'NOTICE'}
-                            </Button>
-                          </Box>
-                        )}
                         {bookings.length === 0 && !cellClosed && !cellNotice ? (
                           <Typography variant="body2" color="text.secondary">-</Typography>
                         ) : (
@@ -1092,7 +1162,7 @@ export default function Schedule() {
                   sx={{
                     borderRight: '1px solid var(--border-color)',
                     borderBottom: '1px solid var(--border-color)',
-                    bgcolor: selectedDateCommonStripIsClosure ? '#e9c6c6' : '#d5e2ff',
+                    bgcolor: selectedDateCommonStripIsClosure ? 'var(--schedule-row-header-closure-bg)' : 'var(--schedule-row-header-applies-bg)',
                     width: rowHeaderWidth,
                     minWidth: rowHeaderWidth,
                     p: 1,
@@ -1105,6 +1175,20 @@ export default function Schedule() {
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.8 }}>
+                    {selectedDateHasMultipleNotices && (
+                      <IconButton
+                        size="small"
+                        className="schedule-strip-toggle-btn"
+                        onClick={() => setTodayNoticeListExpanded((prev) => !prev)}
+                        aria-label={todayNoticeListExpanded ? 'Collapse notice list' : 'Expand notice list'}
+                      >
+                        {todayNoticeListExpanded ? (
+                          <KeyboardArrowUpRoundedIcon fontSize="small" />
+                        ) : (
+                          <KeyboardArrowDownRoundedIcon fontSize="small" />
+                        )}
+                      </IconButton>
+                    )}
                     <Button
                       size="small"
                       variant="contained"
@@ -1132,16 +1216,6 @@ export default function Schedule() {
                     >
                       {selectedDateStripLabel}
                     </Typography>
-                    {selectedDateHasMultipleHallSpecificNotices && (
-                      <Button
-                        size="small"
-                        variant="text"
-                        onClick={() => setShowHallNoticeBreakdown((prev) => !prev)}
-                        sx={{ minWidth: 'auto', px: 0.6, fontWeight: 900 }}
-                      >
-                        {showHallNoticeBreakdown ? '▲' : '▼'}
-                      </Button>
-                    )}
                   </Box>
                 </Box>
                 <Box
@@ -1155,66 +1229,97 @@ export default function Schedule() {
                     py: 0.8,
                     bgcolor: selectedDateCommonStripIsClosure ? 'rgba(185, 28, 28, 0.14)' : 'rgba(30, 64, 175, 0.12)',
                     display: 'flex',
-                    alignItems: 'center',
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
                     gap: 1.2
                   }}
                 >
-                  <Box className="schedule-alert-marquee">
-                    {selectedDateCommonStripMarquee ? (
-                      <span className="schedule-alert-marquee-track">
-                        {selectedDateCommonStripText} | {selectedDateCommonStripText}
-                      </span>
-                    ) : (
-                      <Typography
-                        sx={{
-                          fontSize: '0.9rem',
-                          fontWeight: 700,
-                          color: selectedDateCommonStripIsClosure ? '#991b1b' : '#1e3a8a'
-                        }}
-                      >
-                        {selectedDateCommonStripText}
-                      </Typography>
-                    )}
+                  <Box sx={{ flex: 1, minWidth: 0, alignSelf: 'center' }}>
+                    <Box className="schedule-alert-marquee">
+                      {selectedDateCommonStripMarquee ? (
+                        <span className="schedule-alert-marquee-track">
+                          {selectedDateCommonStripText} | {selectedDateCommonStripText}
+                        </span>
+                      ) : (
+                        <Typography
+                          sx={{
+                            fontSize: '0.9rem',
+                            fontWeight: 700,
+                            color: selectedDateCommonStripIsClosure ? '#991b1b' : '#1e3a8a'
+                          }}
+                        >
+                          {selectedDateCommonStripText}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+                  {selectedDateCommonStripClosureMeta ? (
+                    <Box sx={{ flexShrink: 0 }}>
+                      {renderClosureIndicator(
+                        selectedDateCommonStripClosureMeta,
+                        `today-top-${noticeIdentityKey(selectedDateCommonStripNotice)}`
+                      )}
+                    </Box>
+                  ) : null}
+                </Box>
+              </Box>
+            )}
+
+            {todayNoticeListExpanded && selectedDateHasMultipleNotices && (
+              <Box sx={{ display: 'flex', width: '100%', background: 'var(--bg-paper)' }}>
+                <Box
+                  sx={{
+                    borderRight: '1px solid var(--border-color)',
+                    borderBottom: '1px solid var(--border-color)',
+                    bgcolor: selectedDateCommonStripIsClosure ? 'var(--schedule-row-header-closure-bg-soft)' : 'var(--schedule-row-header-applies-bg-soft)',
+                    width: rowHeaderWidth,
+                    minWidth: rowHeaderWidth,
+                    position: 'sticky',
+                    left: 0,
+                    zIndex: 10
+                  }}
+                />
+                <Box
+                  sx={{
+                    borderRight: '1px solid var(--border-color)',
+                    borderBottom: '1px solid var(--border-color)',
+                    flex: 1,
+                    minWidth: 0,
+                    px: 1,
+                    py: 0.7
+                  }}
+                >
+                  <Box className="schedule-expanded-strip-list">
+                    {selectedDateExpandedNoticeItems.map((item) => (
+                      <Box key={`today-expanded-${item.key}`} className="schedule-expanded-strip-row">
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <Typography sx={{ fontSize: '0.74rem', fontWeight: 800, letterSpacing: '0.08em', color: item.isAlert ? '#991b1b' : '#1e3a8a' }}>
+                            {item.isAlert ? 'ALERT' : 'NOTICE'}
+                          </Typography>
+                          <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                            {item.title}
+                          </Typography>
+                          <Typography sx={{ fontSize: '0.74rem', color: 'var(--text-secondary)', wordBreak: 'break-word' }}>
+                            {item.dateTimeLabel}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.55, flexShrink: 0 }}>
+                          {item.closureMeta ? renderClosureIndicator(item.closureMeta, `today-expanded-closure-${item.key}`) : null}
+                          <Button
+                            size="small"
+                            onClick={() => navigate(noticeDetailPath(item.notice))}
+                            sx={{ minWidth: 'auto', px: 0.8, fontSize: '0.66rem', fontWeight: 800 }}
+                          >
+                            OPEN
+                          </Button>
+                        </Box>
+                      </Box>
+                    ))}
                   </Box>
                 </Box>
               </Box>
             )}
-            {showHallNoticeBreakdown && selectedDateHasMultipleHallSpecificNotices && (
-              <Box sx={{ borderBottom: '1px solid var(--border-color)', background: 'var(--bg-paper)' }}>
-                {selectedDateHallSpecificNoticeGroups.map((group) => {
-                  const isAlert = isClosureNotice(group.notice);
-                  return (
-                    <Box
-                      key={`today-group-${group.key}`}
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1,
-                        px: 1.2,
-                        py: 0.6,
-                        borderTop: '1px dashed var(--border-color)'
-                      }}
-                    >
-                      <Typography sx={{ fontSize: '0.78rem', fontWeight: 800, color: isAlert ? '#991b1b' : '#1e3a8a', minWidth: rowHeaderWidth - 30 }}>
-                        {isAlert ? 'ALERT' : 'NOTICE'}: {getNoticeTitle(group.notice)}
-                      </Typography>
-                      <Typography sx={{ fontSize: '0.74rem', color: 'var(--text-secondary)', flex: 1 }}>
-                        Halls: {group.halls.join(', ') || 'Specific halls'}
-                      </Typography>
-                      <Button
-                        size="small"
-                        onClick={() => navigate(noticeDetailPath(group.notice))}
-                        sx={{ minWidth: 'auto', px: 0.8, fontSize: '0.66rem', fontWeight: 800 }}
-                      >
-                        OPEN
-                      </Button>
-                    </Box>
-                  );
-                })}
-              </Box>
-            )}
           </Box>
-
           <Box
             ref={bodyRef}
             onScroll={onBodyHorizontalScroll}
@@ -1242,9 +1347,6 @@ export default function Schedule() {
                         noticeOverlapsHourSlot(notice, selectedDate, slotStartHour, slotEndHour)
                       );
                     };
-                    const rowSpecificDayNotices = noticesForHallDate(row.name, selectedDate).filter((notice) => hasSpecificRoomTargets(notice));
-                    const showRowSpecificNoticeButton = selectedDateHasMultipleHallSpecificNotices && rowSpecificDayNotices.length > 0;
-                    const rowButtonIsAlert = rowSpecificDayNotices.some((notice) => isClosureNotice(notice));
                     const rowClosed = rowClosures.length > 0 && rowBookings.length === 0;
                     const rowAllHallsNotice = selectedDateAllHallsGeneralNotices.length > 0 && !rowClosed;
                     const rowNotice = !rowClosed && rowGeneralNotices.length > 0 && rowBookings.length === 0;
@@ -1256,9 +1358,9 @@ export default function Schedule() {
                           borderBottom: '1px solid var(--border-color)',
                           p: 1,
                           bgcolor: rowClosed
-                            ? '#e9c6c6'
+                            ? 'var(--schedule-row-header-closure-bg)'
                             : (rowAllHallsNotice || rowNotice)
-                              ? '#d5e2ff'
+                              ? 'var(--schedule-row-header-applies-bg)'
                               : 'var(--bg-paper)',
                           width: rowHeaderWidth,
                           minWidth: rowHeaderWidth,
@@ -1279,17 +1381,6 @@ export default function Schedule() {
                               color={row.status === 'Filled' ? 'error' : 'success'}
                             />
                             {rowClosed && <Chip label="CLOSED" size="small" color="error" variant="outlined" />}
-                            {showRowSpecificNoticeButton && (
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                color={rowButtonIsAlert ? 'error' : 'primary'}
-                                onClick={() => setNoticeDialog({ open: true, date: selectedDate, notices: rowSpecificDayNotices })}
-                                sx={{ minWidth: 'auto', px: 0.8, fontSize: '0.62rem', fontWeight: 800, lineHeight: 1.1 }}
-                              >
-                                {rowButtonIsAlert ? 'ALERT' : 'NOTICE'}
-                              </Button>
-                            )}
                           </Box>
                         </Box>
 
@@ -1302,11 +1393,11 @@ export default function Schedule() {
                               minWidth: hourColumnWidth,
                               minHeight: 80,
                               bgcolor: rowClosed
-                                ? 'rgba(185, 28, 28, 0.11)'
+                                ? 'var(--schedule-grid-cell-closure-bg)'
                                 : rowGlobalSlotNoticeAt(index)
-                                  ? 'rgba(30, 64, 175, 0.1)'
+                                  ? 'var(--schedule-grid-cell-applies-bg)'
                                 : rowNotice
-                                  ? 'rgba(30, 64, 175, 0.1)'
+                                  ? 'var(--schedule-grid-cell-applies-bg)'
                                   : 'var(--bg-paper)'
                             }} />
                           ))}
@@ -1391,7 +1482,6 @@ export default function Schedule() {
           </Box>
         </Box>
       )}
-
       <Modal
         open={Boolean(noticeDialog.open)}
         onClose={() => setNoticeDialog({ open: false, date: '', notices: [] })}
@@ -1403,12 +1493,13 @@ export default function Schedule() {
             <Typography id="schedule-day-notice-modal-title" variant="h6" sx={{ fontWeight: 700 }}>
               Notices for {noticeDialog.date ? dayjs(noticeDialog.date).format('DD MMM YYYY') : 'selected day'}
             </Typography>
-            <Box sx={{ mt: 1.5, display: 'grid', gap: 1.1 }}>
+            <Box className="schedule-notice-modal-list">
               {noticeDialog.notices.length === 0 && (
                 <Typography variant="body2" color="text.secondary">No notices found.</Typography>
               )}
               {noticeDialog.notices.map((notice) => {
                 const closure = isClosureNotice(notice);
+                const closureMeta = getClosureBadgeMeta(notice);
                 return (
                   <Box
                     key={notice._id || `${notice.title}-${notice.createdAt}`}
@@ -1421,19 +1512,22 @@ export default function Schedule() {
                       p: 1.25
                     }}
                   >
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
                       <Typography sx={{ fontWeight: 700, color: 'var(--text-primary)' }}>
                         {getNoticeTitle(notice)}
                       </Typography>
-                      <Chip
-                        label={closure ? 'CLOSURE' : 'UPDATE'}
-                        size="small"
-                        color={closure ? 'error' : 'primary'}
-                        variant="outlined"
-                      />
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.45 }}>
+                        <Chip
+                          label={closure ? 'CLOSURE' : 'UPDATE'}
+                          size="small"
+                          color={closure ? 'error' : 'primary'}
+                          variant="outlined"
+                        />
+                        {closureMeta ? renderClosureIndicator(closureMeta, `modal-closure-${noticeIdentityKey(notice)}`) : null}
+                      </Box>
                     </Box>
-                    <Typography sx={{ mt: 0.5, fontSize: '0.86rem', color: 'var(--text-secondary)' }}>
-                      {getNoticeSummary(notice) || 'Open this notice to read full details.'}
+                    <Typography sx={{ mt: 0.45, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                      {getNoticeDateTimeLabel(notice)}
                     </Typography>
                     <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>
                       <Button
@@ -1458,6 +1552,7 @@ export default function Schedule() {
     </Container>
   );
 }
+
 
 
 

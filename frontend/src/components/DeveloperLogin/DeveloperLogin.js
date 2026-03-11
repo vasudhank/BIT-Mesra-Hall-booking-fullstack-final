@@ -15,6 +15,7 @@ import EmailIcon from '@mui/icons-material/Email';
 import HttpsIcon from '@mui/icons-material/Https';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import HomeIcon from '@mui/icons-material/Home';
+import QuickPageMenu from '../Navigation/QuickPageMenu';
 import './DeveloperLogin.css';
 
 export default function DeveloperLogin() {
@@ -66,6 +67,15 @@ export default function DeveloperLogin() {
 
   return (
     <div className="developer-login-body">
+      <div className="developer-login-menu-anchor">
+        <QuickPageMenu
+          iconOnly
+          buttonClassName="developer-login-menu-btn"
+          panelClassName="developer-login-menu-panel"
+          itemClassName="developer-login-menu-item"
+          align="right"
+        />
+      </div>
       <Grid container justifyContent="center" alignItems="center" style={{ height: '100%' }}>
         <Grid item xs={11} sm={8} md={6} lg={5} xl={4}>
           <Card className="login-card glass developer-login-card">

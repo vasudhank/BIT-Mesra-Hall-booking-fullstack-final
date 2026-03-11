@@ -279,7 +279,9 @@ body.dark-mode .gemini-sidebar.resizing .sidebar-resize-handle::after {
 }
 
 .sidebar-settings-btn,
-.sidebar-home-btn {
+.sidebar-home-btn,
+.sidebar-menu-btn,
+.sidebar-hide-btn {
   width: 100%;
   border: 1px solid var(--gemini-border);
   background: var(--gemini-muted-surface);
@@ -295,7 +297,9 @@ body.dark-mode .gemini-sidebar.resizing .sidebar-resize-handle::after {
 }
 
 .sidebar-settings-btn:hover,
-.sidebar-home-btn:hover {
+.sidebar-home-btn:hover,
+.sidebar-menu-btn:hover,
+.sidebar-hide-btn:hover {
   background: var(--gemini-brand-soft);
   border-color: rgba(37, 99, 235, 0.35);
 }
@@ -310,8 +314,39 @@ body.dark-mode .gemini-sidebar.resizing .sidebar-resize-handle::after {
 
 .sidebar-settings-icon-btn,
 .sidebar-home-icon-btn,
-.sidebar-hide-icon-btn {
+.sidebar-hide-icon-btn,
+.sidebar-menu-icon-btn {
   color: var(--gemini-user-text) !important;
+}
+
+.sidebar-menu-icon-btn {
+  min-width: 32px !important;
+  min-height: 32px !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--gemini-border) !important;
+  background: var(--gemini-muted-surface) !important;
+}
+
+.sidebar-menu-icon-btn:hover {
+  border-color: rgba(37, 99, 235, 0.35) !important;
+  background: var(--gemini-brand-soft) !important;
+}
+
+.ai-sidebar-menu-panel {
+  border: 1px solid var(--gemini-border) !important;
+  background: var(--gemini-surface) !important;
+  color: var(--gemini-user-text) !important;
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.25) !important;
+}
+
+.ai-sidebar-menu-item {
+  color: var(--gemini-user-text) !important;
+  font-family: "Sora", "IBM Plex Sans", sans-serif !important;
+  font-weight: 600 !important;
+}
+
+.ai-sidebar-menu-item:hover {
+  background: var(--gemini-brand-soft) !important;
 }
 
 .ai-sidebar-collapse-icon {
@@ -337,7 +372,8 @@ body.dark-mode .sidebar-top-row .MuiIconButton-root,
 body.dark-mode .sidebar-bottom-icons .MuiIconButton-root,
 body.dark-mode .sidebar-settings-icon-btn,
 body.dark-mode .sidebar-home-icon-btn,
-body.dark-mode .sidebar-hide-icon-btn {
+body.dark-mode .sidebar-hide-icon-btn,
+body.dark-mode .sidebar-menu-icon-btn {
   color: #e5e7eb !important;
 }
 

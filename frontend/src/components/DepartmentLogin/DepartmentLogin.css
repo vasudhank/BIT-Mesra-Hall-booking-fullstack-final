@@ -21,6 +21,42 @@
   background:#05080c;
 }
 
+.department-login-menu-anchor {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  z-index: 5;
+}
+
+.department-login-menu-btn {
+  width: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  border-radius: 11px !important;
+  border: 1px solid rgba(255, 255, 255, 0.34) !important;
+  background: rgba(15, 23, 42, 0.45) !important;
+  color: #f8fafc !important;
+}
+
+.department-login-menu-btn:hover {
+  border-color: rgba(56, 189, 248, 0.72) !important;
+  background: rgba(15, 23, 42, 0.65) !important;
+}
+
+.department-login-menu-panel {
+  border-color: rgba(255, 255, 255, 0.26) !important;
+  background: rgba(15, 23, 42, 0.96) !important;
+  color: #f8fafc !important;
+}
+
+.department-login-menu-item {
+  color: #f8fafc !important;
+}
+
+.department-login-menu-item:hover {
+  background: rgba(56, 189, 248, 0.2) !important;
+}
+
 .department-login-body::before,
 .department-login-body::after{
   content:"";

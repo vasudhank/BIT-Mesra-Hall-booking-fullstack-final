@@ -54,3 +54,48 @@
     height: 100%;
     fill: currentColor;
 }
+
+.appbar-user-menu-btn {
+    width: 100%;
+    justify-content: flex-start;
+    border: none !important;
+    background: transparent !important;
+    color: #25354F !important;
+    border-radius: 8px !important;
+    min-height: 36px !important;
+    font-family: 'RecklessNeue' !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.02em;
+}
+
+.appbar-user-menu-btn:hover {
+    background: rgba(15, 23, 42, 0.06) !important;
+}
+
+.appbar-user-submenu-panel {
+    border: 1px solid rgba(148, 163, 184, 0.34) !important;
+    background: #ffffff !important;
+    color: #25354F !important;
+    border-radius: 12px !important;
+    max-height: 220px !important;
+    overflow-y: auto !important;
+    box-shadow: 0 12px 26px rgba(15, 23, 42, 0.22) !important;
+}
+
+.appbar-user-submenu-item {
+    color: #25354F !important;
+    font-family: 'RecklessNeue' !important;
+    font-weight: 700 !important;
+}
+
+.appbar-user-submenu-item:hover {
+    background: rgba(15, 23, 42, 0.06) !important;
+}
+
+body.dark-mode .appbar-user-menu-btn {
+    color: #f8fafc !important;
+}
+
+body.dark-mode .appbar-user-menu-btn:hover {
+    background: rgba(148, 163, 184, 0.2) !important;
+}

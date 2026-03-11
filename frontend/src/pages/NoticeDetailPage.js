@@ -78,6 +78,11 @@ const FONT_OPTIONS = [
   { value: 'courgette', label: 'Courgette (Cursive)', family: 'Courgette' }
 ];
 
+const INLINE_FONT_OPTIONS = FONT_OPTIONS.map((opt) => ({
+  value: opt.value,
+  label: opt.family
+}));
+
 const INLINE_TEXT_COLORS = [
   { key: 'red', value: '#b91c1c', label: 'Text red' },
   { key: 'green', value: '#166534', label: 'Text green' },
@@ -134,6 +139,30 @@ const stripInlineTypographyStyles = (htmlValue) => {
     root.querySelectorAll('[style]').forEach((el) => {
       el.style.removeProperty('font-family');
       el.style.removeProperty('font-size');
+      const styleAttr = el.getAttribute('style');
+      if (!styleAttr || !styleAttr.trim()) {
+        el.removeAttribute('style');
+      }
+    });
+    return String(root.innerHTML || '').trim();
+  } catch (_) {
+    return html;
+  }
+};
+
+const stripInlineColorStyles = (htmlValue) => {
+  const html = String(htmlValue || '').trim();
+  if (!html) return '';
+  if (typeof window === 'undefined' || typeof window.DOMParser === 'undefined') {
+    return html;
+  }
+  try {
+    const parser = new window.DOMParser();
+    const doc = parser.parseFromString(`<div id="notice-color-root">${html}</div>`, 'text/html');
+    const root = doc.getElementById('notice-color-root');
+    if (!root) return html;
+    root.querySelectorAll('[style]').forEach((el) => {
+      el.style.removeProperty('color');
       const styleAttr = el.getAttribute('style');
       if (!styleAttr || !styleAttr.trim()) {
         el.removeAttribute('style');
@@ -581,6 +610,10 @@ export default function NoticeDetailPage() {
   });
   const [pickerDragMode, setPickerDragMode] = useState('');
   const [pickerHexDraft, setPickerHexDraft] = useState('#111827');
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 960px)').matches : false
+  );
+  const [isHeaderStripCollapsed, setIsHeaderStripCollapsed] = useState(false);
 
   const noticeTitleRef = useRef(null);
   const noticeBodyRef = useRef(null);
@@ -594,6 +627,25 @@ export default function NoticeDetailPage() {
   useEffect(() => {
     localStorage.setItem(READING_STORAGE_KEY, JSON.stringify(reading));
   }, [reading]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mediaQuery = window.matchMedia('(max-width: 960px)');
+    const onChange = (event) => setIsMobile(event.matches);
+    setIsMobile(mediaQuery.matches);
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', onChange);
+      return () => mediaQuery.removeEventListener('change', onChange);
+    }
+    mediaQuery.addListener(onChange);
+    return () => mediaQuery.removeListener(onChange);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setIsHeaderStripCollapsed(false);
+    }
+  }, [isMobile]);
 
   const viewerKey = useMemo(() => {
     if (auth.status === 'Authenticated') {
@@ -960,6 +1012,30 @@ export default function NoticeDetailPage() {
     setReading((p) => ({ ...p, [key]: value }));
   };
 
+  const applyHeaderColor = useCallback((colorValue) => {
+    const nextColor = sanitizeColorToken(colorValue);
+    if (!nextColor) return;
+    const titleSource = syncTitleDraftFromDom() || styleDraft.titleHtml || defaultTitleHtml;
+    const contentSource = syncBodyDraftFromDom() || styleDraft.contentHtml || defaultDescriptionHtml;
+    const normalizedTitleHtml = stripInlineColorStyles(titleSource) || defaultTitleHtml;
+    const normalizedContentHtml = stripInlineColorStyles(contentSource) || defaultDescriptionHtml;
+
+    applyStyleDraftPatch({
+      titleColor: nextColor,
+      descriptionColor: nextColor,
+      titleHtml: normalizedTitleHtml,
+      contentHtml: normalizedContentHtml
+    });
+  }, [
+    applyStyleDraftPatch,
+    syncTitleDraftFromDom,
+    syncBodyDraftFromDom,
+    styleDraft.titleHtml,
+    styleDraft.contentHtml,
+    defaultTitleHtml,
+    defaultDescriptionHtml
+  ]);
+
   const customPickerColor = useMemo(
     () => hsvToHex(customPicker.h, customPicker.s, customPicker.v),
     [customPicker.h, customPicker.s, customPicker.v]
@@ -971,9 +1047,17 @@ export default function NoticeDetailPage() {
   }, []);
 
   const openCustomColorPicker = (event, target) => {
-    const baseColor = target === 'title'
-      ? safeHexColor(styleDraft.titleColor, '#111827')
-      : safeHexColor(styleDraft.descriptionColor, '#111827');
+    const unifiedColor = (styleDraft.titleColor && styleDraft.titleColor === styleDraft.descriptionColor)
+      ? styleDraft.titleColor
+      : '';
+    let baseColor = safeHexColor(styleDraft.descriptionColor || styleDraft.titleColor, '#111827');
+    if (target === 'title') {
+      baseColor = safeHexColor(styleDraft.titleColor, '#111827');
+    } else if (target === 'description') {
+      baseColor = safeHexColor(styleDraft.descriptionColor, '#111827');
+    } else if (target === 'global') {
+      baseColor = safeHexColor(unifiedColor || styleDraft.titleColor || styleDraft.descriptionColor, '#111827');
+    }
     const hsv = hexToHsv(baseColor);
     const triggerRect = event.currentTarget.getBoundingClientRect();
     const panelWidth = 328;
@@ -1007,8 +1091,10 @@ export default function NoticeDetailPage() {
     const nextColor = safeHexColor(pickerHexDraft || customPickerColor, customPickerColor);
     if (customPicker.target === 'title') {
       applyStyleDraftPatch({ titleColor: nextColor });
-    } else {
+    } else if (customPicker.target === 'description') {
       applyStyleDraftPatch({ descriptionColor: nextColor });
+    } else {
+      applyHeaderColor(nextColor);
     }
     closeCustomColorPicker();
   };
@@ -1358,97 +1444,199 @@ export default function NoticeDetailPage() {
 
   const titleColorChanged = (styleDraft.titleColor || '') !== (originalColorState.titleColor || '');
   const descriptionColorChanged = (styleDraft.descriptionColor || '') !== (originalColorState.descriptionColor || '');
+  const headerSharedColor = (styleDraft.titleColor && styleDraft.titleColor === styleDraft.descriptionColor)
+    ? styleDraft.titleColor
+    : '';
 
   return (
     <div className={`notice-detail-print-page ${themeClasses}`} style={{ '--font-base': `${reading.textSize}px` }}>
       <div className="notices-layout-center">
-        <section className="notices-sticky-strip" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
-          <Link
-            className="notices-hero-home"
-            to="/notices"
-            style={{ color: 'var(--notice-text)', fontWeight: 600, fontFamily: 'Outfit, sans-serif' }}
-          >
-            <Icons.ArrowLeft /> Board
-          </Link>
+        <section
+          className={`notices-sticky-strip notice-detail-sticky-strip ${isMobile && isHeaderStripCollapsed ? 'notice-detail-sticky-strip-collapsed' : ''}`}
+        >
+          {!(isMobile && isHeaderStripCollapsed) && (
+            <>
+              <div className="notice-detail-strip-main-row">
+                <Link className="notices-hero-home notice-detail-board-link" to="/notices">
+                  <Icons.ArrowLeft /> Board
+                </Link>
 
-          <div className="strip-controls-row" style={{ gap: '12px' }}>
-            {notice && (
-              <div className="notice-admin-icon-group" role="group" aria-label="Notice actions">
-                {isAdmin && (
+                <div className="notice-detail-strip-controls-top">
+                  <div className="notice-color-swatches compact notice-header-color-swatches notice-header-color-swatches-desktop">
+                    {TITLE_COLORS.map((color) => (
+                      <button
+                        key={`header-desktop-color-${color.key}`}
+                        type="button"
+                        className={`notice-color-dot ${headerSharedColor === color.value ? 'active' : ''}`}
+                        style={{ '--dot-color': color.value }}
+                        title={`Apply ${color.label} to all`}
+                        aria-label={`Apply ${color.label} to title, description and selected text`}
+                        onClick={() => applyHeaderColor(color.value)}
+                      />
+                    ))}
+                    <button
+                      type="button"
+                      className="notice-color-dot notice-color-dot-any"
+                      title="Choose any global color"
+                      aria-label="Choose any global color"
+                      onClick={(e) => openCustomColorPicker(e, 'global')}
+                    />
+                  </div>
+
+                  {notice && (
+                    <div className="notice-admin-icon-group" role="group" aria-label="Notice actions">
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          className={`notice-admin-icon-btn scope ${hasPendingStyleChanges ? 'has-pending' : ''}`}
+                          onClick={openScopeDialog}
+                          title="Apply styling scope"
+                          aria-label="Apply styling scope"
+                        >
+                          <Icons.Scope />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="notice-admin-icon-btn print"
+                        onClick={openPrintDialog}
+                        title="Print notice"
+                        aria-label="Print notice"
+                      >
+                        <Icons.Print />
+                      </button>
+                      {isAdmin && (
+                        <>
+                          <button
+                            type="button"
+                            className="notice-admin-icon-btn"
+                            onClick={openEditModal}
+                            title="Edit notice"
+                            aria-label="Edit notice"
+                          >
+                            <Icons.Edit />
+                          </button>
+                          <button
+                            type="button"
+                            className="notice-admin-icon-btn danger"
+                            onClick={openDeleteDialog}
+                            title="Delete notice"
+                            aria-label="Delete notice"
+                          >
+                            <Icons.Trash />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="readability-group notice-detail-theme-group">
+                    <button type="button" onClick={() => updateReading('theme', 'classic')} className={`readability-btn ${reading.theme === 'classic' ? 'active' : ''}`}><Icons.Sun/></button>
+                    <button type="button" onClick={() => updateReading('theme', 'paper')} className={`readability-btn ${reading.theme === 'paper' ? 'active' : ''}`}><Icons.Book/></button>
+                    <button type="button" onClick={() => updateReading('theme', 'night')} className={`readability-btn ${reading.theme === 'night' ? 'active' : ''}`}><Icons.Moon/></button>
+                  </div>
+
+                  <div className="notice-detail-typography-desktop">
+                    <FontSizeControl
+                      value={reading.textSize}
+                      onChange={applyGlobalTextSize}
+                      min={12}
+                      max={40}
+                      className="notice-header-font-size-group notice-detail-header-font-size-group"
+                      ariaLabel="Global font size control"
+                    />
+
+                    <div className="readability-group notice-detail-font-select-group">
+                      <select
+                        className="readability-select"
+                        value={reading.font}
+                        onChange={(e) => applyGlobalFont(e.target.value)}
+                      >
+                        {FONT_OPTIONS.map((opt) => (
+                          <option key={`reading-font-desktop-${opt.value}`} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="notice-detail-strip-typography-row">
+                <div className="notice-color-swatches compact notice-header-color-swatches notice-header-color-swatches-mobile">
+                  {TITLE_COLORS.map((color) => (
+                    <button
+                      key={`header-mobile-color-${color.key}`}
+                      type="button"
+                      className={`notice-color-dot ${headerSharedColor === color.value ? 'active' : ''}`}
+                      style={{ '--dot-color': color.value }}
+                      title={`Apply ${color.label} to all`}
+                      aria-label={`Apply ${color.label} to title, description and selected text`}
+                      onClick={() => applyHeaderColor(color.value)}
+                    />
+                  ))}
                   <button
                     type="button"
-                    className={`notice-admin-icon-btn scope ${hasPendingStyleChanges ? 'has-pending' : ''}`}
-                    onClick={openScopeDialog}
-                    title="Apply styling scope"
-                    aria-label="Apply styling scope"
+                    className="notice-color-dot notice-color-dot-any"
+                    title="Choose any global color"
+                    aria-label="Choose any global color"
+                    onClick={(e) => openCustomColorPicker(e, 'global')}
+                  />
+                </div>
+
+                <FontSizeControl
+                  value={reading.textSize}
+                  onChange={applyGlobalTextSize}
+                  min={12}
+                  max={40}
+                  className="notice-header-font-size-group notice-detail-header-font-size-group"
+                  ariaLabel="Global font size control"
+                />
+
+                <div className="readability-group notice-detail-font-select-group">
+                  <select
+                    className="readability-select"
+                    value={reading.font}
+                    onChange={(e) => applyGlobalFont(e.target.value)}
                   >
-                    <Icons.Scope />
-                  </button>
-                )}
+                    {FONT_OPTIONS.map((opt) => (
+                      <option key={`reading-font-${opt.value}`} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {isMobile && (
                 <button
                   type="button"
-                  className="notice-admin-icon-btn print"
-                  onClick={openPrintDialog}
-                  title="Print notice"
-                  aria-label="Print notice"
+                  className="notice-detail-strip-edge-toggle"
+                  onClick={() => setIsHeaderStripCollapsed(true)}
+                  aria-label="Collapse notice detail header strip"
                 >
-                  <Icons.Print />
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                  </svg>
                 </button>
-                {isAdmin && (
-                  <>
-                    <button
-                      type="button"
-                      className="notice-admin-icon-btn"
-                      onClick={openEditModal}
-                      title="Edit notice"
-                      aria-label="Edit notice"
-                    >
-                      <Icons.Edit />
-                    </button>
-                    <button
-                      type="button"
-                      className="notice-admin-icon-btn danger"
-                      onClick={openDeleteDialog}
-                      title="Delete notice"
-                      aria-label="Delete notice"
-                    >
-                      <Icons.Trash />
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-
-            <div className="readability-group">
-              <button type="button" onClick={() => updateReading('theme', 'classic')} className={`readability-btn ${reading.theme === 'classic' ? 'active' : ''}`}><Icons.Sun/></button>
-              <button type="button" onClick={() => updateReading('theme', 'paper')} className={`readability-btn ${reading.theme === 'paper' ? 'active' : ''}`}><Icons.Book/></button>
-              <button type="button" onClick={() => updateReading('theme', 'night')} className={`readability-btn ${reading.theme === 'night' ? 'active' : ''}`}><Icons.Moon/></button>
-            </div>
-
-            <FontSizeControl
-              value={reading.textSize}
-              onChange={applyGlobalTextSize}
-              min={12}
-              max={40}
-              className="notice-header-font-size-group"
-              ariaLabel="Global font size control"
-            />
-
-            <div className="readability-group">
-              <select
-                className="readability-select"
-                value={reading.font}
-                onChange={(e) => applyGlobalFont(e.target.value)}
-              >
-                {FONT_OPTIONS.map((opt) => (
-                  <option key={`reading-font-${opt.value}`} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+              )}
+            </>
+          )}
         </section>
+
+        {isMobile && isHeaderStripCollapsed && (
+          <button
+            type="button"
+            className="notice-detail-strip-float-toggle"
+            onClick={() => setIsHeaderStripCollapsed(false)}
+            aria-label="Expand notice detail header strip"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
+        )}
 
         {actionMessage.text && (
           <div className={`notice-inline-message ${actionMessage.type === 'error' ? 'error' : ''}`} style={{ marginBottom: '22px' }}>
@@ -1508,12 +1696,12 @@ export default function NoticeDetailPage() {
                   />
                   <div className="readability-group notice-inline-font-family-group">
                     <select
-                      className="readability-select"
+                      className="readability-select notice-inline-font-select"
                       value={titleFontKey}
                       onChange={(e) => applyTitleTypographyChange({ titleFont: e.target.value })}
                       aria-label="Title font style"
                     >
-                      {FONT_OPTIONS.map((opt) => (
+                      {INLINE_FONT_OPTIONS.map((opt) => (
                         <option key={`title-font-${opt.value}`} value={opt.value}>
                           {opt.label}
                         </option>
@@ -1594,12 +1782,12 @@ export default function NoticeDetailPage() {
                 />
                 <div className="readability-group notice-inline-font-family-group">
                   <select
-                    className="readability-select"
+                    className="readability-select notice-inline-font-select"
                     value={descriptionFontKey}
                     onChange={(e) => applyDescriptionTypographyChange({ descriptionFont: e.target.value })}
                     aria-label="Description font style"
                   >
-                    {FONT_OPTIONS.map((opt) => (
+                    {INLINE_FONT_OPTIONS.map((opt) => (
                       <option key={`description-font-${opt.value}`} value={opt.value}>
                         {opt.label}
                       </option>
