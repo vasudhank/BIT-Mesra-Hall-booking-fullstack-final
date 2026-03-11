@@ -287,7 +287,7 @@ export default function AdminHall() {
         {showControlStrip ? (
           <Box
             className='admin-hall-controls-strip'
-            style={isMobile ? { top: `${showAppbar ? appbarHeight + 8 : 6}px` } : undefined}
+            style={isMobile ? { top: `${showAppbar ? appbarHeight : 0}px` } : undefined}
           >
             <Box className='admin-hall-controls-left'>
               <label className='admin-hall-select-inline'>

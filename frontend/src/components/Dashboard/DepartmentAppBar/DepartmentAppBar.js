@@ -289,12 +289,12 @@ export default function DepartmentAppBar({
           >
             {isMobileMenu && (
               <MenuItem onClick={() => { setAnchorElUser(null); navigate('/department/booking'); }}>
-                <Typography className="dropdown-text">BOOKINGS</Typography>
+                <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%' }}>BOOKINGS</Typography>
               </MenuItem>
             )}
             <MenuItem onClick={() => setAnchorElUser(null)}>
               <Link to="/">
-                <Typography className="dropdown-text">HOME</Typography>
+                <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%' }}>HOME</Typography>
               </Link>
             </MenuItem>
             <MenuItem onClick={() => { setAnchorElUser(null); }} sx={{ color: 'black' }}>
@@ -305,7 +305,7 @@ export default function DepartmentAppBar({
             <MenuItem disableRipple sx={{ px: 1.25, py: 0.8 }}>
               <QuickPageMenu
                 buttonLabel="MENU"
-                buttonClassName="appbar-user-menu-btn"
+                buttonClassName={`appbar-user-menu-btn${isMobileMenu ? ' appbar-user-menu-btn-mobile' : ''}`}
                 panelClassName="appbar-user-submenu-panel"
                 itemClassName="appbar-user-submenu-item"
                 align="left"
@@ -317,18 +317,20 @@ export default function DepartmentAppBar({
             </MenuItem>
             <Divider sx={{ my: 0.3 }} />
             <MenuItem onClick={togglePageTheme} sx={{ color: 'black' }}>
-              <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.2 }}>
-                <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>
+              <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: isMobileMenu ? 'center' : 'space-between', gap: 1.2 }}>
+                <Typography textAlign="center" className="dropdown-text" sx={{ width: isMobileMenu ? 'auto' : '100%', color: 'black' }}>
                   {themeActionLabel}
                 </Typography>
-                <Typography sx={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.02em' }}>
-                  {themeShortcutLabel}
-                </Typography>
+                {!isMobileMenu && (
+                  <Typography sx={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.02em' }}>
+                    {themeShortcutLabel}
+                  </Typography>
+                )}
               </Box>
             </MenuItem>
             <MenuItem onClick={() => setAnchorElUser(null)}>
               <Typography className="dropdown-text"
-  style={{ color: "red", fontWeight: "bold" }} onClick={logout}>
+  style={{ color: "red", fontWeight: "bold", width: '100%', textAlign: 'center' }} onClick={logout}>
                 LOGOUT
               </Typography>
             </MenuItem>

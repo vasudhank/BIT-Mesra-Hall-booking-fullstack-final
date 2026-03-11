@@ -99,3 +99,21 @@ body.dark-mode .appbar-user-menu-btn {
 body.dark-mode .appbar-user-menu-btn:hover {
     background: rgba(148, 163, 184, 0.2) !important;
 }
+
+@media (max-width: 900px) {
+  .appbar-user-menu-btn-mobile {
+    justify-content: center !important;
+    text-align: center !important;
+    width: 100% !important;
+    min-height: 34px !important;
+  }
+
+  .appbar-user-menu-btn-mobile .quick-page-menu-icon {
+    display: none !important;
+  }
+
+  .appbar-user-menu-btn-mobile .quick-page-menu-label {
+    width: 100%;
+    text-align: center;
+  }
+}

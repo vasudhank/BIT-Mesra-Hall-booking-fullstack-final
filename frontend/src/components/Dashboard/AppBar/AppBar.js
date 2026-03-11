@@ -16,6 +16,7 @@ import TextField from '@mui/material/TextField';
 import InputAdornment from '@mui/material/InputAdornment';
 import SearchIcon from '@mui/icons-material/Search';
 import Divider from '@mui/material/Divider'; 
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import api from '../../../api/axiosInstance';
 import { useDispatch } from "react-redux";
@@ -52,6 +53,7 @@ export default function Appbar({
   const [anchorElNav, setAnchorElNav] = React.useState(null);
   const [anchorElUser, setAnchorElUser] = React.useState(null);
   const [dateTime, setDateTime] = React.useState("");
+  const isMobileMenu = useMediaQuery('(max-width:900px)');
   const [effectiveMode, setEffectiveMode] = React.useState(() =>
     resolveEffectiveThemeMode(location.pathname, readGlobalThemeMode())
   );
@@ -345,7 +347,7 @@ export default function Appbar({
                   <MenuItem disableRipple sx={{ px: 1.25, py: 0.8 }}>
                     <QuickPageMenu
                       buttonLabel="MENU"
-                      buttonClassName="appbar-user-menu-btn"
+                      buttonClassName="appbar-user-menu-btn appbar-user-menu-btn-mobile"
                       panelClassName="appbar-user-submenu-panel"
                       itemClassName="appbar-user-submenu-item"
                       align="left"
@@ -360,13 +362,15 @@ export default function Appbar({
                   </MenuItem>
                   <Divider sx={{ my: 0.4 }} />
                   <MenuItem onClick={togglePageTheme}>
-                    <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.2 }}>
-                      <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>
+                    <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: isMobileMenu ? 'center' : 'space-between', gap: 1.2 }}>
+                      <Typography textAlign="center" className="dropdown-text" sx={{ width: isMobileMenu ? 'auto' : '100%', color: '#25354F' }}>
                         {themeActionLabel}
                       </Typography>
-                      <Typography sx={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.02em' }}>
-                        {themeShortcutLabel}
-                      </Typography>
+                      {!isMobileMenu && (
+                        <Typography sx={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.02em' }}>
+                          {themeShortcutLabel}
+                        </Typography>
+                      )}
                     </Box>
                   </MenuItem>
                   <MenuItem onClick={() => { handleCloseNavMenu(); logout(); }}>

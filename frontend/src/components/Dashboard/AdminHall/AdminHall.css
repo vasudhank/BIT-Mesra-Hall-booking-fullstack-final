@@ -9,7 +9,7 @@
   --appbar-height: 64px;
   --content-gap: 4px;
   --section-top-gap: 8px;
-  --admin-hall-strip-top: calc(var(--appbar-height) + 8px);
+  --admin-hall-strip-top: var(--appbar-height);
   --admin-hall-strip-bg: #21304a;
   --admin-hall-strip-space: 84px;
 }
@@ -382,11 +382,25 @@
   .admin-hall-controls-strip {
     left: 10px;
     right: 10px;
-    top: calc(var(--appbar-height) + 4px);
+    top: var(--appbar-height);
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
     padding: 10px;
+  }
+
+  .admin-hall-select-inline {
+    font-size: 0.86rem;
+    padding: 1px 8px 1px 3px;
+    min-height: 28px;
+  }
+
+  .admin-hall-select-inline .MuiCheckbox-root {
+    padding: 3px;
+  }
+
+  .admin-hall-select-inline .MuiSvgIcon-root {
+    font-size: 1.05rem;
   }
 
   .admin-hall-controls-left,
