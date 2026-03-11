@@ -817,8 +817,16 @@
     font-size: 0.9rem;
   }
 
+  .feedback-search-wrap {
+    max-width: 260px;
+  }
+
+  .feedback-search-box {
+    max-width: 260px;
+  }
+
   .feedback-mobile-title-sort {
-    width: min(56vw, 178px);
+    width: min(50vw, 160px);
   }
 
   .feedback-status-tabs {
@@ -878,7 +886,15 @@
   }
 
   .feedback-mobile-title-sort {
-    width: min(48vw, 148px);
+    width: min(46vw, 140px);
+  }
+
+  .feedback-search-wrap {
+    max-width: 220px;
+  }
+
+  .feedback-search-box {
+    max-width: 220px;
   }
 
   .feedback-mobile-title-sort select {

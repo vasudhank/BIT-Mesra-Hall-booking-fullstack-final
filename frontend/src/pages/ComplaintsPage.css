@@ -959,7 +959,15 @@
   }
 
   .support-mobile-title-sort {
-    width: min(56vw, 178px);
+    width: min(50vw, 156px);
+  }
+
+  .support-search-box {
+    max-width: 250px;
+  }
+
+  .support-search-box input {
+    width: 100%;
   }
 
   .support-inline-compose-btn {
@@ -973,10 +981,10 @@
   }
 
   .support-filter-btn {
-    padding: 8px 10px;
+    padding: 6px 8px;
     flex: 1;
     justify-content: center;
-    min-width: 90px;
+    min-width: 74px;
   }
 
   .support-mobile-compose-card {
@@ -1011,7 +1019,11 @@
   }
 
   .support-mobile-title-sort {
-    width: min(48vw, 148px);
+    width: min(46vw, 140px);
+  }
+
+  .support-search-box {
+    max-width: 220px;
   }
 
   .support-mobile-title-sort select {
