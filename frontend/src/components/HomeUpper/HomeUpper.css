@@ -1244,17 +1244,20 @@ body.dark-mode .mobile-datetime-bar.mobile-datetime-bar--expanded {
   .c-name { font-size: 1.1rem; margin-bottom: 2px; }
   .c-num, .c-email { font-size: 0.9rem; color: #64748b; }
   .modal-footer-actions-row {
-    flex-wrap: wrap;
-    justify-content: center;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    gap: 10px;
   }
   .modal-footer-hint {
     position: static;
     transform: none;
-    width: 100%;
-    max-width: 100%;
+    width: auto;
+    max-width: none;
+    flex: 1;
+    text-align: left;
     white-space: normal;
   }
-  .modal-footer-actions { width: 100%; justify-content: flex-end; }
+  .modal-footer-actions { width: auto; justify-content: flex-end; margin-left: auto; }
   .popup-card, .popup-card-wide { width: 95%; max-width: 95%; padding: 20px 15px; }
 }
 @media (max-width: 400px) {

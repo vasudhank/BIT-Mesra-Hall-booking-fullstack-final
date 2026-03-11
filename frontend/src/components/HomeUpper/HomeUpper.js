@@ -17,10 +17,13 @@ import CakeIcon from '@mui/icons-material/Cake';
 import OpenInFullIcon from '@mui/icons-material/OpenInFull'; // New icon for immersive
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
+import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined';
 
 // Import the API call
 import { getContactsApi } from "../../api/contactApi";
 import { playElevenLabsSpeech, stopElevenLabsPlayback } from "../../utils/elevenLabsTts";
+import { printHtmlDocument } from "../../utils/printDocument";
+import { exportPdfFromPrintHtml } from "../../utils/exportPdfFromPrintHtml";
 const AIChatWidget = lazy(() => import("../AI/AIChatWidget"));
 
 // --- SUB-COMPONENT: FLIP UNIT (2-DIGIT) ---
@@ -190,6 +193,7 @@ export default function HomeUpper({
   const [selectedContactKeys, setSelectedContactKeys] = useState([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [wishPdfBusy, setWishPdfBusy] = useState(false);
 
   // Snackbar
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -400,17 +404,7 @@ export default function HomeUpper({
       .replace(/,/g, '\\,')
       .replace(/;/g, '\\;');
 
-  const handleWishContactsPrint = () => {
-    const selectedContacts = getWishContactsForExport();
-    const printableContacts = selectedContacts.length > 0
-      ? selectedContacts
-      : getAllWishContactsForExport();
-    if (!printableContacts.length) {
-      setSnackbarMessage('No contacts available to print.');
-      setSnackbarOpen(true);
-      return;
-    }
-
+  const buildWishContactsPrintDocument = (printableContacts = []) => {
     const generatedAt = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
     const rowsHtml = printableContacts
       .map(
@@ -425,7 +419,7 @@ export default function HomeUpper({
       )
       .join('');
 
-    const printDoc = `<!doctype html>
+    const html = `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
@@ -497,66 +491,63 @@ export default function HomeUpper({
 </body>
 </html>`;
 
-    const frame = document.createElement('iframe');
-    frame.style.position = 'fixed';
-    frame.style.width = '0';
-    frame.style.height = '0';
-    frame.style.right = '-9999px';
-    frame.style.bottom = '0';
-    frame.setAttribute('aria-hidden', 'true');
-    frame.style.opacity = '0';
-
-    let hasPrinted = false;
-    let cleanupTimerId = null;
-
-    const cleanup = () => {
-      frame.removeEventListener('load', onFrameLoad);
-      if (cleanupTimerId) {
-        clearTimeout(cleanupTimerId);
-      }
-      if (frame.parentNode) {
-        frame.parentNode.removeChild(frame);
-      }
+    return {
+      html,
+      title: 'Wish Your Day Contacts',
+      marginMm: 14,
+      orientation: 'portrait'
     };
+  };
 
-    const runPrintIfReady = () => {
-      if (hasPrinted) return;
-      const printWindow = frame.contentWindow;
-      const doc = frame.contentDocument;
-      if (!printWindow || !doc || !doc.body) return;
-      const hasPrintableTable = Boolean(doc.querySelector('table'));
-      const hasPrintableText = String(doc.body.textContent || '').trim().length > 0;
-      if (!hasPrintableTable || !hasPrintableText) return;
+  const handleWishContactsPrint = () => {
+    const selectedContacts = getWishContactsForExport();
+    const printableContacts = selectedContacts.length > 0
+      ? selectedContacts
+      : getAllWishContactsForExport();
+    if (!printableContacts.length) {
+      setSnackbarMessage('No contacts available to print.');
+      setSnackbarOpen(true);
+      return;
+    }
+    const built = buildWishContactsPrintDocument(printableContacts);
+    printHtmlDocument({
+      html: built.html,
+      title: built.title,
+      validate: (doc) => Boolean(doc.querySelector('table')) && String(doc.body?.textContent || '').trim().length > 0,
+      settleDelayMs: 320,
+      printFallbackCleanupMs: 180000,
+      initFallbackCleanupMs: 240000
+    });
+  };
 
-      hasPrinted = true;
-
-      const doPrint = () => {
-        const onAfterPrint = () => {
-          printWindow.removeEventListener('afterprint', onAfterPrint);
-          cleanup();
-        };
-        printWindow.addEventListener('afterprint', onAfterPrint);
-        printWindow.focus();
-        printWindow.print();
-        cleanupTimerId = window.setTimeout(cleanup, 3500);
-      };
-
-      if (doc.fonts && doc.fonts.ready) {
-        doc.fonts.ready.then(() => setTimeout(doPrint, 60)).catch(() => setTimeout(doPrint, 60));
-      } else {
-        setTimeout(doPrint, 60);
-      }
-    };
-
-    const onFrameLoad = () => {
-      setTimeout(runPrintIfReady, 30);
-    };
-
-    frame.addEventListener('load', onFrameLoad);
-    frame.srcdoc = printDoc;
-    document.body.appendChild(frame);
-    setTimeout(runPrintIfReady, 250);
-    cleanupTimerId = window.setTimeout(cleanup, 20000);
+  const handleWishContactsPdfDownload = async () => {
+    if (!isMobile || wishPdfBusy) return;
+    const selectedContacts = getWishContactsForExport();
+    const exportContacts = selectedContacts.length > 0
+      ? selectedContacts
+      : getAllWishContactsForExport();
+    if (!exportContacts.length) {
+      setSnackbarMessage('No contacts available to download.');
+      setSnackbarOpen(true);
+      return;
+    }
+    const built = buildWishContactsPrintDocument(exportContacts);
+    setWishPdfBusy(true);
+    try {
+      await exportPdfFromPrintHtml({
+        html: built.html,
+        title: built.title,
+        orientation: built.orientation,
+        marginMm: built.marginMm
+      });
+      setSnackbarMessage('Contacts PDF downloaded.');
+      setSnackbarOpen(true);
+    } catch (_) {
+      setSnackbarMessage('Unable to download contacts PDF.');
+      setSnackbarOpen(true);
+    } finally {
+      setWishPdfBusy(false);
+    }
   };
 
   const handleWishContactsDownload = () => {
@@ -1052,6 +1043,18 @@ export default function HomeUpper({
                   >
                     <PrintOutlinedIcon fontSize="small" />
                   </button>
+                  {isMobile && (
+                    <button
+                      type="button"
+                      className="modal-icon-action-btn"
+                      onClick={handleWishContactsPdfDownload}
+                      title="Download contacts PDF"
+                      aria-label="Download contacts PDF"
+                      disabled={wishPdfBusy}
+                    >
+                      <PictureAsPdfOutlinedIcon fontSize="small" />
+                    </button>
+                  )}
                 </div>
               </div>
             )}

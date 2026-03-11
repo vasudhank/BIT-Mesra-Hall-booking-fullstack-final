@@ -2,7 +2,7 @@
   position: fixed;
   inset: 0;
   z-index: 13000;
-  background: rgba(2, 6, 23, 0.55);
+  background: rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
   display: flex;
@@ -12,30 +12,31 @@
 }
 
 .quick-contacts-card {
-  width: min(960px, calc(100vw - 20px));
-  max-height: calc(100vh - 28px);
+  width: 90%;
+  max-width: 900px;
+  max-height: calc(100vh - 30px);
   overflow: hidden;
-  border-radius: 16px;
-  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 12px;
+  border: 1px solid #dbe2eb;
   background: #ffffff;
-  box-shadow: 0 24px 65px rgba(2, 6, 23, 0.35);
-  padding: 18px 18px 14px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+  padding: 24px;
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .quick-contacts-close {
   position: absolute;
   top: 10px;
-  right: 10px;
-  width: 30px;
-  height: 30px;
-  border: 1px solid rgba(148, 163, 184, 0.45);
-  background: #f8fafc;
-  border-radius: 10px;
-  color: #334155;
+  right: 15px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  color: #999;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -44,17 +45,18 @@
 
 .quick-contacts-title {
   margin: 0;
-  font-size: clamp(1.35rem, 2vw, 1.9rem);
-  line-height: 1.1;
+  font-size: 1.8rem;
+  line-height: 1.15;
   text-align: center;
   color: #0f172a;
+  font-family: 'RecklessNeue', 'Outfit', serif;
 }
 
 .quick-contacts-search-row {
   display: flex;
   align-items: stretch;
-  border: 1px solid #d6dee8;
-  border-radius: 11px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
   overflow: hidden;
 }
 
@@ -63,13 +65,14 @@
   min-width: 0;
   border: none;
   outline: none;
-  padding: 11px 12px;
-  font-size: 0.95rem;
+  padding: 12px 16px;
+  font-size: 1rem;
   color: #0f172a;
+  font-family: 'Inter', sans-serif;
 }
 
 .quick-contacts-search-btn {
-  width: 44px;
+  width: 52px;
   border: none;
   background: #0f172a;
   color: #ffffff;
@@ -81,8 +84,9 @@
 
 .quick-contacts-head-wrap {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 10px;
+  margin-bottom: 2px;
 }
 
 .quick-contacts-head-check {
@@ -95,23 +99,22 @@
 .quick-contacts-head-row {
   flex: 1;
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1.4fr;
-  gap: 12px;
-  background: #e2e8f0;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 9px 10px;
-  font-size: 0.78rem;
+  grid-template-columns: 1.2fr 1fr 1.5fr;
+  gap: 15px;
+  background: #f1f5f9;
+  border-radius: 6px;
+  padding: 10px 16px;
+  font-size: 0.8rem;
   font-weight: 700;
-  color: #334155;
+  color: #64748b;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  font-family: 'Inter', sans-serif;
 }
 
 .quick-contacts-list {
-  max-height: min(52vh, 430px);
+  max-height: 50vh;
   overflow: auto;
-  padding-right: 4px;
+  padding-right: 5px;
 }
 
 .quick-contacts-row-wrap {
@@ -130,11 +133,12 @@
 .quick-contacts-row {
   flex: 1;
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1.4fr;
-  gap: 12px;
-  padding: 11px 10px;
-  border-bottom: 1px solid #e2e8f0;
+  grid-template-columns: 1.2fr 1fr 1.5fr;
+  gap: 15px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #f1f5f9;
   align-items: center;
+  transition: background 0.2s ease;
 }
 
 .quick-contacts-row .name {
@@ -151,12 +155,16 @@
   padding: 0;
   margin: 0;
   text-align: left;
-  color: #334155;
+  color: #475569;
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   font: inherit;
+}
+
+.quick-contacts-row:hover {
+  background: #f8fafc;
 }
 
 .quick-contacts-row .linkish:hover {
@@ -184,7 +192,7 @@
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  color: #64748b;
+  color: #94a3b8;
   font-size: 0.8rem;
   white-space: nowrap;
 }
@@ -224,7 +232,7 @@
 
 body.dark-mode .quick-contacts-card {
   background: #0f172a;
-  border-color: rgba(148, 163, 184, 0.35);
+  border-color: rgba(148, 163, 184, 0.4);
 }
 
 body.dark-mode .quick-contacts-title {
@@ -246,12 +254,11 @@ body.dark-mode .quick-contacts-search-btn {
 
 body.dark-mode .quick-contacts-head-row {
   background: #1e293b;
-  border-color: rgba(148, 163, 184, 0.35);
   color: #cbd5e1;
 }
 
 body.dark-mode .quick-contacts-row {
-  border-bottom-color: rgba(148, 163, 184, 0.28);
+  border-bottom-color: rgba(148, 163, 184, 0.22);
 }
 
 body.dark-mode .quick-contacts-row .name {
@@ -260,6 +267,10 @@ body.dark-mode .quick-contacts-row .name {
 
 body.dark-mode .quick-contacts-row .linkish {
   color: #cbd5e1;
+}
+
+body.dark-mode .quick-contacts-row:hover {
+  background: rgba(51, 65, 85, 0.35);
 }
 
 body.dark-mode .quick-contacts-row .linkish:hover {
@@ -274,8 +285,11 @@ body.dark-mode .quick-contacts-footer p {
 body.dark-mode .quick-contacts-close,
 body.dark-mode .quick-contacts-footer .actions button {
   border-color: rgba(148, 163, 184, 0.4);
-  background: #1e293b;
   color: #cbd5e1;
+}
+
+body.dark-mode .quick-contacts-close {
+  background: transparent;
 }
 
 body.dark-mode .quick-contacts-close:hover,
@@ -285,28 +299,60 @@ body.dark-mode .quick-contacts-footer .actions button:hover {
 
 @media (max-width: 640px) {
   .quick-contacts-card {
-    width: calc(100vw - 10px);
-    max-height: calc(100vh - 10px);
-    padding: 12px 10px 10px;
+    width: 95%;
+    max-width: 95%;
+    max-height: calc(100vh - 12px);
+    padding: 20px 15px;
     border-radius: 12px;
+  }
+
+  .quick-contacts-head-wrap {
+    display: none;
+  }
+
+  .quick-contacts-row-wrap {
+    align-items: flex-start;
+  }
+
+  .quick-contacts-row-check {
+    padding-top: 14px;
   }
 
   .quick-contacts-head-row,
   .quick-contacts-row {
-    grid-template-columns: 1.1fr 0.95fr 1.2fr;
-    gap: 8px;
-    font-size: 0.72rem;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 15px;
+  }
+
+  .quick-contacts-row .name {
+    font-size: 1.1rem;
   }
 
   .quick-contacts-row .linkish {
-    font-size: 0.82rem;
+    font-size: 0.9rem;
+  }
+
+  .quick-contacts-footer {
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    gap: 10px;
   }
 
   .quick-contacts-footer p {
+    position: static;
+    transform: none;
+    text-align: left;
+    white-space: normal;
+    max-width: none;
+    flex: 1;
     font-size: 0.74rem;
-    max-width: calc(100% - 96px);
-    overflow: hidden;
-    text-overflow: ellipsis;
+  }
+
+  .quick-contacts-footer .actions {
+    width: auto;
+    justify-content: flex-end;
   }
 }
-
