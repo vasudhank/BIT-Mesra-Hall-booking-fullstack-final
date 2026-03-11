@@ -396,6 +396,10 @@ body.dark-mode .quick-contacts-head-check input[type='checkbox']:indeterminate {
 }
 
 @media (max-width: 640px) {
+  .quick-contacts-overlay {
+    padding: 0;
+  }
+
   .quick-contacts-card {
     width: 95%;
     max-width: 95%;
