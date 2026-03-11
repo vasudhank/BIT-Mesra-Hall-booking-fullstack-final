@@ -211,6 +211,23 @@
   min-width: 0;
 }
 
+.feedback-top-strip-shell {
+  position: sticky;
+  top: 0;
+  z-index: 45;
+  width: 100%;
+  margin: 0 0 14px;
+}
+
+.feedback-page--detached-strip {
+  padding: 0 0 22px;
+}
+
+.feedback-page--detached-strip .feedback-layout {
+  padding: 22px;
+  box-sizing: border-box;
+}
+
 .feedback-sticky-strip {
   position: sticky;
   top: 0;
@@ -777,24 +794,21 @@
     box-sizing: border-box;
   }
 
+  .feedback-page--detached-strip .feedback-layout {
+    padding: 0 12px 0;
+  }
+
   .feedback-sticky-strip {
-    width: calc(100vw + var(--feedback-mobile-strip-overdraw, 2px));
-    max-width: calc(100vw + var(--feedback-mobile-strip-overdraw, 2px));
-    margin-left: calc(50% - 50vw - 1px);
-    margin-right: calc(50% - 50vw - 1px);
+    left: calc(-1 * (var(--feedback-mobile-side-pad, 12px) + var(--feedback-mobile-strip-overdraw, 2px)));
+    right: calc(-1 * (var(--feedback-mobile-side-pad, 12px) + var(--feedback-mobile-strip-overdraw, 2px)));
+    width: auto;
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
     border-radius: 0;
     border-left: none;
     border-right: none;
     margin-top: 0;
-  }
-
-  @supports (width: 100dvw) {
-    .feedback-sticky-strip {
-      width: calc(100dvw + var(--feedback-mobile-strip-overdraw, 2px));
-      max-width: calc(100dvw + var(--feedback-mobile-strip-overdraw, 2px));
-      margin-left: calc(50% - 50dvw - 1px);
-      margin-right: calc(50% - 50dvw - 1px);
-    }
   }
 
   .feedback-sticky-strip.mobile-compact {
@@ -802,7 +816,6 @@
     box-sizing: border-box;
   }
 
-  .feedback-sticky-strip,
   .feedback-top-row,
   .feedback-filter-row,
   .feedback-search-wrap,
@@ -871,6 +884,10 @@
 
   .feedback-layout {
     --feedback-mobile-side-pad: 10px;
+    padding: 0 10px 0;
+  }
+
+  .feedback-page--detached-strip .feedback-layout {
     padding: 0 10px 0;
   }
 
@@ -948,6 +965,10 @@
     padding: 0 6px 0;
   }
 
+  .feedback-page--detached-strip .feedback-layout {
+    padding: 0 6px 0;
+  }
+
   .feedback-sticky-strip.mobile-compact {
     padding: 10px max(6px, env(safe-area-inset-right)) 20px max(6px, env(safe-area-inset-left));
   }
@@ -995,10 +1016,22 @@
     font-size: clamp(1.35rem, 7.2vw, 1.62rem);
   }
 
-  .feedback-sticky-strip,
   .feedback-list,
   .feedback-card {
     max-width: 100%;
     box-sizing: border-box;
   }
+}
+
+.feedback-page--detached-strip .feedback-sticky-strip {
+  position: relative;
+  top: 0;
+  left: auto !important;
+  right: auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
 }

@@ -233,6 +233,18 @@
   min-width: 0;
 }
 
+.support-top-strip-shell {
+  position: sticky;
+  top: 0;
+  z-index: 45;
+  width: 100%;
+  margin: 0 0 14px;
+}
+
+.support-page--detached-strip .support-layout {
+  padding-top: 14px;
+}
+
 .support-top-strip {
   position: sticky;
   top: 0;
@@ -862,6 +874,10 @@
     gap: 14px;
   }
 
+  .support-page--detached-strip .support-layout {
+    padding: 0 16px 14px;
+  }
+
   .support-left-panel {
     position: static;
     max-height: none;
@@ -877,24 +893,17 @@
     position: sticky;
     top: 0;
     z-index: 30;
-    width: calc(100vw + var(--support-mobile-strip-overdraw, 2px));
-    max-width: calc(100vw + var(--support-mobile-strip-overdraw, 2px));
-    margin-left: calc(50% - 50vw - 1px);
-    margin-right: calc(50% - 50vw - 1px);
+    left: calc(-1 * (var(--support-mobile-side-pad, 16px) + var(--support-mobile-strip-overdraw, 2px)));
+    right: calc(-1 * (var(--support-mobile-side-pad, 16px) + var(--support-mobile-strip-overdraw, 2px)));
+    width: auto;
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
     margin-bottom: 12px;
     border-radius: 0;
     border-left: none;
     border-right: none;
     margin-top: 0;
-  }
-
-  @supports (width: 100dvw) {
-    .support-top-strip {
-      width: calc(100dvw + var(--support-mobile-strip-overdraw, 2px));
-      max-width: calc(100dvw + var(--support-mobile-strip-overdraw, 2px));
-      margin-left: calc(50% - 50dvw - 1px);
-      margin-right: calc(50% - 50dvw - 1px);
-    }
   }
 
   .support-top-strip.strip-collapsed-mobile {
@@ -1012,6 +1021,10 @@
     padding: 0 12px 12px;
   }
 
+  .support-page--detached-strip .support-layout {
+    padding: 0 12px 12px;
+  }
+
   .support-raise-card {
     padding: 14px;
     gap: 12px;
@@ -1084,6 +1097,10 @@
     padding: 0 6px 10px;
   }
 
+  .support-page--detached-strip .support-layout {
+    padding: 0 6px 10px;
+  }
+
   .support-top-strip.mobile-compact {
     padding: 10px max(6px, env(safe-area-inset-right)) 20px max(6px, env(safe-area-inset-left));
   }
@@ -1126,10 +1143,22 @@
     font-size: clamp(1.35rem, 7.2vw, 1.62rem);
   }
 
-  .support-top-strip,
   .support-list-area,
   .support-thread-card {
     max-width: 100%;
     box-sizing: border-box;
   }
+}
+
+.support-page--detached-strip .support-top-strip {
+  position: relative;
+  top: 0;
+  left: auto !important;
+  right: auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
 }

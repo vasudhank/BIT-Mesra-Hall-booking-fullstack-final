@@ -190,8 +190,136 @@ export default function QueriesPage({ mode = 'public' }) {
   const showMobileCompactControls = !hideComposer && isMobile;
   const isStripCollapsedOnMobile = showMobileCompactControls && isHeaderStripCollapsed;
 
+  const topStrip = (
+    <div className="support-top-strip-shell">
+      <div className={`support-top-strip ${showMobileCompactControls ? 'mobile-compact' : ''} ${isStripCollapsedOnMobile ? 'strip-collapsed-mobile' : ''}`}>
+        {!isStripCollapsedOnMobile && (
+          <>
+            {isDeveloperView && (
+              <div className="developer-action-row">
+                <Link to="/" className="dev-action-btn">Home</Link>
+                <Link to="/developer/account" className="dev-action-btn">Accounts</Link>
+                <Link to="/developer/complaints" className="dev-action-btn">Complaints</Link>
+                <Link to="/developer/queries" className="dev-action-btn">Queries</Link>
+                <Link to="/developer/feedback" className="dev-action-btn">Feedback</Link>
+                <button className="dev-action-btn" onClick={logoutDeveloper}>Logout</button>
+                <QuickPageMenu
+                  buttonLabel="Menu"
+                  buttonClassName="dev-action-btn support-dev-menu-btn"
+                  panelClassName="support-dev-menu-panel"
+                  itemClassName="support-dev-menu-item"
+                  excludeKeys={['complaints', 'queries', 'feedback']}
+                  align="left"
+                  preferLeftWhenTight
+                />
+              </div>
+            )}
+            <div className="support-top-grid">
+              <div className={`support-top-left ${showMobileCompactControls ? 'mobile-controls-visible' : ''}`} />
+              <div className={`support-top-center ${showMobileCompactControls ? 'compact-mode' : ''}`}>
+                <div className="support-title-row">
+                  <h1>Queries</h1>
+                  {showMobileCompactControls && (
+                    <div className="support-title-mobile-tools">
+                      <div className="support-sort-box inline support-mobile-title-sort">
+                        <label>SORT QUERIES</label>
+                        <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                          {SORT_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <QuickPageMenu
+                        iconOnly
+                        buttonClassName="support-header-home-btn support-header-menu-btn"
+                        panelClassName="support-menu-panel"
+                        itemClassName="support-menu-item"
+                        align="right"
+                        extraItems={[
+                          { key: 'mobile-home', label: 'Home', path: '/' },
+                          { key: 'mobile-compose-query', label: 'Ask a Query', onClick: () => setIsComposeModalOpen(true) }
+                        ]}
+                      />
+                    </div>
+                  )}
+                </div>
+                <p>Ask project-specific questions, get AI/community help, and mark accepted answers.</p>
+                <div className="support-filter-row">
+                  <button
+                    className={`support-filter-btn ${filter === 'ACTIVE' ? 'active' : ''}`}
+                    onClick={() => setFilter('ACTIVE')}
+                  >
+                    Active <span className="filter-count">{counts.active}</span>
+                  </button>
+                  <button
+                    className={`support-filter-btn ${filter === 'RESOLVED' ? 'active' : ''}`}
+                    onClick={() => setFilter('RESOLVED')}
+                  >
+                    Resolved <span className="filter-count">{counts.resolved}</span>
+                  </button>
+                  <button
+                    className={`support-filter-btn ${filter === 'ALL' ? 'active' : ''}`}
+                    onClick={() => setFilter('ALL')}
+                  >
+                    All <span className="filter-count">{queries.length}</span>
+                  </button>
+                </div>
+              </div>
+              <div className="support-top-right">
+                <label>SEARCH</label>
+                <div className="support-search-box">
+                  <SearchIcon className="search-icon"/>
+                  <input
+                    type="text"
+                    value={searchInput}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setSearchInput(next);
+                      if (!next.trim()) setAppliedSearch('');
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') setAppliedSearch(searchInput.trim());
+                    }}
+                    placeholder="Search queries..."
+                  />
+                </div>
+              </div>
+            </div>
+            {showMobileCompactControls && (
+              <button
+                type="button"
+                className="support-strip-toggle support-strip-toggle--bottom"
+                onClick={() => setIsHeaderStripCollapsed(true)}
+                aria-label="Collapse header strip"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="18 15 12 9 6 15"></polyline>
+                </svg>
+              </button>
+            )}
+          </>
+        )}
+        {showMobileCompactControls && isStripCollapsedOnMobile && (
+          <button
+            type="button"
+            className="support-strip-toggle support-strip-toggle--floating"
+            onClick={() => setIsHeaderStripCollapsed(false)}
+            aria-label="Expand header strip"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="support-page queries-page">
+    <div className="support-page queries-page support-page--detached-strip">
+      {topStrip}
       <div className={`support-layout ${hideComposer ? 'support-layout--no-left' : ''}`}>
         {!hideComposer && !isMobile && (
           <aside className="support-left-panel">
@@ -261,129 +389,6 @@ export default function QueriesPage({ mode = 'public' }) {
         )}
 
         <section className="support-right-panel">
-          <div className={`support-top-strip ${showMobileCompactControls ? 'mobile-compact' : ''} ${isStripCollapsedOnMobile ? 'strip-collapsed-mobile' : ''}`}>
-            {!isStripCollapsedOnMobile && (
-              <>
-                {isDeveloperView && (
-                  <div className="developer-action-row">
-                    <Link to="/" className="dev-action-btn">Home</Link>
-                    <Link to="/developer/account" className="dev-action-btn">Accounts</Link>
-                    <Link to="/developer/complaints" className="dev-action-btn">Complaints</Link>
-                    <Link to="/developer/queries" className="dev-action-btn">Queries</Link>
-                    <Link to="/developer/feedback" className="dev-action-btn">Feedback</Link>
-                    <button className="dev-action-btn" onClick={logoutDeveloper}>Logout</button>
-                    <QuickPageMenu
-                      buttonLabel="Menu"
-                      buttonClassName="dev-action-btn support-dev-menu-btn"
-                      panelClassName="support-dev-menu-panel"
-                      itemClassName="support-dev-menu-item"
-                      excludeKeys={['complaints', 'queries', 'feedback']}
-                      align="left"
-                      preferLeftWhenTight
-                    />
-                  </div>
-                )}
-                <div className="support-top-grid">
-                  <div className={`support-top-left ${showMobileCompactControls ? 'mobile-controls-visible' : ''}`} />
-                  <div className={`support-top-center ${showMobileCompactControls ? 'compact-mode' : ''}`}>
-                    <div className="support-title-row">
-                      <h1>Queries</h1>
-                      {showMobileCompactControls && (
-                        <div className="support-title-mobile-tools">
-                          <div className="support-sort-box inline support-mobile-title-sort">
-                            <label>SORT QUERIES</label>
-                            <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                              {SORT_OPTIONS.map((opt) => (
-                                <option key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <QuickPageMenu
-                            iconOnly
-                            buttonClassName="support-header-home-btn support-header-menu-btn"
-                            panelClassName="support-menu-panel"
-                            itemClassName="support-menu-item"
-                            align="right"
-                            extraItems={[
-                              { key: 'mobile-home', label: 'Home', path: '/' },
-                              { key: 'mobile-compose-query', label: 'Ask a Query', onClick: () => setIsComposeModalOpen(true) }
-                            ]}
-                          />
-                        </div>
-                      )}
-                    </div>
-                    <p>Ask project-specific questions, get AI/community help, and mark accepted answers.</p>
-                    <div className="support-filter-row">
-                      <button
-                        className={`support-filter-btn ${filter === 'ACTIVE' ? 'active' : ''}`}
-                        onClick={() => setFilter('ACTIVE')}
-                      >
-                        Active <span className="filter-count">{counts.active}</span>
-                      </button>
-                      <button
-                        className={`support-filter-btn ${filter === 'RESOLVED' ? 'active' : ''}`}
-                        onClick={() => setFilter('RESOLVED')}
-                      >
-                        Resolved <span className="filter-count">{counts.resolved}</span>
-                      </button>
-                      <button
-                        className={`support-filter-btn ${filter === 'ALL' ? 'active' : ''}`}
-                        onClick={() => setFilter('ALL')}
-                      >
-                        All <span className="filter-count">{queries.length}</span>
-                      </button>
-                    </div>
-                  </div>
-                  <div className="support-top-right">
-                    <label>SEARCH</label>
-                    <div className="support-search-box">
-                      <SearchIcon className="search-icon"/>
-                      <input
-                        type="text"
-                        value={searchInput}
-                        onChange={(e) => {
-                          const next = e.target.value;
-                          setSearchInput(next);
-                          if (!next.trim()) setAppliedSearch('');
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') setAppliedSearch(searchInput.trim());
-                        }}
-                        placeholder="Search queries..."
-                      />
-                    </div>
-                  </div>
-                </div>
-                {showMobileCompactControls && (
-                  <button
-                    type="button"
-                    className="support-strip-toggle support-strip-toggle--bottom"
-                    onClick={() => setIsHeaderStripCollapsed(true)}
-                    aria-label="Collapse header strip"
-                  >
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="18 15 12 9 6 15"></polyline>
-                    </svg>
-                  </button>
-                )}
-              </>
-            )}
-            {showMobileCompactControls && isStripCollapsedOnMobile && (
-              <button
-                type="button"
-                className="support-strip-toggle support-strip-toggle--floating"
-                onClick={() => setIsHeaderStripCollapsed(false)}
-                aria-label="Expand header strip"
-              >
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-              </button>
-            )}
-          </div>
-
           <div className="support-list-area">
             {loading ? (
               <div className="support-empty">

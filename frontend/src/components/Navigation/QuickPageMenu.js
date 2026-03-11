@@ -8,6 +8,7 @@ import {
   resolveEffectiveThemeMode,
   setPageThemeMode
 } from '../../utils/themeModeScope';
+import { QUICK_MENU_OPEN_CONTACTS_EVENT } from './quickMenuEvents';
 import './QuickPageMenu.css';
 
 const MENU_KEYS = {
@@ -392,6 +393,20 @@ export default function QuickPageMenu({
     }
   };
 
+  const handleMenuItem = (item) => {
+    if (item?.key === MENU_KEYS.CONTACTS) {
+      setOpen(false);
+      if (typeof closeParentMenu === 'function') {
+        closeParentMenu();
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(QUICK_MENU_OPEN_CONTACTS_EVENT));
+      }
+      return;
+    }
+    handleNavigate(item.path);
+  };
+
   const buttonAria = ariaLabel || 'Open quick page menu';
   const themeToggleTarget = effectiveMode === 'dark' ? 'light' : 'dark';
   const themeToggleLabel = themeToggleTarget === 'dark' ? 'Dark' : 'Light';
@@ -441,7 +456,7 @@ export default function QuickPageMenu({
                 handleCustomItem(item);
                 return;
               }
-              handleNavigate(item.path);
+              handleMenuItem(item);
             }}
           >
             {item.label}

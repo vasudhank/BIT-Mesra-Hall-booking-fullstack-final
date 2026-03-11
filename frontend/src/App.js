@@ -36,6 +36,7 @@ import CalendarPage from './pages/CalendarPage';
 import DeveloperRoute from './routes/DeveloperRoute';
 import AdminOnlyRoute from './routes/AdminOnlyRoute';
 import TrashPage from './pages/TrashPage';
+import WishYourDayOverlay from './components/Contacts/WishYourDayOverlay';
 
 import { checkauth } from './store/slices/userSlice';
 import {
@@ -263,6 +264,7 @@ function App() {
   return (
     <Router>
       <AppRoutes lightMode={lightMode} toggleTheme={toggleTheme} />
+      <WishYourDayOverlay />
     </Router>
   );
 }

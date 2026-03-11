@@ -154,8 +154,155 @@ export default function FeedbackPage({ mode = 'public' }) {
   const showMobileCompactControls = !isDeveloperView && isMobile;
   const isStripCollapsedOnMobile = showMobileCompactControls && isHeaderStripCollapsed;
 
+  const topStrip = (
+    <div className="feedback-top-strip-shell">
+      <div className={`feedback-sticky-strip ${showMobileCompactControls ? 'mobile-compact' : ''} ${isStripCollapsedOnMobile ? 'strip-collapsed-mobile' : ''}`}>
+        {!isStripCollapsedOnMobile && (
+          <>
+            {isDeveloperView && (
+              <div className="developer-action-row">
+                <Link to="/" className="dev-action-btn">
+                  Home
+                </Link>
+                <Link to="/developer/account" className="dev-action-btn">
+                  Accounts
+                </Link>
+                <button className="dev-action-btn" onClick={logoutDeveloper}>
+                  Logout
+                </button>
+                <QuickPageMenu
+                  buttonLabel="Menu"
+                  buttonClassName="dev-action-btn feedback-dev-menu-btn"
+                  panelClassName="feedback-dev-menu-panel"
+                  itemClassName="feedback-dev-menu-item"
+                  align="left"
+                  preferLeftWhenTight
+                />
+              </div>
+            )}
+
+            <div className={`feedback-top-row ${showMobileCompactControls ? 'compact-mode' : ''}`}>
+              <div className="feedback-title-wrap">
+                <div className="feedback-title-row">
+                  <h1>FEEDBACK</h1>
+                  {showMobileCompactControls && (
+                    <div className="feedback-title-mobile-tools">
+                      <div className="feedback-sort-wrap inline feedback-mobile-title-sort">
+                        <label>SORT FEEDBACK</label>
+                        <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                          {SORT_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <QuickPageMenu
+                        iconOnly
+                        buttonClassName="feedback-header-home-btn feedback-header-menu-btn"
+                        panelClassName="feedback-menu-panel"
+                        itemClassName="feedback-menu-item"
+                        align="right"
+                        extraItems={[
+                          { key: 'mobile-home', label: 'Home', path: '/' },
+                          { key: 'mobile-compose-feedback', label: 'Share Feedback', onClick: () => setIsComposeModalOpen(true) }
+                        ]}
+                      />
+                    </div>
+                  )}
+                </div>
+                <p>Help us improve with bugs, ideas, and appreciation.</p>
+              </div>
+
+              <div className="feedback-search-wrap">
+                <label>SEARCH FEEDBACK</label>
+                <div className="feedback-search-box">
+                  <input
+                    type="text"
+                    value={searchInput}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setSearchInput(next);
+                      if (!next.trim()) setAppliedSearch('');
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') setAppliedSearch(searchInput.trim());
+                    }}
+                    placeholder="Type, email, status..."
+                  />
+                  <button type="button" onClick={() => setAppliedSearch(searchInput.trim())}>
+                    <SearchIcon />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="feedback-filter-row">
+              {!showMobileCompactControls && (
+                <div className="feedback-sort-wrap">
+                  <label>SORT FEEDBACK</label>
+                  <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                    {SORT_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="feedback-status-tabs">
+                {STATUS_OPTIONS.map((status) => {
+                  const label = status === 'ALL' ? 'All' : status.replace('_', ' ');
+                  const count = status === 'ALL' ? feedbacks.length : (counts[status] || 0);
+                  return (
+                  <button
+                    key={status}
+                    className={`feedback-status-tab ${statusFilter === status ? 'active' : ''}`}
+                    onClick={() => setStatusFilter(status)}
+                  >
+                    <span className="feedback-status-label">{label}</span>
+                    <span className="feedback-status-count-badge">{count}</span>
+                  </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {showMobileCompactControls && (
+              <button
+                type="button"
+                className="feedback-strip-toggle feedback-strip-toggle--bottom"
+                onClick={() => setIsHeaderStripCollapsed(true)}
+                aria-label="Collapse feedback strip"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="18 15 12 9 6 15"></polyline>
+                </svg>
+              </button>
+            )}
+          </>
+        )}
+
+        {showMobileCompactControls && isStripCollapsedOnMobile && (
+          <button
+            type="button"
+            className="feedback-strip-toggle feedback-strip-toggle--floating"
+            onClick={() => setIsHeaderStripCollapsed(false)}
+            aria-label="Expand feedback strip"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <div className={`feedback-page ${fullscreenComposer ? 'composer-fullscreen' : ''}`}>
+    <div className={`feedback-page feedback-page--detached-strip ${fullscreenComposer ? 'composer-fullscreen' : ''}`}>
+      {topStrip}
       <div className="feedback-layout">
         {!isDeveloperView && !isMobile && (
           <aside className={`feedback-left ${fullscreenComposer ? 'fullscreen' : ''}`}>
@@ -240,148 +387,6 @@ export default function FeedbackPage({ mode = 'public' }) {
         )}
 
         <section className="feedback-right">
-          <div className={`feedback-sticky-strip ${showMobileCompactControls ? 'mobile-compact' : ''} ${isStripCollapsedOnMobile ? 'strip-collapsed-mobile' : ''}`}>
-            {!isStripCollapsedOnMobile && (
-              <>
-                {isDeveloperView && (
-                  <div className="developer-action-row">
-                    <Link to="/" className="dev-action-btn">
-                      Home
-                    </Link>
-                    <Link to="/developer/account" className="dev-action-btn">
-                      Accounts
-                    </Link>
-                    <button className="dev-action-btn" onClick={logoutDeveloper}>
-                      Logout
-                    </button>
-                    <QuickPageMenu
-                      buttonLabel="Menu"
-                      buttonClassName="dev-action-btn feedback-dev-menu-btn"
-                      panelClassName="feedback-dev-menu-panel"
-                      itemClassName="feedback-dev-menu-item"
-                      align="left"
-                      preferLeftWhenTight
-                    />
-                  </div>
-                )}
-
-                <div className={`feedback-top-row ${showMobileCompactControls ? 'compact-mode' : ''}`}>
-                  <div className="feedback-title-wrap">
-                    <div className="feedback-title-row">
-                      <h1>FEEDBACK</h1>
-                      {showMobileCompactControls && (
-                        <div className="feedback-title-mobile-tools">
-                          <div className="feedback-sort-wrap inline feedback-mobile-title-sort">
-                            <label>SORT FEEDBACK</label>
-                            <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                              {SORT_OPTIONS.map((opt) => (
-                                <option key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <QuickPageMenu
-                            iconOnly
-                            buttonClassName="feedback-header-home-btn feedback-header-menu-btn"
-                            panelClassName="feedback-menu-panel"
-                            itemClassName="feedback-menu-item"
-                            align="right"
-                            extraItems={[
-                              { key: 'mobile-home', label: 'Home', path: '/' },
-                              { key: 'mobile-compose-feedback', label: 'Share Feedback', onClick: () => setIsComposeModalOpen(true) }
-                            ]}
-                          />
-                        </div>
-                      )}
-                    </div>
-                    <p>Help us improve with bugs, ideas, and appreciation.</p>
-                  </div>
-
-                  <div className="feedback-search-wrap">
-                    <label>SEARCH FEEDBACK</label>
-                    <div className="feedback-search-box">
-                      <input
-                        type="text"
-                        value={searchInput}
-                        onChange={(e) => {
-                          const next = e.target.value;
-                          setSearchInput(next);
-                          if (!next.trim()) setAppliedSearch('');
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') setAppliedSearch(searchInput.trim());
-                        }}
-                        placeholder="Type, email, status..."
-                      />
-                      <button type="button" onClick={() => setAppliedSearch(searchInput.trim())}>
-                        <SearchIcon />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="feedback-filter-row">
-                  {!showMobileCompactControls && (
-                    <div className="feedback-sort-wrap">
-                      <label>SORT FEEDBACK</label>
-                      <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                        {SORT_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  <div className="feedback-status-tabs">
-                    {STATUS_OPTIONS.map((status) => {
-                      const label = status === 'ALL' ? 'All' : status.replace('_', ' ');
-                      const count = status === 'ALL' ? feedbacks.length : (counts[status] || 0);
-                      return (
-                      <button
-                        key={status}
-                        className={`feedback-status-tab ${statusFilter === status ? 'active' : ''}`}
-                        onClick={() => setStatusFilter(status)}
-                      >
-                        <span className="feedback-status-label">{label}</span>
-                        <span className="feedback-status-count-badge">{count}</span>
-                      </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {showMobileCompactControls && (
-                  <button
-                    type="button"
-                    className="feedback-strip-toggle feedback-strip-toggle--bottom"
-                    onClick={() => setIsHeaderStripCollapsed(true)}
-                    aria-label="Collapse feedback strip"
-                  >
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="18 15 12 9 6 15"></polyline>
-                    </svg>
-                  </button>
-                )}
-              </>
-            )}
-
-            {showMobileCompactControls && isStripCollapsedOnMobile && (
-              <button
-                type="button"
-                className="feedback-strip-toggle feedback-strip-toggle--floating"
-                onClick={() => setIsHeaderStripCollapsed(false)}
-                aria-label="Expand feedback strip"
-              >
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-              </button>
-            )}
-          </div>
-
           <div className="feedback-list">
             {loading ? (
               <div className="feedback-empty">Loading feedback...</div>
