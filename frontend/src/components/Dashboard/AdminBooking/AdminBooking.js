@@ -16,6 +16,14 @@ import { changeBookingRequestApi } from '../../../api/changebookingrequestapi';
 import { Container, useMediaQuery, useTheme, FormControl, Select, MenuItem } from '@mui/material';
 import { fuzzyFilterAndRank } from '../../../utils/fuzzySearch';
 
+const SORT_MODE_INLINE_LABELS = {
+  TIME_ASC: 'Time ↑',
+  TIME_DESC: 'Time ↓',
+  HALL_ASC: 'Hall A-Z',
+  HALL_DESC: 'Hall Z-A',
+  FACULTY_ASC: 'Faculty'
+};
+
 export default function AdminBooking() {
 
   const pageRootRef = useRef(null);
@@ -142,7 +150,8 @@ export default function AdminBooking() {
     const measureAppbar = () => {
       const appbar = document.querySelector('.appbar');
       if (appbar) {
-        setAppbarHeight(Math.round(appbar.getBoundingClientRect().height));
+        // Use ceil so sticky strips never render even a fraction under the fixed appbar.
+        setAppbarHeight(Math.ceil(appbar.getBoundingClientRect().height));
       }
     };
 
@@ -389,8 +398,11 @@ export default function AdminBooking() {
   const selectedVisibleRequests = visibleRequests.filter((req) => selectedRequestIds.includes(req._id));
   const selectedVisibleCount = selectedVisibleRequests.length;
   const allVisibleSelected = visibleIds.length > 0 && selectedVisibleCount === visibleIds.length;
-  const viewportStripTop = showAppbar ? appbarHeight + (isMobile ? 8 : 0) : 8;
-  const contentTopOffset = viewportStripTop + (showViewportStrip ? viewportStripHeight + 8 : 0);
+  const viewportStripTop = showAppbar ? appbarHeight : 8;
+  // Manual control for lowering option-strip buttons without adding gap below appbar.
+  const viewportToolsInnerTopOffset = isMobile ? 20 : 14;
+  const contentDropOffset = isMobile ? 12 : 10;
+  const contentTopOffset = viewportStripTop + (showViewportStrip ? viewportStripHeight : 0) + contentDropOffset;
   const bulkStickyTop = viewportStripTop + (showViewportStrip ? viewportStripHeight : 0);
   const showBulkActionsStrip = showBulkStrip || (showConflictStrip && viewMode !== 'REQUEST_LIST');
 
@@ -571,7 +583,10 @@ export default function AdminBooking() {
             <div
               ref={viewportToolsRef}
               className='booking-viewport-tools'
-              style={{ top: viewportStripTop }}
+              style={{
+                top: viewportStripTop,
+                '--booking-tools-inner-top-offset': `${viewportToolsInnerTopOffset}px`
+              }}
             >
               <button className='viewport-tool-btn' onClick={() => setShowAppbar((v) => !v)}>
                 {showAppbar ? 'Hide Appbar' : 'Show Appbar'}
@@ -590,9 +605,12 @@ export default function AdminBooking() {
               </button>
 
               <div className='booking-sort-wrap'>
-                <span className='booking-sort-label'>Sort</span>
                 <FormControl size='small' className='booking-sort-control'>
-                  <Select value={sortMode} onChange={(e) => setSortMode(e.target.value)}>
+                  <Select
+                    value={sortMode}
+                    onChange={(e) => setSortMode(e.target.value)}
+                    renderValue={(selected) => `Sort: ${SORT_MODE_INLINE_LABELS[selected] || 'Time ↑'}`}
+                  >
                     <MenuItem value='TIME_ASC'>Time (Earlier-Later)</MenuItem>
                     <MenuItem value='TIME_DESC'>Time (Later-Earlier)</MenuItem>
                     <MenuItem value='HALL_ASC'>Hall (A-Z)</MenuItem>

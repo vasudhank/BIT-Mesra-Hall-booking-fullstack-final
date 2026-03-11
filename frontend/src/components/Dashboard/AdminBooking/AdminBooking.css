@@ -479,7 +479,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: var(--booking-tools-inner-top-offset, 14px) 10px 8px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(14, 21, 36, 0.92);
@@ -554,10 +554,11 @@
 }
 
 .booking-sort-wrap {
-  margin-left: auto;
+  margin-left: 0;
   display: flex;
   align-items: center;
   gap: 6px;
+  flex: 0 0 auto;
 }
 
 .booking-sort-label {
@@ -568,26 +569,31 @@
 }
 
 .booking-sort-control {
-  min-width: 210px;
+  min-width: 158px;
+  max-width: 172px;
 }
 
 .booking-sort-control .MuiOutlinedInput-root {
   border-radius: 999px !important;
   color: #fff !important;
   background: rgba(255, 255, 255, 0.12) !important;
+  min-height: 31px !important;
 }
 
 .booking-sort-control .MuiSelect-select {
   font-family: 'Inter', sans-serif;
-  font-size: 0.8rem;
-  padding: 8px 34px 8px 12px !important;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 5px 30px 5px 10px !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.1;
 }
 
 .booking-sort-control .MuiSelect-icon {
-  right: 10px;
+  right: 8px;
+  font-size: 1rem !important;
   color: #d8e8ff !important;
 }
 
@@ -603,7 +609,7 @@
 
   .booking-viewport-tools {
     width: 98%;
-    padding: 8px;
+    padding: var(--booking-tools-inner-top-offset, 20px) 8px 8px;
     gap: 6px;
   }
 
@@ -622,12 +628,13 @@
   }
 
   .booking-sort-wrap {
-    width: 100%;
+    width: auto;
     margin-left: 0;
   }
 
   .booking-sort-control {
-    min-width: 100%;
+    min-width: 146px;
+    max-width: 164px;
   }
 
   .request-div-admin {

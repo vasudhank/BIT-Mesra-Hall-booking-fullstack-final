@@ -103,6 +103,9 @@ export default function DepartmentAppBar({
   };
   const themeActionLabel = effectiveMode === 'dark' ? 'LIGHT' : 'DARK';
   const themeShortcutLabel = effectiveMode === 'dark' ? 'Ctrl+L' : 'Ctrl+D';
+  const mobileMenuTextColor = effectiveMode === 'dark' ? '#F8FAFC' : '#25354F';
+  const mobileMenuDangerColor = effectiveMode === 'dark' ? '#FCA5A5' : '#D32F2F';
+  const mobileMenuDividerColor = effectiveMode === 'dark' ? 'rgba(248, 250, 252, 0.28)' : 'rgba(37, 53, 79, 0.2)';
 
   return (
     <AppBar position="fixed" className="appbar">
@@ -280,7 +283,21 @@ export default function DepartmentAppBar({
 
           {/* SHARED MENU */}
           <Menu
-            sx={{ mt: '45px' }}
+            sx={{
+              mt: '45px',
+              ...(isMobileMenu
+                ? {
+                    '& .MuiPaper-root': {
+                      backgroundColor: effectiveMode === 'dark' ? 'rgba(8, 12, 22, 0.96)' : 'rgba(255, 255, 255, 0.96)',
+                      backdropFilter: 'blur(10px)',
+                      color: mobileMenuTextColor,
+                      border: effectiveMode === 'dark' ? '1px solid rgba(248, 250, 252, 0.18)' : '1px solid rgba(37, 53, 79, 0.14)',
+                      borderRadius: '16px',
+                      minWidth: '200px'
+                    }
+                  }
+                : {})
+            }}
             anchorEl={anchorElUser}
             anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
@@ -289,22 +306,26 @@ export default function DepartmentAppBar({
           >
             {isMobileMenu && (
               <MenuItem onClick={() => { setAnchorElUser(null); navigate('/department/booking'); }}>
-                <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%' }}>BOOKINGS</Typography>
+                <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: mobileMenuTextColor }}>BOOKINGS</Typography>
               </MenuItem>
             )}
             <MenuItem onClick={() => setAnchorElUser(null)}>
               <Link to="/">
-                <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%' }}>HOME</Typography>
+                <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: isMobileMenu ? mobileMenuTextColor : 'inherit' }}>HOME</Typography>
               </Link>
             </MenuItem>
-            <MenuItem onClick={() => { setAnchorElUser(null); }} sx={{ color: 'black' }}>
+            <MenuItem onClick={() => { setAnchorElUser(null); }} sx={{ color: isMobileMenu ? mobileMenuTextColor : 'black' }}>
                <Link to="/department/account" style={{ textDecoration: 'none', color: 'inherit' }}>
-                 <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}> ACCOUNTS </Typography>
+                 <Typography textAlign="center" className="dropdown-text" sx={{ color: isMobileMenu ? mobileMenuTextColor : 'black' }}> ACCOUNTS </Typography>
                </Link>
             </MenuItem>
-            <MenuItem disableRipple sx={{ px: 1.25, py: 0.8 }}>
+            <MenuItem
+              disableRipple
+              sx={{ px: 1.25, py: 0.8, width: '100%', display: 'flex', justifyContent: 'center' }}
+            >
               <QuickPageMenu
                 buttonLabel="MENU"
+                className={isMobileMenu ? 'appbar-user-menu-root-mobile' : ''}
                 buttonClassName={`appbar-user-menu-btn${isMobileMenu ? ' appbar-user-menu-btn-mobile' : ''}`}
                 panelClassName="appbar-user-submenu-panel"
                 itemClassName="appbar-user-submenu-item"
@@ -315,10 +336,10 @@ export default function DepartmentAppBar({
                 closeParentMenu={() => setAnchorElUser(null)}
               />
             </MenuItem>
-            <Divider sx={{ my: 0.3 }} />
-            <MenuItem onClick={togglePageTheme} sx={{ color: 'black' }}>
+            <Divider sx={{ my: 0.3, borderColor: isMobileMenu ? mobileMenuDividerColor : undefined, borderBottomWidth: '1px', opacity: 1 }} />
+            <MenuItem onClick={togglePageTheme} sx={{ color: isMobileMenu ? mobileMenuTextColor : 'black' }}>
               <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: isMobileMenu ? 'center' : 'space-between', gap: 1.2 }}>
-                <Typography textAlign="center" className="dropdown-text" sx={{ width: isMobileMenu ? 'auto' : '100%', color: 'black' }}>
+                <Typography textAlign="center" className="dropdown-text" sx={{ width: isMobileMenu ? 'auto' : '100%', color: isMobileMenu ? mobileMenuTextColor : 'black' }}>
                   {themeActionLabel}
                 </Typography>
                 {!isMobileMenu && (
@@ -329,8 +350,16 @@ export default function DepartmentAppBar({
               </Box>
             </MenuItem>
             <MenuItem onClick={() => setAnchorElUser(null)}>
-              <Typography className="dropdown-text"
-  style={{ color: "red", fontWeight: "bold", width: '100%', textAlign: 'center' }} onClick={logout}>
+              <Typography
+                className="dropdown-text"
+                sx={{
+                  color: isMobileMenu ? mobileMenuDangerColor : 'red',
+                  fontWeight: 'bold',
+                  width: '100%',
+                  textAlign: 'center'
+                }}
+                onClick={logout}
+              >
                 LOGOUT
               </Typography>
             </MenuItem>

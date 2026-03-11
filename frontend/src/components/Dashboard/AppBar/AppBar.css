@@ -101,6 +101,50 @@ body.dark-mode .appbar-user-menu-btn:hover {
 }
 
 @media (max-width: 900px) {
+  body.dark-mode .appbar-user-submenu-panel {
+    border-color: rgba(148, 163, 184, 0.46) !important;
+    background: rgba(8, 12, 22, 0.96) !important;
+    color: #f8fafc !important;
+  }
+
+  body.dark-mode .appbar-user-submenu-panel .quick-page-menu-divider {
+    background: rgba(248, 250, 252, 0.26) !important;
+  }
+
+  body.dark-mode .appbar-user-submenu-panel .quick-page-menu-shortcut {
+    color: rgba(226, 232, 240, 0.86) !important;
+  }
+
+  body.dark-mode .appbar-user-submenu-item {
+    color: #f8fafc !important;
+  }
+
+  body.dark-mode .appbar-user-submenu-item:hover {
+    background: rgba(148, 163, 184, 0.18) !important;
+  }
+
+  .appbar-user-menu-root-mobile {
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .appbar-user-menu-root-mobile .quick-page-menu-btn {
+    width: 100% !important;
+    justify-content: center !important;
+    margin: 0 auto !important;
+  }
+
+  .appbar-user-menu-root-mobile .quick-page-menu-icon {
+    display: none !important;
+  }
+
+  .appbar-user-menu-root-mobile .quick-page-menu-label {
+    width: 100%;
+    text-align: center;
+  }
+
   .appbar-user-menu-btn-mobile {
     justify-content: center !important;
     text-align: center !important;

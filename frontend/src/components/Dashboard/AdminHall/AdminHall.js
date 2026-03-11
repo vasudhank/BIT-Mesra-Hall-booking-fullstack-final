@@ -34,6 +34,15 @@ const SORT_OPTIONS = [
   { value: 'STATUS_NOT_BOOKED_FIRST', label: 'Not Booked First' }
 ];
 
+const SORT_INLINE_LABELS = {
+  NAME_ASC: 'Sort: Name A-Z',
+  NAME_DESC: 'Sort: Name Z-A',
+  CAPACITY_ASC: 'Sort: Cap Low',
+  CAPACITY_DESC: 'Sort: Cap High',
+  STATUS_BOOKED_FIRST: 'Sort: Booked',
+  STATUS_NOT_BOOKED_FIRST: 'Sort: Free'
+};
+
 const compareHalls = (a, b, mode) => {
   const nameA = String(a.name || '');
   const nameB = String(b.name || '');
@@ -65,6 +74,8 @@ export default function AdminHall() {
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  // Manual control: push left option buttons (Select All Filled / Vacate Selected etc.) downward.
+  const controlsLeftOffsetY = isMobile ? 12 : 7;
 
   const get_halls = async () => {
     try {
@@ -90,7 +101,7 @@ export default function AdminHall() {
     const measureAppbar = () => {
       const appbar = document.querySelector('.appbar');
       if (appbar) {
-        setAppbarHeight(Math.round(appbar.getBoundingClientRect().height));
+        setAppbarHeight(Math.ceil(appbar.getBoundingClientRect().height));
       }
     };
 
@@ -287,7 +298,10 @@ export default function AdminHall() {
         {showControlStrip ? (
           <Box
             className='admin-hall-controls-strip'
-            style={isMobile ? { top: `${showAppbar ? appbarHeight : 0}px` } : undefined}
+            style={{
+              ...(isMobile ? { top: `${showAppbar ? appbarHeight : 0}px` } : {}),
+              '--admin-hall-controls-left-offset-y': `${controlsLeftOffsetY}px`
+            }}
           >
             <Box className='admin-hall-controls-left'>
               <label className='admin-hall-select-inline'>
@@ -336,6 +350,20 @@ export default function AdminHall() {
               >
                 Delete Selected
               </Button>
+
+              <FormControl size='small' className='admin-hall-sort-control'>
+                <Select
+                  value={sortMode}
+                  onChange={(e) => setSortMode(e.target.value)}
+                  renderValue={(selected) => SORT_INLINE_LABELS[selected] || 'Sort: Name A-Z'}
+                >
+                  {SORT_OPTIONS.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Box>
 
             <Box className='admin-hall-controls-right'>
@@ -354,20 +382,6 @@ export default function AdminHall() {
               >
                 Collapse Strip
               </Button>
-
-              <FormControl size='small' className='admin-hall-sort-control'>
-                <Select
-                  value={sortMode}
-                  onChange={(e) => setSortMode(e.target.value)}
-                  displayEmpty
-                >
-                  {SORT_OPTIONS.map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
-                      {option.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
 
               <Button className='btn-admin-hall-create' onClick={handleOpen}>
                 CREATE HALL

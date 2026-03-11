@@ -134,6 +134,9 @@ export default function Appbar({
   };
   const themeActionLabel = effectiveMode === 'dark' ? 'LIGHT' : 'DARK';
   const themeShortcutLabel = effectiveMode === 'dark' ? 'Ctrl+L' : 'Ctrl+D';
+  const mobileMenuTextColor = effectiveMode === 'dark' ? '#F8FAFC' : '#25354F';
+  const mobileMenuDangerColor = effectiveMode === 'dark' ? '#FCA5A5' : '#D32F2F';
+  const mobileMenuDividerColor = effectiveMode === 'dark' ? 'rgba(248, 250, 252, 0.28)' : 'rgba(37, 53, 79, 0.2)';
 
   return (
     <AppBar position="fixed" className="appbar">
@@ -327,8 +330,10 @@ export default function Appbar({
                   sx={{
                     display: { xs: 'block', md: 'none' },
                     '& .MuiPaper-root': {
-                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      backgroundColor: effectiveMode === 'dark' ? 'rgba(8, 12, 22, 0.96)' : 'rgba(255, 255, 255, 0.96)',
                       backdropFilter: 'blur(10px)',
+                      color: mobileMenuTextColor,
+                      border: effectiveMode === 'dark' ? '1px solid rgba(248, 250, 252, 0.18)' : '1px solid rgba(37, 53, 79, 0.14)',
                       borderRadius: '16px',
                       minWidth: '200px',
                       mt: 1
@@ -337,16 +342,20 @@ export default function Appbar({
                 >
                   {pages.map(([label, path]) => (
                     <MenuItem key={label} onClick={() => { handleCloseNavMenu(); navigate(path); }}>
-                      <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', fontWeight: 700, color: '#25354F' }}>{label}</Typography>
+                      <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', fontWeight: 700, color: mobileMenuTextColor }}>{label}</Typography>
                     </MenuItem>
                   ))}
-                  <Divider sx={{ my: 1 }} />
+                  <Divider sx={{ my: 1, borderColor: mobileMenuDividerColor, borderBottomWidth: '1px', opacity: 1 }} />
                   <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/'); }}>
-                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>HOME</Typography>
+                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: mobileMenuTextColor }}>HOME</Typography>
                   </MenuItem>
-                  <MenuItem disableRipple sx={{ px: 1.25, py: 0.8 }}>
+                  <MenuItem
+                    disableRipple
+                    sx={{ px: 1.25, py: 0.8, width: '100%', display: 'flex', justifyContent: 'center' }}
+                  >
                     <QuickPageMenu
                       buttonLabel="MENU"
+                      className="appbar-user-menu-root-mobile"
                       buttonClassName="appbar-user-menu-btn appbar-user-menu-btn-mobile"
                       panelClassName="appbar-user-submenu-panel"
                       itemClassName="appbar-user-submenu-item"
@@ -358,12 +367,12 @@ export default function Appbar({
                     />
                   </MenuItem>
                   <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/admin/account'); }}>
-                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>ACCOUNTS</Typography>
+                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: mobileMenuTextColor }}>ACCOUNTS</Typography>
                   </MenuItem>
-                  <Divider sx={{ my: 0.4 }} />
+                  <Divider sx={{ my: 0.4, borderColor: mobileMenuDividerColor, borderBottomWidth: '1px', opacity: 1 }} />
                   <MenuItem onClick={togglePageTheme}>
                     <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: isMobileMenu ? 'center' : 'space-between', gap: 1.2 }}>
-                      <Typography textAlign="center" className="dropdown-text" sx={{ width: isMobileMenu ? 'auto' : '100%', color: '#25354F' }}>
+                      <Typography textAlign="center" className="dropdown-text" sx={{ width: isMobileMenu ? 'auto' : '100%', color: mobileMenuTextColor }}>
                         {themeActionLabel}
                       </Typography>
                       {!isMobileMenu && (
@@ -374,7 +383,7 @@ export default function Appbar({
                     </Box>
                   </MenuItem>
                   <MenuItem onClick={() => { handleCloseNavMenu(); logout(); }}>
-                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#d32f2f' }}>LOGOUT</Typography>
+                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: mobileMenuDangerColor }}>LOGOUT</Typography>
                   </MenuItem>
                 </Menu>
               </Box>
