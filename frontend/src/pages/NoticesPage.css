@@ -2190,8 +2190,9 @@ textarea.premium-input { resize: vertical; min-height: 120px; }
   }
 
   .notice-detail-sticky-strip {
+    --notice-detail-mobile-shift-left: 6px;
     margin-bottom: 24px !important;
-    padding: 10px 12px;
+    padding: 10px calc(12px + var(--notice-detail-mobile-shift-left)) 10px calc(12px - var(--notice-detail-mobile-shift-left));
     gap: 10px;
     flex-wrap: wrap;
   }
