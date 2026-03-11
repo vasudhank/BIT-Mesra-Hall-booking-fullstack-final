@@ -219,6 +219,7 @@ export default function Appbar({
                   buttonClassName="appbar-user-menu-btn"
                   panelClassName="appbar-user-submenu-panel"
                   itemClassName="appbar-user-submenu-item"
+                  hideThemeToggle
                   align="left"
                   includeKeys={['schedule', 'ai', 'contacts', 'notices', 'calendar', 'complaints', 'queries', 'feedback']}
                   matchParentMenuWidth
@@ -359,6 +360,7 @@ export default function Appbar({
                       buttonClassName="appbar-user-menu-btn appbar-user-menu-btn-mobile"
                       panelClassName="appbar-user-submenu-panel"
                       itemClassName="appbar-user-submenu-item"
+                      hideThemeToggle
                       align="left"
                       includeKeys={['schedule', 'ai', 'contacts', 'notices', 'calendar', 'complaints', 'queries', 'feedback']}
                       matchParentMenuWidth

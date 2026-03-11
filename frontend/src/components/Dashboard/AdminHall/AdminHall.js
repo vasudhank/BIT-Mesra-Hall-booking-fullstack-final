@@ -409,7 +409,7 @@ export default function AdminHall() {
         {showControlStrip && <div className='admin-hall-controls-spacer' />}
       </Box>
 
-      <Container maxWidth={false} sx={{ mt: 2, padding: isMobile ? '0 !important' : '' }}>
+      <Container maxWidth={false} sx={{ mt: isMobile ? 0.75 : 2, padding: isMobile ? '0 !important' : '' }}>
         <Grid container spacing={isMobile ? 3 : 6} justifyContent="center">
           {filteredHalls.map((hall) => (
             <Grid key={hall._id} item xs={12} sm={7} md={5} lg={4} xl={4}>

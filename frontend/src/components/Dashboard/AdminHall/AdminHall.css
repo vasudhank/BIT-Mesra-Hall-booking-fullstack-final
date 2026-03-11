@@ -376,7 +376,7 @@
 /* ================= MOBILE RESPONSIVENESS ================= */
 @media only screen and (max-width: 768px) {
   :root {
-    --admin-hall-strip-space: 290px;
+    --admin-hall-strip-space: 248px;
     --admin-hall-btn-width-primary: 132px;
     --admin-hall-btn-width-secondary: 132px;
     --admin-hall-btn-height: 33px;
