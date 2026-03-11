@@ -971,6 +971,35 @@
   }
 }
 
+@media (min-width: 401px) and (max-width: 960px) {
+  .support-layout {
+    --support-mobile-side-pad: 8px;
+    padding: 0 8px 14px;
+  }
+
+  .support-top-strip {
+    width: 100vw;
+    width: 100dvw;
+    margin-left: calc(50% - 50vw);
+    margin-left: calc(50% - 50dvw);
+    margin-right: calc(50% - 50vw);
+    margin-right: calc(50% - 50dvw);
+  }
+
+  .support-top-strip.mobile-compact {
+    padding: 12px max(8px, env(safe-area-inset-right)) 22px max(8px, env(safe-area-inset-left));
+  }
+
+  .support-top-grid,
+  .support-top-center,
+  .support-top-right,
+  .support-search-box,
+  .support-filter-row {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
 @media (max-width: 640px) {
   .support-page {
     font-size: 15px;
