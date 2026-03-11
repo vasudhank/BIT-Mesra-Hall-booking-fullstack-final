@@ -32,7 +32,7 @@ import {
 const pages = [
   ['Dashboard', '/admin/hall'],
   ['BOOKINGS', '/admin/booking'],
-  ['DEPARTMENT', '/admin/department'],
+  ['DEPARTMENTS', '/admin/department'],
   ['REQUESTS', '/admin/department/request']
 ];
 
@@ -342,26 +342,32 @@ export default function Appbar({
                   <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/'); }}>
                     <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>HOME</Typography>
                   </MenuItem>
-                  <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/admin/contacts'); }}>
-                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>CONTACTS</Typography>
-                  </MenuItem>
-                  <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/admin/notices'); }}>
-                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>POST NOTICE</Typography>
-                  </MenuItem>
-                  <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/calendar'); }}>
-                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>CALENDER</Typography>
-                  </MenuItem>
-                  <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/admin/complaints'); }}>
-                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>COMPLAINTS</Typography>
-                  </MenuItem>
-                  <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/admin/queries'); }}>
-                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>QUERIES</Typography>
-                  </MenuItem>
-                  <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/admin/feedback'); }}>
-                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>FEEDBACK</Typography>
+                  <MenuItem disableRipple sx={{ px: 1.25, py: 0.8 }}>
+                    <QuickPageMenu
+                      buttonLabel="MENU"
+                      buttonClassName="appbar-user-menu-btn"
+                      panelClassName="appbar-user-submenu-panel"
+                      itemClassName="appbar-user-submenu-item"
+                      align="left"
+                      includeKeys={['schedule', 'ai', 'contacts', 'notices', 'calendar', 'complaints', 'queries', 'feedback']}
+                      matchParentMenuWidth
+                      panelOffsetX={-10}
+                      closeParentMenu={handleCloseNavMenu}
+                    />
                   </MenuItem>
                   <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/admin/account'); }}>
                     <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>ACCOUNTS</Typography>
+                  </MenuItem>
+                  <Divider sx={{ my: 0.4 }} />
+                  <MenuItem onClick={togglePageTheme}>
+                    <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.2 }}>
+                      <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#25354F' }}>
+                        {themeActionLabel}
+                      </Typography>
+                      <Typography sx={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.02em' }}>
+                        {themeShortcutLabel}
+                      </Typography>
+                    </Box>
                   </MenuItem>
                   <MenuItem onClick={() => { handleCloseNavMenu(); logout(); }}>
                     <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: '#d32f2f' }}>LOGOUT</Typography>

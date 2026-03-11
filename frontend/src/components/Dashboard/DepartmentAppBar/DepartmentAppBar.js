@@ -14,6 +14,7 @@ import TextField from '@mui/material/TextField';
 import InputAdornment from '@mui/material/InputAdornment';
 import SearchIcon from '@mui/icons-material/Search';
 import Divider from '@mui/material/Divider';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import api from '../../../api/axiosInstance';
@@ -44,6 +45,7 @@ export default function DepartmentAppBar({
 
   const [anchorElUser, setAnchorElUser] = React.useState(null);
   const [dateTime, setDateTime] = React.useState("");
+  const isMobileMenu = useMediaQuery('(max-width:900px)');
   const [effectiveMode, setEffectiveMode] = React.useState(() =>
     resolveEffectiveThemeMode(location.pathname, readGlobalThemeMode())
   );
@@ -285,21 +287,20 @@ export default function DepartmentAppBar({
             open={Boolean(anchorElUser)}
             onClose={() => setAnchorElUser(null)}
           >
+            {isMobileMenu && (
+              <MenuItem onClick={() => { setAnchorElUser(null); navigate('/department/booking'); }}>
+                <Typography className="dropdown-text">BOOKINGS</Typography>
+              </MenuItem>
+            )}
             <MenuItem onClick={() => setAnchorElUser(null)}>
               <Link to="/">
                 <Typography className="dropdown-text">HOME</Typography>
               </Link>
             </MenuItem>
             <MenuItem onClick={() => { setAnchorElUser(null); }} sx={{ color: 'black' }}>
-               <Link to="/department/account" style={{ textDecoration: 'none', color: 'inherit' }}> 
-                 <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}> ACCOUNTS </Typography> 
-               </Link> 
-            </MenuItem>
-            <MenuItem onClick={() => setAnchorElUser(null)}>
-              <Typography className="dropdown-text" 
-  style={{ color: "red", fontWeight: "bold" }} onClick={logout}>
-                LOGOUT
-              </Typography>
+               <Link to="/department/account" style={{ textDecoration: 'none', color: 'inherit' }}>
+                 <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}> ACCOUNTS </Typography>
+               </Link>
             </MenuItem>
             <MenuItem disableRipple sx={{ px: 1.25, py: 0.8 }}>
               <QuickPageMenu
@@ -324,6 +325,12 @@ export default function DepartmentAppBar({
                   {themeShortcutLabel}
                 </Typography>
               </Box>
+            </MenuItem>
+            <MenuItem onClick={() => setAnchorElUser(null)}>
+              <Typography className="dropdown-text"
+  style={{ color: "red", fontWeight: "bold" }} onClick={logout}>
+                LOGOUT
+              </Typography>
             </MenuItem>
           </Menu>
 

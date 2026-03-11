@@ -2120,6 +2120,7 @@ textarea.premium-input { resize: vertical; min-height: 120px; }
 @media (max-width: 960px) {
   .notices-layout-grid,
   .notices-layout-center {
+    --notices-mobile-side-pad: 12px;
     padding: 12px;
   }
 
@@ -2131,8 +2132,15 @@ textarea.premium-input { resize: vertical; min-height: 120px; }
     position: sticky;
     top: 0;
     z-index: 120;
-    padding: 12px 12px 24px;
+    width: calc(100% + (2 * var(--notices-mobile-side-pad, 12px)));
+    margin-left: calc(-1 * var(--notices-mobile-side-pad, 12px));
+    margin-right: calc(-1 * var(--notices-mobile-side-pad, 12px));
+    padding: 12px max(12px, env(safe-area-inset-right)) 24px max(12px, env(safe-area-inset-left));
     margin-bottom: 14px;
+    box-sizing: border-box;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
   }
 
   .notices-sticky-strip.mobile-compact.strip-collapsed-mobile {
@@ -2450,11 +2458,15 @@ textarea.premium-input { resize: vertical; min-height: 120px; }
 @media (max-width: 400px) {
   .notices-layout-grid,
   .notices-layout-center {
+    --notices-mobile-side-pad: 8px;
     padding: 8px;
   }
 
   .notices-sticky-strip.mobile-compact {
-    padding: 10px 10px 22px 8px;
+    width: calc(100% + (2 * var(--notices-mobile-side-pad, 8px)));
+    margin-left: calc(-1 * var(--notices-mobile-side-pad, 8px));
+    margin-right: calc(-1 * var(--notices-mobile-side-pad, 8px));
+    padding: 10px max(10px, env(safe-area-inset-right)) 22px max(10px, env(safe-area-inset-left));
     max-width: 100%;
     box-sizing: border-box;
   }
