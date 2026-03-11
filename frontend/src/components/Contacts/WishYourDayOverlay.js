@@ -298,14 +298,6 @@ export default function WishYourDayOverlay() {
         <h2 className="quick-contacts-title">Wish Your Day!</h2>
 
         <div className="quick-contacts-search-row">
-          <button
-            type="button"
-            className="quick-contacts-search-btn"
-            onClick={() => setAppliedSearch(searchInput.trim())}
-            aria-label="Search contacts"
-          >
-            <SearchIcon fontSize="small" />
-          </button>
           <input
             type="text"
             value={searchInput}
@@ -322,6 +314,14 @@ export default function WishYourDayOverlay() {
             }}
             placeholder="Search name, number or email..."
           />
+          <button
+            type="button"
+            className="quick-contacts-search-btn"
+            onClick={() => setAppliedSearch(searchInput.trim())}
+            aria-label="Search contacts"
+          >
+            <SearchIcon fontSize="small" />
+          </button>
         </div>
 
         <div className="quick-contacts-head-wrap">
