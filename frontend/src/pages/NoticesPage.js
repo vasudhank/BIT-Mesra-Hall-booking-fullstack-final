@@ -150,7 +150,7 @@ export default function NoticesPage({ mode = 'public' }) {
   const [isMobileHeaderCollapsed, setIsMobileHeaderCollapsed] = useState(false);
   const [isMobileComposeOpen, setIsMobileComposeOpen] = useState(false);
   const mobileSearchInputHeight = 40;
-  const mobileFontControlWidth = 132;
+  const mobileFontControlWidth = 124;
 
   useEffect(() => {
     saveReadingPrefs(reading);

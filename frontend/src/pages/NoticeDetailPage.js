@@ -64,6 +64,7 @@ const TITLE_COLORS = [
   { key: 'black', value: '#111827', label: 'Black' },
   { key: 'maroon', value: '#7f1d1d', label: 'Maroon' }
 ];
+const COMPACT_NOTICE_COLORS = TITLE_COLORS.slice(0, 2);
 
 const FONT_OPTIONS = [
   { value: 'outfit', label: 'Outfit (Sans)', family: 'Outfit' },
@@ -1462,26 +1463,28 @@ export default function NoticeDetailPage() {
                 </Link>
 
                 <div className="notice-detail-strip-controls-top">
-                  <div className="notice-color-swatches compact notice-header-color-swatches notice-header-color-swatches-desktop">
-                    {TITLE_COLORS.map((color) => (
+                  {!isMobile && (
+                    <div className="notice-color-swatches compact notice-header-color-swatches notice-header-color-swatches-desktop">
+                      {TITLE_COLORS.map((color) => (
+                        <button
+                          key={`header-desktop-color-${color.key}`}
+                          type="button"
+                          className={`notice-color-dot ${headerSharedColor === color.value ? 'active' : ''}`}
+                          style={{ '--dot-color': color.value }}
+                          title={`Apply ${color.label} to all`}
+                          aria-label={`Apply ${color.label} to title, description and selected text`}
+                          onClick={() => applyHeaderColor(color.value)}
+                        />
+                      ))}
                       <button
-                        key={`header-desktop-color-${color.key}`}
                         type="button"
-                        className={`notice-color-dot ${headerSharedColor === color.value ? 'active' : ''}`}
-                        style={{ '--dot-color': color.value }}
-                        title={`Apply ${color.label} to all`}
-                        aria-label={`Apply ${color.label} to title, description and selected text`}
-                        onClick={() => applyHeaderColor(color.value)}
+                        className="notice-color-dot notice-color-dot-any"
+                        title="Choose any global color"
+                        aria-label="Choose any global color"
+                        onClick={(e) => openCustomColorPicker(e, 'global')}
                       />
-                    ))}
-                    <button
-                      type="button"
-                      className="notice-color-dot notice-color-dot-any"
-                      title="Choose any global color"
-                      aria-label="Choose any global color"
-                      onClick={(e) => openCustomColorPicker(e, 'global')}
-                    />
-                  </div>
+                    </div>
+                  )}
 
                   {notice && (
                     <div className="notice-admin-icon-group" role="group" aria-label="Notice actions">
@@ -1530,7 +1533,30 @@ export default function NoticeDetailPage() {
                     </div>
                   )}
 
-                  <div className="readability-group notice-detail-theme-group">
+                  {isMobile && (
+                    <div className="notice-color-swatches compact notice-header-color-swatches notice-header-color-swatches-mobile-inline">
+                      {COMPACT_NOTICE_COLORS.map((color) => (
+                        <button
+                          key={`header-mobile-inline-color-${color.key}`}
+                          type="button"
+                          className={`notice-color-dot ${headerSharedColor === color.value ? 'active' : ''}`}
+                          style={{ '--dot-color': color.value }}
+                          title={`Apply ${color.label} to all`}
+                          aria-label={`Apply ${color.label} to title, description and selected text`}
+                          onClick={() => applyHeaderColor(color.value)}
+                        />
+                      ))}
+                      <button
+                        type="button"
+                        className="notice-color-dot notice-color-dot-any"
+                        title="Choose any global color"
+                        aria-label="Choose any global color"
+                        onClick={(e) => openCustomColorPicker(e, 'global')}
+                      />
+                    </div>
+                  )}
+
+                  <div className="readability-group notice-detail-theme-group notice-detail-theme-group-top">
                     <button type="button" onClick={() => updateReading('theme', 'classic')} className={`readability-btn ${reading.theme === 'classic' ? 'active' : ''}`}><Icons.Sun/></button>
                     <button type="button" onClick={() => updateReading('theme', 'paper')} className={`readability-btn ${reading.theme === 'paper' ? 'active' : ''}`}><Icons.Book/></button>
                     <button type="button" onClick={() => updateReading('theme', 'night')} className={`readability-btn ${reading.theme === 'night' ? 'active' : ''}`}><Icons.Moon/></button>
@@ -1564,25 +1590,10 @@ export default function NoticeDetailPage() {
               </div>
 
               <div className="notice-detail-strip-typography-row">
-                <div className="notice-color-swatches compact notice-header-color-swatches notice-header-color-swatches-mobile">
-                  {TITLE_COLORS.map((color) => (
-                    <button
-                      key={`header-mobile-color-${color.key}`}
-                      type="button"
-                      className={`notice-color-dot ${headerSharedColor === color.value ? 'active' : ''}`}
-                      style={{ '--dot-color': color.value }}
-                      title={`Apply ${color.label} to all`}
-                      aria-label={`Apply ${color.label} to title, description and selected text`}
-                      onClick={() => applyHeaderColor(color.value)}
-                    />
-                  ))}
-                  <button
-                    type="button"
-                    className="notice-color-dot notice-color-dot-any"
-                    title="Choose any global color"
-                    aria-label="Choose any global color"
-                    onClick={(e) => openCustomColorPicker(e, 'global')}
-                  />
+                <div className="readability-group notice-detail-theme-group notice-detail-theme-group-mobile">
+                  <button type="button" onClick={() => updateReading('theme', 'classic')} className={`readability-btn ${reading.theme === 'classic' ? 'active' : ''}`}><Icons.Sun/></button>
+                  <button type="button" onClick={() => updateReading('theme', 'paper')} className={`readability-btn ${reading.theme === 'paper' ? 'active' : ''}`}><Icons.Book/></button>
+                  <button type="button" onClick={() => updateReading('theme', 'night')} className={`readability-btn ${reading.theme === 'night' ? 'active' : ''}`}><Icons.Moon/></button>
                 </div>
 
                 <FontSizeControl
@@ -1654,7 +1665,7 @@ export default function NoticeDetailPage() {
               <div className="notice-color-control">
                 <div className="notice-color-control-left">
                   <div className="notice-color-swatches">
-                    {TITLE_COLORS.map((color) => (
+                    {(isMobile ? COMPACT_NOTICE_COLORS : TITLE_COLORS).map((color) => (
                       <button
                         key={`title-${color.key}`}
                         type="button"
@@ -1740,7 +1751,7 @@ export default function NoticeDetailPage() {
             <div className="notice-color-control">
               <div className="notice-color-control-left">
                 <div className="notice-color-swatches">
-                  {TITLE_COLORS.map((color) => (
+                  {(isMobile ? COMPACT_NOTICE_COLORS : TITLE_COLORS).map((color) => (
                     <button
                       key={`desc-${color.key}`}
                       type="button"

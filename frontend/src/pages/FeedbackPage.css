@@ -762,23 +762,47 @@
 }
 
 @media (max-width: 960px) {
+  .feedback-page {
+    padding: 0 0 12px;
+  }
+
+  .feedback-layout {
+    --feedback-mobile-side-pad: 12px;
+    padding: 0 12px 0;
+    box-sizing: border-box;
+  }
+
   .feedback-sticky-strip {
-    width: 100vw;
-    margin-left: calc(50% - 50vw);
-    margin-right: calc(50% - 50vw);
+    width: calc(100% + (2 * var(--feedback-mobile-side-pad, 12px)));
+    margin-left: calc(-1 * var(--feedback-mobile-side-pad, 12px));
+    margin-right: calc(-1 * var(--feedback-mobile-side-pad, 12px));
     border-radius: 0;
     border-left: none;
     border-right: none;
+    margin-top: 0;
   }
 
   .feedback-sticky-strip.mobile-compact {
-    padding: 12px 16px 22px;
+    padding: 12px max(16px, env(safe-area-inset-right)) 22px max(16px, env(safe-area-inset-left));
+    box-sizing: border-box;
+  }
+
+  .feedback-top-row,
+  .feedback-title-row,
+  .feedback-title-mobile-tools,
+  .feedback-mobile-title-sort {
+    min-width: 0;
   }
 }
 
 @media (max-width: 700px) {
   .feedback-page {
-    padding: 12px;
+    padding: 0 0 10px;
+  }
+
+  .feedback-layout {
+    --feedback-mobile-side-pad: 10px;
+    padding: 0 10px 0;
   }
 
   .feedback-sticky-strip {
@@ -794,7 +818,7 @@
   }
 
   .feedback-mobile-title-sort {
-    width: min(60vw, 190px);
+    width: min(56vw, 178px);
   }
 
   .feedback-status-tabs {
@@ -832,5 +856,50 @@
 
   .feedback-card-head > span {
     white-space: normal;
+  }
+}
+
+@media (max-width: 400px) {
+  .feedback-page {
+    padding: 0 0 8px;
+  }
+
+  .feedback-layout {
+    --feedback-mobile-side-pad: 8px;
+    padding: 0 8px 0;
+  }
+
+  .feedback-sticky-strip.mobile-compact {
+    padding: 10px max(10px, env(safe-area-inset-right)) 20px max(10px, env(safe-area-inset-left));
+  }
+
+  .feedback-title-row {
+    gap: 6px;
+  }
+
+  .feedback-mobile-title-sort {
+    width: min(48vw, 148px);
+  }
+
+  .feedback-mobile-title-sort select {
+    font-size: 0.74rem;
+    padding: 0 8px;
+  }
+
+  .feedback-header-menu-btn {
+    width: 36px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+  }
+
+  .feedback-title-row h1 {
+    font-size: clamp(1.35rem, 7.2vw, 1.62rem);
+  }
+
+  .feedback-sticky-strip,
+  .feedback-list,
+  .feedback-card {
+    max-width: 100%;
+    box-sizing: border-box;
   }
 }
