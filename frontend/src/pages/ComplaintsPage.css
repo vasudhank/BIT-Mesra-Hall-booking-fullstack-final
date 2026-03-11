@@ -856,6 +856,7 @@
 
   .support-layout {
     --support-mobile-side-pad: 16px;
+    --support-mobile-strip-overdraw: 4px;
     grid-template-columns: 1fr;
     padding: 0 16px 14px;
     gap: 14px;
@@ -876,14 +877,24 @@
     position: sticky;
     top: 0;
     z-index: 30;
-    width: calc(100% + (2 * var(--support-mobile-side-pad, 16px)));
-    margin-left: calc(-1 * var(--support-mobile-side-pad, 16px));
-    margin-right: calc(-1 * var(--support-mobile-side-pad, 16px));
+    width: calc(100vw + var(--support-mobile-strip-overdraw, 2px));
+    max-width: calc(100vw + var(--support-mobile-strip-overdraw, 2px));
+    margin-left: calc(50% - 50vw - 1px);
+    margin-right: calc(50% - 50vw - 1px);
     margin-bottom: 12px;
     border-radius: 0;
     border-left: none;
     border-right: none;
     margin-top: 0;
+  }
+
+  @supports (width: 100dvw) {
+    .support-top-strip {
+      width: calc(100dvw + var(--support-mobile-strip-overdraw, 2px));
+      max-width: calc(100dvw + var(--support-mobile-strip-overdraw, 2px));
+      margin-left: calc(50% - 50dvw - 1px);
+      margin-right: calc(50% - 50dvw - 1px);
+    }
   }
 
   .support-top-strip.strip-collapsed-mobile {
@@ -975,15 +986,6 @@
   .support-layout {
     --support-mobile-side-pad: 8px;
     padding: 0 8px 14px;
-  }
-
-  .support-top-strip {
-    width: 100vw;
-    width: 100dvw;
-    margin-left: calc(50% - 50vw);
-    margin-left: calc(50% - 50dvw);
-    margin-right: calc(50% - 50vw);
-    margin-right: calc(50% - 50dvw);
   }
 
   .support-top-strip.mobile-compact {
@@ -1080,15 +1082,6 @@
   .support-layout {
     --support-mobile-side-pad: 6px;
     padding: 0 6px 10px;
-  }
-
-  .support-top-strip {
-    width: 100vw;
-    width: 100dvw;
-    margin-left: calc(50% - 50vw);
-    margin-left: calc(50% - 50dvw);
-    margin-right: calc(50% - 50vw);
-    margin-right: calc(50% - 50dvw);
   }
 
   .support-top-strip.mobile-compact {

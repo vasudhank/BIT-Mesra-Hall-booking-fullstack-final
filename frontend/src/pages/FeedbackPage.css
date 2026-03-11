@@ -772,18 +772,29 @@
 
   .feedback-layout {
     --feedback-mobile-side-pad: 12px;
+    --feedback-mobile-strip-overdraw: 4px;
     padding: 0 12px 0;
     box-sizing: border-box;
   }
 
   .feedback-sticky-strip {
-    width: calc(100% + (2 * var(--feedback-mobile-side-pad, 12px)));
-    margin-left: calc(-1 * var(--feedback-mobile-side-pad, 12px));
-    margin-right: calc(-1 * var(--feedback-mobile-side-pad, 12px));
+    width: calc(100vw + var(--feedback-mobile-strip-overdraw, 2px));
+    max-width: calc(100vw + var(--feedback-mobile-strip-overdraw, 2px));
+    margin-left: calc(50% - 50vw - 1px);
+    margin-right: calc(50% - 50vw - 1px);
     border-radius: 0;
     border-left: none;
     border-right: none;
     margin-top: 0;
+  }
+
+  @supports (width: 100dvw) {
+    .feedback-sticky-strip {
+      width: calc(100dvw + var(--feedback-mobile-strip-overdraw, 2px));
+      max-width: calc(100dvw + var(--feedback-mobile-strip-overdraw, 2px));
+      margin-left: calc(50% - 50dvw - 1px);
+      margin-right: calc(50% - 50dvw - 1px);
+    }
   }
 
   .feedback-sticky-strip.mobile-compact {
@@ -836,15 +847,6 @@
   .feedback-layout {
     --feedback-mobile-side-pad: 8px;
     padding: 0 8px 0;
-  }
-
-  .feedback-sticky-strip {
-    width: 100vw;
-    width: 100dvw;
-    margin-left: calc(50% - 50vw);
-    margin-left: calc(50% - 50dvw);
-    margin-right: calc(50% - 50vw);
-    margin-right: calc(50% - 50dvw);
   }
 
   .feedback-sticky-strip.mobile-compact {
@@ -944,15 +946,6 @@
   .feedback-layout {
     --feedback-mobile-side-pad: 6px;
     padding: 0 6px 0;
-  }
-
-  .feedback-sticky-strip {
-    width: 100vw;
-    width: 100dvw;
-    margin-left: calc(50% - 50vw);
-    margin-left: calc(50% - 50dvw);
-    margin-right: calc(50% - 50vw);
-    margin-right: calc(50% - 50dvw);
   }
 
   .feedback-sticky-strip.mobile-compact {
