@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import { deleteNoticeApi, getNoticeByIdApi, updateNoticeApi } from '../api/noticesApi';
 import api from '../api/axiosInstance';
 import HallMultiSelectDropdown from '../components/Notices/HallMultiSelectDropdown';
+import { printHtmlDocument } from '../utils/printDocument';
 import './NoticesPage.css';
 
 const READING_STORAGE_KEY = 'bit_notice_reading_preferences_v1';
@@ -1368,7 +1369,8 @@ export default function NoticeDetailPage() {
       ? `<div class="meta">${chips.map((item, index) => `<span class="${index === 0 ? 'badge' : ''}">${escapeHtml(item)}</span>`).join('')}</div>`
       : '';
 
-    const docTitle = escapeHtml(String(notice.title || notice.subject || 'Notice'));
+    const rawDocTitle = String(notice.title || notice.subject || 'Notice').trim() || 'Notice';
+    const docTitle = escapeHtml(rawDocTitle);
     const docHtml = `<!doctype html>
 <html>
 <head>
@@ -1404,42 +1406,18 @@ export default function NoticeDetailPage() {
 </body>
 </html>`;
 
-    const frame = document.createElement('iframe');
-    frame.style.position = 'fixed';
-    frame.style.width = '0';
-    frame.style.height = '0';
-    frame.style.right = '-10000px';
-    frame.style.bottom = '0';
-    frame.setAttribute('aria-hidden', 'true');
-
-    const cleanup = () => {
-      try {
-        document.body.removeChild(frame);
-      } catch (_) {
-        // already removed
-      }
-    };
-
-    frame.onload = () => {
-      const win = frame.contentWindow;
-      if (!win) {
-        cleanup();
-        return;
-      }
-      const handleAfterPrint = () => {
-        win.removeEventListener('afterprint', handleAfterPrint);
-        cleanup();
-      };
-      win.addEventListener('afterprint', handleAfterPrint);
-      setTimeout(() => {
-        win.focus();
-        win.print();
-      }, 200);
-      setTimeout(handleAfterPrint, 6000);
-    };
-
-    document.body.appendChild(frame);
-    frame.srcdoc = docHtml;
+    printHtmlDocument({
+      html: docHtml,
+      title: rawDocTitle,
+      validate: (doc) => {
+        const hasTitle = Boolean(doc.querySelector('h1'));
+        const bodyText = String(doc.querySelector('.body')?.textContent || '').trim();
+        return hasTitle && bodyText.length > 0;
+      },
+      settleDelayMs: 360,
+      printFallbackCleanupMs: 180000,
+      initFallbackCleanupMs: 240000
+    });
     closePrintDialog();
   };
 

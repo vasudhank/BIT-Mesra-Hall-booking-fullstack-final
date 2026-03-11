@@ -6,6 +6,7 @@ import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import { createPortal } from 'react-dom';
 import { getContactsApi } from '../../api/contactApi';
 import { QUICK_MENU_OPEN_CONTACTS_EVENT } from '../Navigation/quickMenuEvents';
+import { printHtmlDocument } from '../../utils/printDocument';
 import './WishYourDayOverlay.css';
 
 const normalizeForSearch = (value) =>
@@ -162,10 +163,7 @@ export default function WishYourDayOverlay() {
       )
       .join('');
 
-    const popup = window.open('', '_blank', 'noopener,noreferrer,width=1000,height=800');
-    if (!popup) return;
-
-    popup.document.write(`
+    const printHtml = `
       <!doctype html>
       <html>
         <head>
@@ -202,12 +200,16 @@ export default function WishYourDayOverlay() {
           </table>
         </body>
       </html>
-    `);
-    popup.document.close();
-    popup.focus();
-    setTimeout(() => {
-      popup.print();
-    }, 200);
+    `;
+
+    printHtmlDocument({
+      html: printHtml,
+      title: 'Wish Your Day Contacts',
+      validate: (doc) => Boolean(doc.querySelector('table')) && String(doc.body?.textContent || '').trim().length > 0,
+      settleDelayMs: 320,
+      printFallbackCleanupMs: 180000,
+      initFallbackCleanupMs: 240000
+    });
   };
 
   const handleDownload = () => {
@@ -354,4 +356,3 @@ export default function WishYourDayOverlay() {
     document.body
   );
 }
-
