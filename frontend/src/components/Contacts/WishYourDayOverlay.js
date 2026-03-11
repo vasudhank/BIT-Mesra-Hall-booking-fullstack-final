@@ -335,9 +335,9 @@ export default function WishYourDayOverlay() {
             />
           </label>
           <div className="quick-contacts-head-row">
-            <span>Name</span>
-            <span>Phone Number</span>
-            <span>Email Address</span>
+            <span>NAME</span>
+            <span>PHONE NUMBER</span>
+            <span>EMAIL ADDRESS</span>
           </div>
         </div>
 
