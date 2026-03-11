@@ -5,6 +5,7 @@ import { deleteNoticeApi, getNoticeByIdApi, updateNoticeApi } from '../api/notic
 import api from '../api/axiosInstance';
 import HallMultiSelectDropdown from '../components/Notices/HallMultiSelectDropdown';
 import { printHtmlDocument } from '../utils/printDocument';
+import { exportPdfFromPrintHtml } from '../utils/exportPdfFromPrintHtml';
 import './NoticesPage.css';
 
 const READING_STORAGE_KEY = 'bit_notice_reading_preferences_v1';
@@ -593,6 +594,7 @@ export default function NoticeDetailPage() {
     includeMeta: true,
     includeBorder: false
   });
+  const [printPdfBusy, setPrintPdfBusy] = useState(false);
   const [scopeDialog, setScopeDialog] = useState({ open: false });
   const [hasPendingStyleChanges, setHasPendingStyleChanges] = useState(false);
   const [selectionToolbar, setSelectionToolbar] = useState({ open: false, x: 0, y: 0 });
@@ -1336,7 +1338,7 @@ export default function NoticeDetailPage() {
     setPrintDialog((prev) => ({ ...prev, open: true }));
   };
 
-  const runCustomPrint = () => {
+  const buildNoticePrintDocument = () => {
     if (!notice || typeof document === 'undefined') return;
 
     const currentBodyHtml = sanitizeDescriptionHtml(syncBodyDraftFromDom() || styleDraft.contentHtml || defaultDescriptionHtml);
@@ -1406,9 +1408,20 @@ export default function NoticeDetailPage() {
 </body>
 </html>`;
 
-    printHtmlDocument({
+    return {
       html: docHtml,
       title: rawDocTitle,
+      marginMm,
+      orientation
+    };
+  };
+
+  const runCustomPrint = () => {
+    const built = buildNoticePrintDocument();
+    if (!built) return;
+    printHtmlDocument({
+      html: built.html,
+      title: built.title,
       validate: (doc) => {
         const hasTitle = Boolean(doc.querySelector('h1'));
         const bodyText = String(doc.querySelector('.body')?.textContent || '').trim();
@@ -1419,6 +1432,27 @@ export default function NoticeDetailPage() {
       initFallbackCleanupMs: 240000
     });
     closePrintDialog();
+  };
+
+  const downloadNoticePdf = async () => {
+    if (printPdfBusy) return;
+    const built = buildNoticePrintDocument();
+    if (!built) return;
+    setPrintPdfBusy(true);
+    try {
+      await exportPdfFromPrintHtml({
+        html: built.html,
+        title: built.title,
+        orientation: built.orientation,
+        marginMm: built.marginMm
+      });
+      setActionMessage({ type: 'success', text: 'Notice PDF downloaded.' });
+      closePrintDialog();
+    } catch (_) {
+      setActionMessage({ type: 'error', text: 'Unable to download notice PDF.' });
+    } finally {
+      setPrintPdfBusy(false);
+    }
   };
 
   const titleColorChanged = (styleDraft.titleColor || '') !== (originalColorState.titleColor || '');
@@ -2024,6 +2058,16 @@ export default function NoticeDetailPage() {
               <button type="button" className="notice-admin-secondary-btn" onClick={closePrintDialog}>
                 Cancel
               </button>
+              {isMobile && (
+                <button
+                  type="button"
+                  className="notice-admin-secondary-btn"
+                  onClick={downloadNoticePdf}
+                  disabled={printPdfBusy}
+                >
+                  {printPdfBusy ? 'Preparing PDF...' : 'Download PDF'}
+                </button>
+              )}
               <button type="button" className="btn-primary" onClick={runCustomPrint}>
                 Preview &amp; Print
               </button>

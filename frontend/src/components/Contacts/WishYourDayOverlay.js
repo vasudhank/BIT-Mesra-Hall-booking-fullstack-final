@@ -3,10 +3,12 @@ import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
 import DownloadOutlinedIcon from '@mui/icons-material/DownloadOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
+import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined';
 import { createPortal } from 'react-dom';
 import { getContactsApi } from '../../api/contactApi';
 import { QUICK_MENU_OPEN_CONTACTS_EVENT } from '../Navigation/quickMenuEvents';
 import { printHtmlDocument } from '../../utils/printDocument';
+import { exportPdfFromPrintHtml } from '../../utils/exportPdfFromPrintHtml';
 import './WishYourDayOverlay.css';
 
 const normalizeForSearch = (value) =>
@@ -29,6 +31,71 @@ const getContactKey = (contact) =>
       `${String(contact?.name || '').trim()}__${String(contact?.number || '').trim()}__${String(contact?.email || '').trim()}`
   );
 
+const isLikelyMobile = () => {
+  if (typeof window === 'undefined') return false;
+  const byWidth = window.matchMedia('(max-width: 960px)').matches;
+  const byPointer = window.matchMedia('(pointer: coarse)').matches;
+  const ua = typeof navigator !== 'undefined' ? String(navigator.userAgent || '').toLowerCase() : '';
+  const byUa = /android|iphone|ipad|ipod|mobile/i.test(ua);
+  return byWidth || byPointer || byUa;
+};
+
+const buildContactsPrintDocument = (contactsToExport) => {
+  const rows = contactsToExport
+    .map(
+      (contact, index) => `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(contact.name || '-')}</td>
+            <td>${escapeHtml(contact.number || '-')}</td>
+            <td>${escapeHtml(contact.email || '-')}</td>
+          </tr>
+        `
+    )
+    .join('');
+
+  const html = `
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Wish Your Day Contacts</title>
+          <style>
+            @page { size: A4; margin: 14mm; }
+            * { box-sizing: border-box; }
+            body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #0f172a; background: #fff; }
+            h1 { margin: 0 0 12px; font-size: 20px; text-align: center; }
+            table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+            th, td { border: 1.35px solid #334155; padding: 8px 7px; text-align: left; vertical-align: top; word-break: break-word; }
+            th { background: #e2e8f0; font-weight: 700; }
+            th:nth-child(1), td:nth-child(1) { width: 8%; text-align: center; }
+            th:nth-child(2), td:nth-child(2) { width: 32%; }
+            th:nth-child(3), td:nth-child(3) { width: 24%; }
+            th:nth-child(4), td:nth-child(4) { width: 36%; }
+            thead { display: table-header-group; }
+            tr { page-break-inside: avoid; break-inside: avoid; }
+          </style>
+        </head>
+        <body>
+          <h1>Wish Your Day Contact List</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Phone Number</th>
+                <th>Email Address</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+  return { html, title: 'Wish Your Day Contacts', marginMm: 14, orientation: 'portrait' };
+};
+
 export default function WishYourDayOverlay() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -36,7 +103,9 @@ export default function WishYourDayOverlay() {
   const [searchInput, setSearchInput] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
   const [selectedKeys, setSelectedKeys] = useState([]);
+  const [mobilePrintPdfBusy, setMobilePrintPdfBusy] = useState(false);
   const selectAllRef = useRef(null);
+  const mobilePrintFallbackEnabled = isLikelyMobile();
 
   const closeOverlay = () => {
     setOpen(false);
@@ -150,66 +219,33 @@ export default function WishYourDayOverlay() {
   const handlePrint = () => {
     const exportContacts = getExportContacts();
     if (!exportContacts.length) return;
-    const rows = exportContacts
-      .map(
-        (contact, index) => `
-          <tr>
-            <td>${index + 1}</td>
-            <td>${escapeHtml(contact.name || '-')}</td>
-            <td>${escapeHtml(contact.number || '-')}</td>
-            <td>${escapeHtml(contact.email || '-')}</td>
-          </tr>
-        `
-      )
-      .join('');
-
-    const printHtml = `
-      <!doctype html>
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>Wish Your Day Contacts</title>
-          <style>
-            @page { size: A4; margin: 14mm; }
-            * { box-sizing: border-box; }
-            body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #0f172a; background: #fff; }
-            h1 { margin: 0 0 12px; font-size: 20px; text-align: center; }
-            table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
-            th, td { border: 1.35px solid #334155; padding: 8px 7px; text-align: left; vertical-align: top; word-break: break-word; }
-            th { background: #e2e8f0; font-weight: 700; }
-            th:nth-child(1), td:nth-child(1) { width: 8%; text-align: center; }
-            th:nth-child(2), td:nth-child(2) { width: 32%; }
-            th:nth-child(3), td:nth-child(3) { width: 24%; }
-            th:nth-child(4), td:nth-child(4) { width: 36%; }
-            thead { display: table-header-group; }
-            tr { page-break-inside: avoid; break-inside: avoid; }
-          </style>
-        </head>
-        <body>
-          <h1>Wish Your Day Contact List</h1>
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Name</th>
-                <th>Phone Number</th>
-                <th>Email Address</th>
-              </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </body>
-      </html>
-    `;
+    const built = buildContactsPrintDocument(exportContacts);
 
     printHtmlDocument({
-      html: printHtml,
-      title: 'Wish Your Day Contacts',
+      html: built.html,
+      title: built.title,
       validate: (doc) => Boolean(doc.querySelector('table')) && String(doc.body?.textContent || '').trim().length > 0,
       settleDelayMs: 320,
       printFallbackCleanupMs: 180000,
       initFallbackCleanupMs: 240000
     });
+  };
+
+  const handleMobilePdfDownload = async () => {
+    const exportContacts = getExportContacts();
+    if (!exportContacts.length || mobilePrintPdfBusy) return;
+    const built = buildContactsPrintDocument(exportContacts);
+    setMobilePrintPdfBusy(true);
+    try {
+      await exportPdfFromPrintHtml({
+        html: built.html,
+        title: built.title,
+        orientation: built.orientation,
+        marginMm: built.marginMm
+      });
+    } finally {
+      setMobilePrintPdfBusy(false);
+    }
   };
 
   const handleDownload = () => {
@@ -349,6 +385,17 @@ export default function WishYourDayOverlay() {
             <button type="button" onClick={handlePrint} aria-label="Print contacts list" title="Print contacts">
               <PrintOutlinedIcon fontSize="small" />
             </button>
+            {mobilePrintFallbackEnabled && (
+              <button
+                type="button"
+                onClick={handleMobilePdfDownload}
+                disabled={mobilePrintPdfBusy}
+                aria-label="Download contacts PDF"
+                title="Download PDF (mobile fallback)"
+              >
+                <PictureAsPdfOutlinedIcon fontSize="small" />
+              </button>
+            )}
           </div>
         </div>
       </div>
