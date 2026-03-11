@@ -818,11 +818,11 @@
   }
 
   .feedback-search-wrap {
-    max-width: 260px;
+    max-width: var(--feedback-mobile-search-max, 260px);
   }
 
   .feedback-search-box {
-    max-width: 260px;
+    max-width: var(--feedback-mobile-search-max, 260px);
   }
 
   .feedback-mobile-title-sort {
@@ -890,11 +890,11 @@
   }
 
   .feedback-search-wrap {
-    max-width: 220px;
+    max-width: var(--feedback-mobile-search-max, 220px);
   }
 
   .feedback-search-box {
-    max-width: 220px;
+    max-width: var(--feedback-mobile-search-max, 220px);
   }
 
   .feedback-mobile-title-sort select {
