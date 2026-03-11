@@ -1078,12 +1078,31 @@
 
 @media (max-width: 400px) {
   .support-layout {
-    --support-mobile-side-pad: 10px;
-    padding: 0 10px 10px;
+    --support-mobile-side-pad: 6px;
+    padding: 0 6px 10px;
+  }
+
+  .support-top-strip {
+    width: 100vw;
+    width: 100dvw;
+    margin-left: calc(50% - 50vw);
+    margin-left: calc(50% - 50dvw);
+    margin-right: calc(50% - 50vw);
+    margin-right: calc(50% - 50dvw);
   }
 
   .support-top-strip.mobile-compact {
-    padding: 10px max(10px, env(safe-area-inset-right)) 20px max(10px, env(safe-area-inset-left));
+    padding: 10px max(6px, env(safe-area-inset-right)) 20px max(6px, env(safe-area-inset-left));
+  }
+
+  .support-top-grid,
+  .support-top-center,
+  .support-top-right,
+  .support-search-box,
+  .support-filter-row,
+  .support-filter-btn {
+    width: 100%;
+    min-width: 0;
   }
 
   .support-title-row {

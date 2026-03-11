@@ -942,12 +942,31 @@
   }
 
   .feedback-layout {
-    --feedback-mobile-side-pad: 8px;
-    padding: 0 8px 0;
+    --feedback-mobile-side-pad: 6px;
+    padding: 0 6px 0;
+  }
+
+  .feedback-sticky-strip {
+    width: 100vw;
+    width: 100dvw;
+    margin-left: calc(50% - 50vw);
+    margin-left: calc(50% - 50dvw);
+    margin-right: calc(50% - 50vw);
+    margin-right: calc(50% - 50dvw);
   }
 
   .feedback-sticky-strip.mobile-compact {
-    padding: 10px max(10px, env(safe-area-inset-right)) 20px max(10px, env(safe-area-inset-left));
+    padding: 10px max(6px, env(safe-area-inset-right)) 20px max(6px, env(safe-area-inset-left));
+  }
+
+  .feedback-top-row,
+  .feedback-filter-row,
+  .feedback-search-wrap,
+  .feedback-search-box,
+  .feedback-status-tabs,
+  .feedback-status-tab {
+    width: 100%;
+    min-width: 0;
   }
 
   .feedback-title-row {
