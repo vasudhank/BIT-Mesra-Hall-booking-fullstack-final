@@ -1573,7 +1573,7 @@ export default function NoticeDetailPage() {
 
   return (
     <div
-      className={`notice-detail-print-page ${themeClasses}`}
+      className={`notice-detail-print-page ${themeClasses} ${isHeaderStripCollapsed ? 'notice-header-strip-collapsed' : ''}`}
       style={{
         '--font-base': `${reading.textSize}px`,
         '--notice-header-strip-height': `${headerStripHeight}px`,

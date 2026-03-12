@@ -1134,6 +1134,8 @@ textarea.premium-input { resize: vertical; min-height: 120px; }
   --notice-title-to-description-gap: 35px;
   --notice-description-controls-bottom-gap: 1px;
   --notice-description-text-top-gap: 1px;
+  --notice-detail-strip-max-width-desktop: 960px;
+  --notice-detail-strip-viewport-gap-desktop: 84px;
   padding-top: calc(
     var(--notice-fixed-top-gap, 10px)
     + var(--notice-combined-fixed-height, 0px)
@@ -1340,8 +1342,14 @@ textarea.premium-input { resize: vertical; min-height: 120px; }
   top: var(--notice-fixed-top-gap, 10px) !important;
   left: 50%;
   transform: translateX(-50%);
-  width: min(1000px, calc(100vw - 64px));
-  max-width: min(1000px, calc(100vw - 64px));
+  width: min(
+    var(--notice-detail-strip-max-width-desktop, 960px),
+    calc(100vw - var(--notice-detail-strip-viewport-gap-desktop, 84px))
+  );
+  max-width: min(
+    var(--notice-detail-strip-max-width-desktop, 960px),
+    calc(100vw - var(--notice-detail-strip-viewport-gap-desktop, 84px))
+  );
   margin: 0 !important;
   display: flex;
   flex-wrap: nowrap;
@@ -2506,6 +2514,16 @@ textarea.premium-input { resize: vertical; min-height: 120px; }
     --notice-title-to-description-gap: 20px;
     --notice-description-controls-bottom-gap: 0.5px;
     --notice-description-text-top-gap: 0.5px;
+  }
+
+  .notice-detail-print-page.notice-header-strip-collapsed .notices-layout-center::before {
+    height: calc(
+      var(--notice-fixed-top-gap, 8px)
+      + var(--notice-header-to-controls-gap, 10px)
+      + 2px
+    );
+    background: var(--notice-surface-solid);
+    z-index: 142;
   }
 
   .notice-detail-strip-edge-toggle {
