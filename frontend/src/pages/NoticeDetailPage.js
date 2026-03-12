@@ -618,6 +618,13 @@ export default function NoticeDetailPage() {
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 960px)').matches : false
   );
   const [isHeaderStripCollapsed, setIsHeaderStripCollapsed] = useState(false);
+  const [isTitleControlsCollapsed, setIsTitleControlsCollapsed] = useState(false);
+  const [isDescriptionControlsCollapsed, setIsDescriptionControlsCollapsed] = useState(false);
+  const [headerStripHeight, setHeaderStripHeight] = useState(0);
+  const [detailControlsHeight, setDetailControlsHeight] = useState(0);
+  const [headerExpandTop, setHeaderExpandTop] = useState(10);
+  const [titleExpandTop, setTitleExpandTop] = useState(120);
+  const [descriptionExpandTop, setDescriptionExpandTop] = useState(180);
 
   const noticeTitleRef = useRef(null);
   const noticeBodyRef = useRef(null);
@@ -627,6 +634,15 @@ export default function NoticeDetailPage() {
   const customPickerRef = useRef(null);
   const pickerSvRef = useRef(null);
   const pickerHueRef = useRef(null);
+  const headerStripRef = useRef(null);
+  const detailControlsRef = useRef(null);
+  const titleControlsCardRef = useRef(null);
+  const descriptionControlsCardRef = useRef(null);
+  const headerEdgeToggleRef = useRef(null);
+  const titleCardToggleRef = useRef(null);
+  const descriptionCardToggleRef = useRef(null);
+
+  const allStripsExpanded = !isHeaderStripCollapsed && !isTitleControlsCollapsed && !isDescriptionControlsCollapsed;
 
   useEffect(() => {
     localStorage.setItem(READING_STORAGE_KEY, JSON.stringify(reading));
@@ -650,6 +666,98 @@ export default function NoticeDetailPage() {
       setIsHeaderStripCollapsed(false);
     }
   }, [isMobile]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const updateHeaderStripHeight = () => {
+      const rect = headerStripRef.current?.getBoundingClientRect?.();
+      setHeaderStripHeight(Math.max(0, Math.round(rect?.height || 0)));
+    };
+
+    updateHeaderStripHeight();
+    window.addEventListener('resize', updateHeaderStripHeight);
+
+    let observer = null;
+    if (typeof ResizeObserver !== 'undefined' && headerStripRef.current) {
+      observer = new ResizeObserver(updateHeaderStripHeight);
+      observer.observe(headerStripRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateHeaderStripHeight);
+      if (observer) observer.disconnect();
+    };
+  }, [isHeaderStripCollapsed, isMobile]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const updateDetailControlsHeight = () => {
+      const rect = detailControlsRef.current?.getBoundingClientRect?.();
+      setDetailControlsHeight(Math.max(0, Math.round(rect?.height || 0)));
+    };
+
+    updateDetailControlsHeight();
+    window.addEventListener('resize', updateDetailControlsHeight);
+
+    let observer = null;
+    if (typeof ResizeObserver !== 'undefined' && detailControlsRef.current) {
+      observer = new ResizeObserver(updateDetailControlsHeight);
+      observer.observe(detailControlsRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateDetailControlsHeight);
+      if (observer) observer.disconnect();
+    };
+  }, [isTitleControlsCollapsed, isDescriptionControlsCollapsed, isMobile, loading, error, notice?._id]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const updateIfMoved = (setter, nextValue) => {
+      if (!Number.isFinite(nextValue)) return;
+      const safeNext = Math.max(0, Math.round(nextValue));
+      setter((prev) => (Math.abs(prev - safeNext) >= 1 ? safeNext : prev));
+    };
+
+    const measureAnchorTops = () => {
+      if (!allStripsExpanded) return;
+
+      const headerTop = headerEdgeToggleRef.current?.getBoundingClientRect?.()?.top;
+      const titleTop = titleCardToggleRef.current?.getBoundingClientRect?.()?.top;
+      const descriptionTop = descriptionCardToggleRef.current?.getBoundingClientRect?.()?.top;
+
+      updateIfMoved(setHeaderExpandTop, headerTop);
+      updateIfMoved(setTitleExpandTop, titleTop);
+      updateIfMoved(setDescriptionExpandTop, descriptionTop);
+    };
+
+    const rafId = window.requestAnimationFrame(measureAnchorTops);
+    window.addEventListener('resize', measureAnchorTops);
+
+    let observer = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(measureAnchorTops);
+      if (headerStripRef.current) observer.observe(headerStripRef.current);
+      if (detailControlsRef.current) observer.observe(detailControlsRef.current);
+      if (headerEdgeToggleRef.current) observer.observe(headerEdgeToggleRef.current);
+      if (titleCardToggleRef.current) observer.observe(titleCardToggleRef.current);
+      if (descriptionCardToggleRef.current) observer.observe(descriptionCardToggleRef.current);
+    }
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', measureAnchorTops);
+      if (observer) observer.disconnect();
+    };
+  }, [
+    allStripsExpanded,
+    isMobile,
+    loading,
+    error,
+    notice?._id,
+    headerStripHeight,
+    detailControlsHeight
+  ]);
 
   const viewerKey = useMemo(() => {
     if (auth.status === 'Authenticated') {
@@ -1460,14 +1568,32 @@ export default function NoticeDetailPage() {
   const headerSharedColor = (styleDraft.titleColor && styleDraft.titleColor === styleDraft.descriptionColor)
     ? styleDraft.titleColor
     : '';
+  const allDetailCardsCollapsed = isTitleControlsCollapsed && isDescriptionControlsCollapsed;
+  const allFixedPanelsCollapsed = isHeaderStripCollapsed && allDetailCardsCollapsed;
 
   return (
-    <div className={`notice-detail-print-page ${themeClasses}`} style={{ '--font-base': `${reading.textSize}px` }}>
+    <div
+      className={`notice-detail-print-page ${themeClasses}`}
+      style={{
+        '--font-base': `${reading.textSize}px`,
+        '--notice-header-strip-height': `${headerStripHeight}px`,
+        '--notice-detail-controls-height': `${detailControlsHeight}px`,
+        '--notice-combined-fixed-height': `${Math.max(0, headerStripHeight + detailControlsHeight)}px`,
+        '--notice-header-expand-top': `${headerExpandTop}px`,
+        '--notice-title-expand-top': `${titleExpandTop}px`,
+        '--notice-description-expand-top': `${descriptionExpandTop}px`
+      }}
+    >
+      <div
+        className={`notice-detail-fixed-opaque-shell ${allFixedPanelsCollapsed ? 'is-hidden' : ''}`}
+        aria-hidden="true"
+      />
       <div className="notices-layout-center">
         <section
-          className={`notices-sticky-strip notice-detail-sticky-strip ${isMobile && isHeaderStripCollapsed ? 'notice-detail-sticky-strip-collapsed' : ''}`}
+          ref={headerStripRef}
+          className={`notices-sticky-strip notice-detail-sticky-strip ${isHeaderStripCollapsed ? 'notice-detail-sticky-strip-collapsed' : ''}`}
         >
-          {!(isMobile && isHeaderStripCollapsed) && (
+          {!isHeaderStripCollapsed && (
             <>
               <div className="notice-detail-strip-main-row">
                 <Link className="notices-hero-home notice-detail-board-link" to="/notices">
@@ -1632,23 +1758,22 @@ export default function NoticeDetailPage() {
                 </div>
               </div>
 
-              {isMobile && (
-                <button
-                  type="button"
-                  className="notice-detail-strip-edge-toggle"
-                  onClick={() => setIsHeaderStripCollapsed(true)}
-                  aria-label="Collapse notice detail header strip"
-                >
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="15 18 9 12 15 6"></polyline>
-                  </svg>
-                </button>
-              )}
+              <button
+                type="button"
+                ref={headerEdgeToggleRef}
+                className="notice-detail-strip-edge-toggle"
+                onClick={() => setIsHeaderStripCollapsed(true)}
+                aria-label="Collapse notice detail header strip"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+              </button>
             </>
           )}
         </section>
 
-        {isMobile && isHeaderStripCollapsed && (
+        {isHeaderStripCollapsed && (
           <button
             type="button"
             className="notice-detail-strip-float-toggle"
@@ -1673,165 +1798,236 @@ export default function NoticeDetailPage() {
 
         {!loading && !error && notice && (
           <article className="notice-detail-container">
-            <header className="notice-detail-header">
-              <div className="notice-color-control">
-                <div className="notice-color-control-left">
-                  <div className="notice-color-swatches">
-                    {(isMobile ? COMPACT_NOTICE_COLORS : TITLE_COLORS).map((color) => (
-                      <button
-                        key={`title-${color.key}`}
-                        type="button"
-                        className={`notice-color-dot ${styleDraft.titleColor === color.value ? 'active' : ''}`}
-                        style={{ '--dot-color': color.value }}
-                        title={color.label}
-                        aria-label={`Set title color ${color.label}`}
-                        onClick={() => applyStyleDraftPatch({ titleColor: color.value })}
-                      />
-                    ))}
-                    <button
-                      type="button"
-                      className="notice-color-dot notice-color-dot-any"
-                      title="Choose any title color"
-                      aria-label="Choose any title color"
-                      onClick={(e) => openCustomColorPicker(e, 'title')}
-                    />
-                    {titleColorChanged && (
-                      <button
-                        type="button"
-                        className="notice-color-undo-btn"
-                        title="Undo title color"
-                        aria-label="Undo title color"
-                        onClick={() => applyStyleDraftPatch({ titleColor: originalColorState.titleColor || '' })}
-                      >
-                        <Icons.Undo />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="notice-color-control-right">
-                  <FontSizeControl
-                    value={titleFontSizePx}
-                    onChange={(next) => applyTitleTypographyChange({ titleFontSize: next })}
-                    min={12}
-                    max={72}
-                    className="notice-inline-font-size-group"
-                    ariaLabel="Title font size control"
-                  />
-                  <div className="readability-group notice-inline-font-family-group">
-                    <select
-                      className="readability-select notice-inline-font-select"
-                      value={titleFontKey}
-                      onChange={(e) => applyTitleTypographyChange({ titleFont: e.target.value })}
-                      aria-label="Title font style"
-                    >
-                      {INLINE_FONT_OPTIONS.map((opt) => (
-                        <option key={`title-font-${opt.value}`} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
+            <div
+              ref={detailControlsRef}
+              className={`notice-detail-fixed-control-area ${allDetailCardsCollapsed ? 'is-empty' : ''}`}
+            >
+              {!isTitleControlsCollapsed && (
+                <section
+                  ref={titleControlsCardRef}
+                  className="notice-detail-floating-card notice-detail-floating-title-card"
+                >
+                  <header className="notice-detail-header">
+                    <div className="notice-color-control">
+                      <div className="notice-color-control-left">
+                        <div className="notice-color-swatches">
+                          {(isMobile ? COMPACT_NOTICE_COLORS : TITLE_COLORS).map((color) => (
+                            <button
+                              key={`title-${color.key}`}
+                              type="button"
+                              className={`notice-color-dot ${styleDraft.titleColor === color.value ? 'active' : ''}`}
+                              style={{ '--dot-color': color.value }}
+                              title={color.label}
+                              aria-label={`Set title color ${color.label}`}
+                              onClick={() => applyStyleDraftPatch({ titleColor: color.value })}
+                            />
+                          ))}
+                          <button
+                            type="button"
+                            className="notice-color-dot notice-color-dot-any"
+                            title="Choose any title color"
+                            aria-label="Choose any title color"
+                            onClick={(e) => openCustomColorPicker(e, 'title')}
+                          />
+                          {titleColorChanged && (
+                            <button
+                              type="button"
+                              className="notice-color-undo-btn"
+                              title="Undo title color"
+                              aria-label="Undo title color"
+                              onClick={() => applyStyleDraftPatch({ titleColor: originalColorState.titleColor || '' })}
+                            >
+                              <Icons.Undo />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="notice-color-control-right">
+                        <FontSizeControl
+                          value={titleFontSizePx}
+                          onChange={(next) => applyTitleTypographyChange({ titleFontSize: next })}
+                          min={12}
+                          max={72}
+                          className="notice-inline-font-size-group"
+                          ariaLabel="Title font size control"
+                        />
+                        <div className="readability-group notice-inline-font-family-group">
+                          <select
+                            className="readability-select notice-inline-font-select"
+                            value={titleFontKey}
+                            onChange={(e) => applyTitleTypographyChange({ titleFont: e.target.value })}
+                            aria-label="Title font style"
+                          >
+                            {INLINE_FONT_OPTIONS.map((opt) => (
+                              <option key={`title-font-${opt.value}`} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
 
-              <h1
-                ref={noticeTitleRef}
+                    <h1
+                      ref={noticeTitleRef}
+                      style={{
+                        color: styleDraft.titleColor || undefined,
+                        fontFamily: titleFontFamily,
+                        fontSize: `${titleFontSizePx}px`
+                      }}
+                      onMouseUp={captureSelectionToolbar}
+                      onKeyUp={captureSelectionToolbar}
+                      dangerouslySetInnerHTML={{ __html: styleDraft.titleHtml || defaultTitleHtml }}
+                    />
+                    <div className="notice-meta" style={{ marginTop: '16px' }}>
+                      <span className={`notice-badge ${notice.kind === 'HOLIDAY' ? 'holiday' : 'general'}`} style={{ border: 'none' }}>
+                        {notice.kind === 'HOLIDAY' ? 'Closure Notice' : 'General Notice'}
+                      </span>
+                      <span>Published: {formatDate(notice.createdAt)}</span>
+                      {notice.holidayName && <span>Event: {notice.holidayName}</span>}
+                      {notice.startDateTime && <span>Start: {formatDate(notice.startDateTime)}</span>}
+                      {notice.endDateTime && <span>End: {formatDate(notice.endDateTime)}</span>}
+                      {Array.isArray(notice.rooms) && notice.rooms.length > 0 && (
+                        <span>Rooms: {notice.rooms.join(', ')}</span>
+                      )}
+                      {notice.closureAllHalls && <span>All halls marked closed</span>}
+                    </div>
+                  </header>
+
+                  <button
+                    type="button"
+                    ref={titleCardToggleRef}
+                    className="notice-detail-content-card-toggle"
+                    aria-label="Collapse title and status controls"
+                    onClick={() => setIsTitleControlsCollapsed(true)}
+                  >
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                  </button>
+                </section>
+              )}
+
+              {isTitleControlsCollapsed && (
+                <button
+                  type="button"
+                  className="notice-detail-content-card-expand notice-detail-title-card-expand"
+                  aria-label="Expand title and status controls"
+                  onClick={() => setIsTitleControlsCollapsed(false)}
+                >
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </button>
+              )}
+
+              {!isDescriptionControlsCollapsed && (
+                <section
+                  ref={descriptionControlsCardRef}
+                  className="notice-detail-floating-card notice-detail-floating-description-card"
+                >
+                  <div className="notice-color-control">
+                    <div className="notice-color-control-left">
+                      <div className="notice-color-swatches">
+                        {(isMobile ? COMPACT_NOTICE_COLORS : TITLE_COLORS).map((color) => (
+                          <button
+                            key={`desc-${color.key}`}
+                            type="button"
+                            className={`notice-color-dot ${styleDraft.descriptionColor === color.value ? 'active' : ''}`}
+                            style={{ '--dot-color': color.value }}
+                            title={color.label}
+                            aria-label={`Set description color ${color.label}`}
+                            onClick={() => applyStyleDraftPatch({ descriptionColor: color.value })}
+                          />
+                        ))}
+                        <button
+                          type="button"
+                          className="notice-color-dot notice-color-dot-any"
+                          title="Choose any description color"
+                          aria-label="Choose any description color"
+                          onClick={(e) => openCustomColorPicker(e, 'description')}
+                        />
+                        {descriptionColorChanged && (
+                          <button
+                            type="button"
+                            className="notice-color-undo-btn"
+                            title="Undo description color"
+                            aria-label="Undo description color"
+                            onClick={() => applyStyleDraftPatch({ descriptionColor: originalColorState.descriptionColor || '' })}
+                          >
+                            <Icons.Undo />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="notice-color-control-right">
+                      <FontSizeControl
+                        value={descriptionFontSizePx}
+                        onChange={(next) => applyDescriptionTypographyChange({ descriptionFontSize: next })}
+                        min={12}
+                        max={72}
+                        className="notice-inline-font-size-group"
+                        ariaLabel="Description font size control"
+                      />
+                      <div className="readability-group notice-inline-font-family-group">
+                        <select
+                          className="readability-select notice-inline-font-select"
+                          value={descriptionFontKey}
+                          onChange={(e) => applyDescriptionTypographyChange({ descriptionFont: e.target.value })}
+                          aria-label="Description font style"
+                        >
+                          {INLINE_FONT_OPTIONS.map((opt) => (
+                            <option key={`description-font-${opt.value}`} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    ref={descriptionCardToggleRef}
+                    className="notice-detail-content-card-toggle"
+                    aria-label="Collapse description controls"
+                    onClick={() => setIsDescriptionControlsCollapsed(true)}
+                  >
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                  </button>
+                </section>
+              )}
+
+              {isDescriptionControlsCollapsed && (
+                <button
+                  type="button"
+                  className="notice-detail-content-card-expand notice-detail-description-card-expand"
+                  aria-label="Expand description controls"
+                  onClick={() => setIsDescriptionControlsCollapsed(false)}
+                >
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            <div className={`notice-detail-body-wrap ${allDetailCardsCollapsed ? 'controls-fully-collapsed' : ''}`}>
+              <div
+                className="notice-detail-body"
+                ref={noticeBodyRef}
                 style={{
-                  color: styleDraft.titleColor || undefined,
-                  fontFamily: titleFontFamily,
-                  fontSize: `${titleFontSizePx}px`
+                  '--notice-description-color': styleDraft.descriptionColor || '',
+                  '--notice-description-font-family': descriptionFontFamily,
+                  '--notice-description-font-size': `${descriptionFontSizePx}px`
                 }}
                 onMouseUp={captureSelectionToolbar}
                 onKeyUp={captureSelectionToolbar}
-                dangerouslySetInnerHTML={{ __html: styleDraft.titleHtml || defaultTitleHtml }}
+                dangerouslySetInnerHTML={{ __html: styleDraft.contentHtml || defaultDescriptionHtml }}
               />
-              <div className="notice-meta" style={{ marginTop: '16px' }}>
-                <span className={`notice-badge ${notice.kind === 'HOLIDAY' ? 'holiday' : 'general'}`} style={{ border: 'none' }}>
-                  {notice.kind === 'HOLIDAY' ? 'Closure Notice' : 'General Notice'}
-                </span>
-                <span>Published: {formatDate(notice.createdAt)}</span>
-                {notice.holidayName && <span>Event: {notice.holidayName}</span>}
-                {notice.startDateTime && <span>Start: {formatDate(notice.startDateTime)}</span>}
-                {notice.endDateTime && <span>End: {formatDate(notice.endDateTime)}</span>}
-                {Array.isArray(notice.rooms) && notice.rooms.length > 0 && (
-                  <span>Rooms: {notice.rooms.join(', ')}</span>
-                )}
-                {notice.closureAllHalls && <span>All halls marked closed</span>}
-              </div>
-            </header>
-
-            <div className="notice-color-control">
-              <div className="notice-color-control-left">
-                <div className="notice-color-swatches">
-                  {(isMobile ? COMPACT_NOTICE_COLORS : TITLE_COLORS).map((color) => (
-                    <button
-                      key={`desc-${color.key}`}
-                      type="button"
-                      className={`notice-color-dot ${styleDraft.descriptionColor === color.value ? 'active' : ''}`}
-                      style={{ '--dot-color': color.value }}
-                      title={color.label}
-                      aria-label={`Set description color ${color.label}`}
-                      onClick={() => applyStyleDraftPatch({ descriptionColor: color.value })}
-                    />
-                  ))}
-                  <button
-                    type="button"
-                    className="notice-color-dot notice-color-dot-any"
-                    title="Choose any description color"
-                    aria-label="Choose any description color"
-                    onClick={(e) => openCustomColorPicker(e, 'description')}
-                  />
-                  {descriptionColorChanged && (
-                    <button
-                      type="button"
-                      className="notice-color-undo-btn"
-                      title="Undo description color"
-                      aria-label="Undo description color"
-                      onClick={() => applyStyleDraftPatch({ descriptionColor: originalColorState.descriptionColor || '' })}
-                    >
-                      <Icons.Undo />
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div className="notice-color-control-right">
-                <FontSizeControl
-                  value={descriptionFontSizePx}
-                  onChange={(next) => applyDescriptionTypographyChange({ descriptionFontSize: next })}
-                  min={12}
-                  max={72}
-                  className="notice-inline-font-size-group"
-                  ariaLabel="Description font size control"
-                />
-                <div className="readability-group notice-inline-font-family-group">
-                  <select
-                    className="readability-select notice-inline-font-select"
-                    value={descriptionFontKey}
-                    onChange={(e) => applyDescriptionTypographyChange({ descriptionFont: e.target.value })}
-                    aria-label="Description font style"
-                  >
-                    {INLINE_FONT_OPTIONS.map((opt) => (
-                      <option key={`description-font-${opt.value}`} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
             </div>
-
-            <div
-              className="notice-detail-body"
-              ref={noticeBodyRef}
-              style={{
-                '--notice-description-color': styleDraft.descriptionColor || '',
-                '--notice-description-font-family': descriptionFontFamily,
-                '--notice-description-font-size': `${descriptionFontSizePx}px`
-              }}
-              onMouseUp={captureSelectionToolbar}
-              onKeyUp={captureSelectionToolbar}
-              dangerouslySetInnerHTML={{ __html: styleDraft.contentHtml || defaultDescriptionHtml }}
-            />
 
             {selectionToolbar.open && (
               <div
