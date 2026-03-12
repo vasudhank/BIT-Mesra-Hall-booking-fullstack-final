@@ -1496,6 +1496,10 @@ textarea.premium-input { resize: vertical; min-height: 120px; }
   color: var(--notice-accent);
 }
 
+.notice-detail-mobile-collapse-stack {
+  display: none;
+}
+
 .notice-detail-sticky-strip.notice-detail-sticky-strip-collapsed {
   padding: 0 !important;
   border: none;
@@ -2530,6 +2534,38 @@ textarea.premium-input { resize: vertical; min-height: 120px; }
     );
     background: var(--notice-surface-solid);
     z-index: 142;
+  }
+
+  .notice-detail-mobile-collapse-stack {
+    position: fixed;
+    left: 0;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+    z-index: 1450;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    pointer-events: none;
+  }
+
+  .notice-detail-mobile-collapse-btn {
+    width: 18px;
+    height: 42px;
+    border-radius: 12px;
+    border: 1px solid var(--notice-border-strong);
+    background: var(--notice-surface-solid);
+    color: var(--notice-muted);
+    box-shadow: var(--notice-shadow-sm);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+
+  .notice-detail-mobile-collapse-btn:hover {
+    border-color: var(--notice-accent);
+    color: var(--notice-accent);
   }
 
   .notice-detail-strip-edge-toggle {

@@ -1773,7 +1773,7 @@ export default function NoticeDetailPage() {
           )}
         </section>
 
-        {isHeaderStripCollapsed && (
+        {isHeaderStripCollapsed && !isMobile && (
           <button
             type="button"
             className="notice-detail-strip-float-toggle"
@@ -1784,6 +1784,49 @@ export default function NoticeDetailPage() {
               <polyline points="9 18 15 12 9 6"></polyline>
             </svg>
           </button>
+        )}
+
+        {isMobile && (isHeaderStripCollapsed || isTitleControlsCollapsed || isDescriptionControlsCollapsed) && (
+          <div className="notice-detail-mobile-collapse-stack" aria-label="Collapsed strip controls">
+            {isHeaderStripCollapsed && (
+              <button
+                type="button"
+                className="notice-detail-mobile-collapse-btn"
+                onClick={() => setIsHeaderStripCollapsed(false)}
+                aria-label="Expand notice detail header strip"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>
+            )}
+
+            {isTitleControlsCollapsed && (
+              <button
+                type="button"
+                className="notice-detail-mobile-collapse-btn"
+                onClick={() => setIsTitleControlsCollapsed(false)}
+                aria-label="Expand title and status controls"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>
+            )}
+
+            {isDescriptionControlsCollapsed && (
+              <button
+                type="button"
+                className="notice-detail-mobile-collapse-btn"
+                onClick={() => setIsDescriptionControlsCollapsed(false)}
+                aria-label="Expand description controls"
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>
+            )}
+          </div>
         )}
 
         {actionMessage.text && (
@@ -1908,7 +1951,7 @@ export default function NoticeDetailPage() {
                 </section>
               )}
 
-              {isTitleControlsCollapsed && (
+              {isTitleControlsCollapsed && !isMobile && (
                 <button
                   type="button"
                   className="notice-detail-content-card-expand notice-detail-title-card-expand"
@@ -2000,7 +2043,7 @@ export default function NoticeDetailPage() {
                 </section>
               )}
 
-              {isDescriptionControlsCollapsed && (
+              {isDescriptionControlsCollapsed && !isMobile && (
                 <button
                   type="button"
                   className="notice-detail-content-card-expand notice-detail-description-card-expand"
