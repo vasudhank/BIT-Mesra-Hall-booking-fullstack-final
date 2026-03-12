@@ -24,6 +24,15 @@ body.dark-mode {
   --gemini-gradient: linear-gradient(135deg, #6aa5ff 0%, #40c4ff 48%, #57d6b6 100%);
 }
 
+.ai-immersive-page-wrap {
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
+  background: var(--gemini-bg);
+  overflow: hidden;
+}
+
 .gemini-chat-shell {
   display: flex;
   height: 100%;
@@ -294,6 +303,15 @@ body.dark-mode .gemini-sidebar.resizing .sidebar-resize-handle::after {
   align-items: center;
   gap: 7px;
   cursor: pointer;
+}
+
+.sidebar-menu-btn.quick-page-menu-btn {
+  justify-content: flex-start !important;
+  text-align: left;
+}
+
+.sidebar-menu-btn .quick-page-menu-label {
+  text-align: left;
 }
 
 .sidebar-settings-btn:hover,
@@ -1319,6 +1337,22 @@ body.dark-mode .message-search-mark {
 }
 
 @media (max-width: 960px) {
+  body.ai-immersive-page {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  .ai-immersive-page-wrap {
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .gemini-chat-shell.immersive-shell {
+    height: 100%;
+    max-height: 100dvh;
+  }
+
   .gemini-sidebar.open {
     width: var(--gemini-sidebar-open-width, 200px);
   }
