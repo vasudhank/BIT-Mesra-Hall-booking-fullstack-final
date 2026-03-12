@@ -33,75 +33,28 @@
   min-height: 36px !important;
   padding: 0 !important;
   border-radius: 11px !important;
-  border: 1px solid rgba(15, 23, 42, 0.16) !important;
-  background: rgba(255, 255, 255, 0.78) !important;
-  color: #0f172a !important;
-  backdrop-filter: blur(12px) saturate(145%);
-  -webkit-backdrop-filter: blur(12px) saturate(145%);
-  transition: background 180ms ease, border-color 180ms ease, color 180ms ease;
+  border: 1px solid rgba(255, 255, 255, 0.34) !important;
+  background: rgba(15, 23, 42, 0.45) !important;
+  color: #f8fafc !important;
 }
 
 .department-login-menu-btn:hover {
-  border-color: rgba(56, 189, 248, 0.62) !important;
-  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(56, 189, 248, 0.72) !important;
+  background: rgba(15, 23, 42, 0.65) !important;
 }
 
 .department-login-menu-panel {
-  border-color: rgba(15, 23, 42, 0.12) !important;
-  background: rgba(255, 255, 255, 0.94) !important;
-  color: #0f172a !important;
-  backdrop-filter: blur(18px) saturate(155%);
-  -webkit-backdrop-filter: blur(18px) saturate(155%);
-  transition: background 180ms ease, border-color 180ms ease, color 180ms ease;
+  border-color: rgba(255, 255, 255, 0.26) !important;
+  background: rgba(15, 23, 42, 0.96) !important;
+  color: #f8fafc !important;
 }
 
 .department-login-menu-item {
-  color: #0f172a !important;
+  color: #f8fafc !important;
 }
 
 .department-login-menu-item:hover {
-  background: rgba(59, 130, 246, 0.12) !important;
-}
-
-.department-login-menu-panel .quick-page-menu-divider {
-  background: rgba(15, 23, 42, 0.14) !important;
-}
-
-.department-login-menu-panel .quick-page-menu-shortcut {
-  color: rgba(15, 23, 42, 0.7) !important;
-}
-
-body.dark-mode .department-login-menu-btn {
-  border-color: rgba(148, 163, 184, 0.30) !important;
-  background: rgba(15, 23, 42, 0.62) !important;
-  color: #e2e8f0 !important;
-}
-
-body.dark-mode .department-login-menu-btn:hover {
-  border-color: rgba(56, 189, 248, 0.72) !important;
-  background: rgba(15, 23, 42, 0.82) !important;
-}
-
-body.dark-mode .department-login-menu-panel {
-  border-color: rgba(148, 163, 184, 0.34) !important;
-  background: rgba(15, 23, 42, 0.92) !important;
-  color: #e2e8f0 !important;
-}
-
-body.dark-mode .department-login-menu-item {
-  color: #e2e8f0 !important;
-}
-
-body.dark-mode .department-login-menu-item:hover {
-  background: rgba(56, 189, 248, 0.16) !important;
-}
-
-body.dark-mode .department-login-menu-panel .quick-page-menu-divider {
-  background: rgba(148, 163, 184, 0.30) !important;
-}
-
-body.dark-mode .department-login-menu-panel .quick-page-menu-shortcut {
-  color: rgba(226, 232, 240, 0.75) !important;
+  background: rgba(56, 189, 248, 0.2) !important;
 }
 
 .department-login-body::before,
@@ -353,44 +306,13 @@ body.dark-mode .department-login-menu-panel .quick-page-menu-shortcut {
    MOBILE RESPONSIVENESS
    ========================================================= */
 @media (max-width: 768px) {
-  .department-login-body {
-    background:
-      linear-gradient(180deg, #edf3ff 0%, #e3edf9 54%, #dce7f4 100%);
-  }
-
   .department-login-body::before,
   .department-login-body::after {
     animation: none;
-    inset: -18%;
-    filter: blur(66px) saturate(120%);
-    opacity: 0.52;
-    mix-blend-mode: normal;
-    background:
-      radial-gradient(circle at 14% 20%, rgba(56, 189, 248, 0.25), transparent 58%),
-      radial-gradient(circle at 84% 18%, rgba(59, 130, 246, 0.22), transparent 61%),
-      radial-gradient(circle at 50% 88%, rgba(99, 102, 241, 0.16), transparent 64%);
-  }
-
-  .department-login-body::after {
-    opacity: 0.34;
-    background:
-      radial-gradient(circle at 20% 76%, rgba(37, 99, 235, 0.16), transparent 62%),
-      radial-gradient(circle at 80% 72%, rgba(125, 211, 252, 0.16), transparent 64%);
-  }
-
-  body.dark-mode .department-login-body {
-    background:
-      linear-gradient(180deg, #0b1220 0%, #0f1a2d 58%, #111f33 100%);
-  }
-
-  body.dark-mode .department-login-body::before,
-  body.dark-mode .department-login-body::after {
-    filter: blur(70px) saturate(116%);
-    opacity: 0.44;
-    background:
-      radial-gradient(circle at 14% 20%, rgba(45, 212, 191, 0.18), transparent 60%),
-      radial-gradient(circle at 84% 16%, rgba(56, 189, 248, 0.16), transparent 62%),
-      radial-gradient(circle at 52% 82%, rgba(59, 130, 246, 0.16), transparent 66%);
+    background: radial-gradient(circle at 50% 50%, #FF00FF, rgb(243, 7, 7), yellow, rgb(82, 246, 82),rgb(79, 79, 240));
+    filter: blur(90px) saturate(160%);
+    opacity: 0.7;
+    inset: -20%;
   }
 
   .login-card {
