@@ -1134,8 +1134,8 @@ textarea.premium-input { resize: vertical; min-height: 120px; }
   --notice-title-to-description-gap: 35px;
   --notice-description-controls-bottom-gap: 1px;
   --notice-description-text-top-gap: 1px;
-  --notice-detail-strip-max-width-desktop: 960px;
-  --notice-detail-strip-viewport-gap-desktop: 84px;
+  --notice-detail-strip-max-width-desktop: 830px;
+  --notice-detail-strip-viewport-gap-desktop: 140px;
   padding-top: calc(
     var(--notice-fixed-top-gap, 10px)
     + var(--notice-combined-fixed-height, 0px)
