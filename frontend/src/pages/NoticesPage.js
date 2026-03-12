@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { createNoticeApi, deleteNoticeApi, getNoticesApi, updateNoticeApi } from '../api/noticesApi';
@@ -149,8 +149,10 @@ export default function NoticesPage({ mode = 'public' }) {
   );
   const [isMobileHeaderCollapsed, setIsMobileHeaderCollapsed] = useState(false);
   const [isMobileComposeOpen, setIsMobileComposeOpen] = useState(false);
+  const [mobileHeaderStripHeight, setMobileHeaderStripHeight] = useState(0);
   const mobileSearchInputHeight = 40;
   const mobileFontControlWidth = 124;
+  const mobileHeaderStripRef = useRef(null);
 
   useEffect(() => {
     saveReadingPrefs(reading);
@@ -229,6 +231,33 @@ export default function NoticesPage({ mode = 'public' }) {
       setIsMobileComposeOpen(false);
     }
   }, [isMobile]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const updateStripHeight = () => {
+      if (!isMobile) {
+        setMobileHeaderStripHeight(0);
+        return;
+      }
+      const rect = mobileHeaderStripRef.current?.getBoundingClientRect?.();
+      setMobileHeaderStripHeight(Math.max(0, Math.round(rect?.height || 0)));
+    };
+
+    updateStripHeight();
+    window.addEventListener('resize', updateStripHeight);
+
+    let observer = null;
+    if (typeof ResizeObserver !== 'undefined' && mobileHeaderStripRef.current) {
+      observer = new ResizeObserver(updateStripHeight);
+      observer.observe(mobileHeaderStripRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateStripHeight);
+      if (observer) observer.disconnect();
+    };
+  }, [isMobile, isMobileHeaderCollapsed, reading.theme, reading.textSize, reading.font]);
 
   const onSearchSubmit = (e) => {
     e?.preventDefault?.();
@@ -503,7 +532,13 @@ export default function NoticesPage({ mode = 'public' }) {
   );
 
   return (
-    <div className={themeClasses} style={{ '--font-base': `${reading.textSize}px` }}>
+    <div
+      className={themeClasses}
+      style={{
+        '--font-base': `${reading.textSize}px`,
+        '--notices-mobile-strip-height': `${mobileHeaderStripHeight}px`
+      }}
+    >
       <div className={allowAdminComposer ? "notices-layout-grid" : "notices-layout-center"}>
         
         {/* LEFT SIDEBAR */}
@@ -563,6 +598,7 @@ export default function NoticesPage({ mode = 'public' }) {
           )}
 
           <section
+            ref={mobileHeaderStripRef}
             className={`notices-sticky-strip ${showMobileNoticesControls ? 'mobile-compact' : ''} ${showMobileNoticesControls && isMobileHeaderCollapsed ? 'strip-collapsed-mobile' : ''}`}
             style={
               showMobileNoticesControls
