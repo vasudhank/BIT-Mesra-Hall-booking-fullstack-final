@@ -245,6 +245,26 @@
   padding-top: 14px;
 }
 
+@media (min-width: 1281px) {
+  .support-page--detached-strip.support-page--has-left .support-top-strip-shell {
+    max-width: 1680px;
+    margin: 0 auto 14px;
+    padding-left: calc(28px + 340px + 26px);
+    padding-right: 28px;
+    box-sizing: border-box;
+  }
+}
+
+@media (min-width: 961px) and (max-width: 1280px) {
+  .support-page--detached-strip.support-page--has-left .support-top-strip-shell {
+    max-width: 1680px;
+    margin: 0 auto 14px;
+    padding-left: calc(22px + 320px + 20px);
+    padding-right: 22px;
+    box-sizing: border-box;
+  }
+}
+
 .support-top-strip {
   position: sticky;
   top: 0;
@@ -826,6 +846,18 @@
   outline-offset: 2px;
 }
 
+@media (min-width: 961px) {
+  .support-page {
+    --support-left-compose-top-desktop: 6px;
+  }
+
+  .support-left-panel {
+    top: var(--support-left-compose-top-desktop);
+    max-height: none;
+    overflow: visible;
+  }
+}
+
 @media (max-width: 1280px) {
   .support-layout {
     grid-template-columns: 320px minmax(0, 1fr);
@@ -988,6 +1020,74 @@
 
   .support-quick-solution {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 1281px) {
+  .complaints-page {
+    --complaints-left-panel-top-desktop: 10px;
+    --complaints-left-panel-bottom-desktop: 12px;
+    --complaints-left-panel-width-desktop: 340px;
+    --complaints-left-panel-left-desktop: calc((100vw - min(1680px, 100vw)) / 2 + 28px);
+  }
+}
+
+@media (min-width: 961px) and (max-width: 1280px) {
+  .complaints-page {
+    --complaints-left-panel-top-desktop: 10px;
+    --complaints-left-panel-bottom-desktop: 12px;
+    --complaints-left-panel-width-desktop: 320px;
+    --complaints-left-panel-left-desktop: calc((100vw - min(1680px, 100vw)) / 2 + 22px);
+  }
+}
+
+@media (min-width: 961px) {
+  .complaints-page.support-page--has-left .support-top-strip-shell {
+    pointer-events: none;
+  }
+
+  .complaints-page.support-page--has-left .support-top-strip {
+    pointer-events: auto;
+  }
+
+  .complaints-page.support-page--has-left .support-layout {
+    grid-template-columns: var(--complaints-left-panel-width-desktop) minmax(0, 1fr);
+  }
+
+  .complaints-page.support-page--has-left .support-left-panel {
+    position: fixed;
+    top: var(--complaints-left-panel-top-desktop);
+    left: var(--complaints-left-panel-left-desktop);
+    width: var(--complaints-left-panel-width-desktop);
+    height: calc(100vh - var(--complaints-left-panel-top-desktop) - var(--complaints-left-panel-bottom-desktop));
+    max-height: calc(100vh - var(--complaints-left-panel-top-desktop) - var(--complaints-left-panel-bottom-desktop));
+    overflow: hidden;
+    padding-right: 0;
+    z-index: 34;
+  }
+
+  .complaints-page.support-page--has-left .support-right-panel {
+    grid-column: 2;
+    min-width: 0;
+  }
+
+  .complaints-page.support-page--has-left .support-left-panel .support-sort-box,
+  .complaints-page.support-page--has-left .support-left-panel .support-home-menu-row {
+    flex: 0 0 auto;
+  }
+
+  .complaints-page.support-page--has-left .support-left-panel .support-raise-card {
+    flex: 0 0 auto;
+    min-height: auto;
+    overflow: visible;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .complaints-page.support-page--has-left .support-left-panel .support-input-label textarea {
+    min-height: 100px;
+    max-height: 136px;
+    resize: none;
   }
 }
 

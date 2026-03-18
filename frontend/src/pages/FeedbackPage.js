@@ -301,7 +301,9 @@ export default function FeedbackPage({ mode = 'public' }) {
   );
 
   return (
-    <div className={`feedback-page feedback-page--detached-strip ${fullscreenComposer ? 'composer-fullscreen' : ''}`}>
+    <div
+      className={`feedback-page feedback-page--detached-strip ${!isDeveloperView && !isMobile ? 'feedback-page--has-left' : ''} ${fullscreenComposer ? 'composer-fullscreen' : ''}`.trim()}
+    >
       {topStrip}
       <div className="feedback-layout">
         {!isDeveloperView && !isMobile && (

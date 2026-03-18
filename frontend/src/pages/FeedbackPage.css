@@ -228,6 +228,25 @@
   box-sizing: border-box;
 }
 
+@media (min-width: 1221px) {
+  .feedback-page--detached-strip.feedback-page--has-left .feedback-top-strip-shell {
+    max-width: 1660px;
+    margin: 0 auto 14px;
+    padding-left: calc(22px + 360px + 22px);
+    padding-right: 22px;
+    box-sizing: border-box;
+  }
+}
+
+@media (min-width: 1221px) {
+  .feedback-page {
+    --feedback-left-panel-top-desktop: 10px;
+    --feedback-left-panel-bottom-desktop: 12px;
+    --feedback-left-panel-width-desktop: 360px;
+    --feedback-left-panel-left-desktop: calc((100vw - min(1660px, 100vw)) / 2 + 22px);
+  }
+}
+
 .feedback-sticky-strip {
   position: sticky;
   top: 0;
@@ -737,6 +756,53 @@
 .feedback-page textarea:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--support-accent) 75%, white);
   outline-offset: 2px;
+}
+
+@media (min-width: 961px) {
+  .feedback-page--has-left .feedback-top-strip-shell {
+    pointer-events: none;
+  }
+
+  .feedback-page--has-left .feedback-sticky-strip {
+    pointer-events: auto;
+  }
+}
+
+@media (min-width: 1221px) {
+  .feedback-page--has-left .feedback-layout {
+    grid-template-columns: var(--feedback-left-panel-width-desktop) minmax(0, 1fr);
+  }
+
+  .feedback-page--has-left .feedback-left {
+    position: fixed;
+    top: var(--feedback-left-panel-top-desktop);
+    left: var(--feedback-left-panel-left-desktop);
+    width: var(--feedback-left-panel-width-desktop);
+    height: calc(100vh - var(--feedback-left-panel-top-desktop) - var(--feedback-left-panel-bottom-desktop));
+    max-height: calc(100vh - var(--feedback-left-panel-top-desktop) - var(--feedback-left-panel-bottom-desktop));
+    overflow: hidden;
+    padding-right: 0;
+    z-index: 34;
+  }
+
+  .feedback-page--has-left .feedback-right {
+    grid-column: 2;
+    min-width: 0;
+  }
+
+  .feedback-page--has-left .feedback-compose-card {
+    flex: 0 0 auto;
+    min-height: auto;
+    overflow: visible;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .feedback-page--has-left .feedback-compose-card textarea {
+    min-height: 100px;
+    max-height: 136px;
+    resize: none;
+  }
 }
 
 @media (max-width: 1220px) {

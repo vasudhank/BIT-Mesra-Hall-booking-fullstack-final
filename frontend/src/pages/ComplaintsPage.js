@@ -337,7 +337,9 @@ export default function ComplaintsPage({ mode = 'public' }) {
   );
 
   return (
-    <div className="support-page complaints-page support-page--detached-strip">
+    <div
+      className={`support-page complaints-page support-page--detached-strip ${!hideComposer && !isMobile ? 'support-page--has-left' : ''}`.trim()}
+    >
       {topStrip}
       <div className={`support-layout ${hideComposer ? 'support-layout--no-left' : ''}`}>
         {!hideComposer && !isMobile && (

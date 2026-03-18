@@ -3,7 +3,7 @@
 /* --- Premium Base Variables --- */
 .notices-theme-root {
   --notice-bg: #f4f6f8;
-  --notice-surface: rgba(255, 255, 255, 0.75);
+  --notice-surface: #f4f6f8;
   --notice-surface-solid: #f4f6f8;
   --notice-text: #1e293b;
   --notice-muted: #64748b;
@@ -32,7 +32,7 @@
 /* --- Paper (Sepia) Mode --- */
 .notices-theme-root.reader-theme-paper {
   --notice-bg: #f5eedf;
-  --notice-surface: rgba(251, 245, 232, 0.75);
+  --notice-surface: #f5eedf;
   --notice-surface-solid: #f5eedf;
   --notice-text: #433422;
   --notice-muted: #78644e;
@@ -48,7 +48,7 @@
 /* --- Night (Dark) Mode --- */
 .notices-theme-root.reader-theme-night {
   --notice-bg: #090e17;
-  --notice-surface: rgba(15, 23, 42, 0.75);
+  --notice-surface: #090e17;
   --notice-surface-solid: #0f172a;
   --notice-text: #e2e8f0;
   --notice-muted: #94a3b8;
@@ -745,10 +745,8 @@ textarea.premium-input { resize: vertical; min-height: 120px; }
   background: var(--notice-surface);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid var(--notice-border);
-  border-radius: var(--notice-radius);
-  padding: 16px 4px;
-  box-shadow: var(--notice-shadow-sm);
+  
+  padding: 26px 18px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -2506,6 +2504,15 @@ textarea.premium-input { resize: vertical; min-height: 120px; }
   .mobile-compose-popup-card .btn-primary {
     font-size: 0.84rem;
     padding: 9px 12px;
+  }
+
+  .notice-admin-modal-backdrop {
+    padding: 10px;
+  }
+
+  .notice-admin-modal-card {
+    width: min(720px, calc(100vw - 20px));
+    max-height: calc(100dvh - 32px);
   }
 
   .notice-detail-sticky-strip {

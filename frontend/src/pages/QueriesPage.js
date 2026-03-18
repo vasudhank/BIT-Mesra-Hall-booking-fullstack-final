@@ -318,7 +318,9 @@ export default function QueriesPage({ mode = 'public' }) {
   );
 
   return (
-    <div className="support-page queries-page support-page--detached-strip">
+    <div
+      className={`support-page queries-page support-page--detached-strip ${!hideComposer && !isMobile ? 'support-page--has-left' : ''}`.trim()}
+    >
       {topStrip}
       <div className={`support-layout ${hideComposer ? 'support-layout--no-left' : ''}`}>
         {!hideComposer && !isMobile && (
