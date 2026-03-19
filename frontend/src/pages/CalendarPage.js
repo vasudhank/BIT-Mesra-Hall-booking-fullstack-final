@@ -6691,6 +6691,7 @@ export default function CalendarPage() {
                 buttonClassName="gcal-user-menu-item gcal-user-menu-quick-btn"
                 panelClassName="gcal-user-menu-quick-panel"
                 itemClassName="gcal-user-menu-quick-item"
+                hideThemeToggle
                 inlinePanel
                 align="left"
                 closeParentMenu={closeUserMenu}
@@ -6706,6 +6707,7 @@ export default function CalendarPage() {
                 buttonClassName="gcal-user-menu-item gcal-user-menu-quick-btn"
                 panelClassName="gcal-user-menu-quick-panel"
                 itemClassName="gcal-user-menu-quick-item"
+                hideThemeToggle
                 inlinePanel
                 align="left"
                 excludeKeys={['admin', 'faculty']}

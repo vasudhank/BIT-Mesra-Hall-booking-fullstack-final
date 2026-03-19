@@ -69,6 +69,73 @@
   transform: translateY(-1px);
 }
 
+.thread-top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.thread-desktop-menu {
+  position: relative;
+}
+
+.thread-desktop-menu-btn {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--support-border-strong);
+  border-radius: 11px;
+  background: var(--support-surface-strong);
+  color: var(--support-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.thread-desktop-menu-btn:hover {
+  border-color: var(--support-accent);
+  transform: translateY(-1px);
+}
+
+.thread-desktop-menu-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  border: 1px solid var(--support-border-strong);
+  border-radius: 12px;
+  background: var(--support-surface-strong);
+  box-shadow: var(--support-shadow-md);
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+  z-index: 1100;
+}
+
+.thread-desktop-menu-item {
+  width: 100%;
+  min-height: 36px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--support-text);
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.thread-desktop-menu-item:hover {
+  background: color-mix(in srgb, var(--support-accent) 14%, transparent);
+}
+
 .thread-issue-card,
 .thread-add-solution-card,
 .thread-solutions-card {
@@ -290,6 +357,13 @@
   resize: vertical;
 }
 
+.thread-add-solution-card textarea:focus,
+.thread-add-solution-card textarea:focus-visible {
+  border-color: var(--support-accent);
+  box-shadow: none !important;
+  outline: none !important;
+}
+
 .submit-btn {
   margin-top: 8px;
   border: none;
@@ -464,11 +538,42 @@
   color: var(--support-text-soft);
 }
 
+.thread-solutions-search-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--support-text-soft);
+  cursor: pointer;
+}
+
+.thread-solutions-search-btn:hover {
+  color: var(--support-accent);
+}
+
+.thread-solutions-search-btn:focus,
+.thread-solutions-search-btn:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 .thread-solutions-search input {
   border: none;
   box-shadow: none;
   background: transparent;
   padding: 8px 0;
+}
+
+.thread-solutions-search input:focus,
+.thread-solutions-search input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
 }
 
 .thread-strip-toggle {
@@ -508,6 +613,20 @@
   top: 0;
   transform: translateX(-50%);
   z-index: 1000;
+}
+
+.thread-strip-toggle--restore-mobile {
+  position: fixed;
+  left: 0;
+  top: max(48px, env(safe-area-inset-top, 0px));
+  width: 14px;
+  height: 30px;
+  border-radius: 0 12px 12px 0;
+  z-index: 1002;
+}
+
+.thread-strip-toggle--restore-mobile:hover {
+  transform: translateX(1px);
 }
 
 .thread-question-modal-backdrop {
@@ -560,6 +679,52 @@
   line-height: 1;
   padding: 0 11px;
   cursor: pointer;
+}
+
+.thread-solution-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1210;
+  background: color-mix(in srgb, #000 52%, transparent);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.thread-add-solution-modal-card {
+  width: min(960px, calc(100vw - 56px));
+  max-height: min(88vh, 860px);
+  overflow: auto;
+  box-shadow: var(--support-shadow-lg);
+}
+
+.thread-solution-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.thread-solution-modal-head h2 {
+  margin: 0;
+}
+
+.thread-solution-modal-close {
+  min-height: 34px;
+  border: 1px solid var(--support-border-strong);
+  border-radius: 9px;
+  background: var(--support-surface-strong);
+  color: var(--support-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 11px;
+  cursor: pointer;
+}
+
+.thread-solution-modal-close:hover {
+  border-color: var(--support-accent);
 }
 
 .thread-solutions-list {
@@ -875,6 +1040,10 @@
 }
 
 @media (max-width: 960px) {
+  .thread-top-nav {
+    justify-content: flex-start;
+  }
+
   .thread-solutions-card {
     overflow: visible;
   }

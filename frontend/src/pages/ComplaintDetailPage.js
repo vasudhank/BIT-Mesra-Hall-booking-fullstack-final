@@ -102,7 +102,7 @@ const buildReplyTree = (replies = []) => {
 export default function ComplaintDetailPage({ mode = 'public' }) {
   const { id } = useParams();
   const issueCardRef = useRef(null);
-  const addSolutionCardRef = useRef(null);
+  const desktopMenuRef = useRef(null);
   const [complaint, setComplaint] = useState(null);
   const [loading, setLoading] = useState(false);
   const [sort, setSort] = useState('DATE_DESC');
@@ -119,9 +119,10 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 960px)').matches : false
   );
-  const [isAddSolutionCompact, setIsAddSolutionCompact] = useState(false);
   const [isAnswersStripCollapsed, setIsAnswersStripCollapsed] = useState(false);
   const [isQuestionPopupOpen, setIsQuestionPopupOpen] = useState(false);
+  const [isDesktopThreadMenuOpen, setIsDesktopThreadMenuOpen] = useState(false);
+  const [isDesktopSolutionPopupOpen, setIsDesktopSolutionPopupOpen] = useState(false);
 
   const viewerId = useMemo(() => getViewerId(), []);
   const [solutionReactionMap, setSolutionReactionMap] = useState(() => readReactionStore('complaintSolutionReactions'));
@@ -198,64 +199,34 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
   }, []);
 
   useEffect(() => {
-    if (!isMobile || !addSolutionCardRef.current) {
-      setIsAddSolutionCompact(false);
-      return;
-    }
-
-    const target = addSolutionCardRef.current;
-    const scrollParents = [];
-    let node = target.parentElement;
-    while (node) {
-      const styles = window.getComputedStyle(node);
-      const overflowY = styles.overflowY || styles.overflow;
-      if (/(auto|scroll|overlay)/i.test(overflowY)) {
-        scrollParents.push(node);
-      }
-      node = node.parentElement;
-    }
-
-    let rafId = 0;
-    const updateCompactState = () => {
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        const rect = target.getBoundingClientRect();
-        const nextCompact = rect.bottom <= 0;
-        setIsAddSolutionCompact((prev) => (prev === nextCompact ? prev : nextCompact));
-      });
-    };
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        const nextCompact = entry.boundingClientRect.bottom <= 0 || entry.intersectionRatio < 0.2;
-        setIsAddSolutionCompact((prev) => (prev === nextCompact ? prev : nextCompact));
-      },
-      {
-        threshold: [0, 0.2, 0.5, 1],
-        rootMargin: '-64px 0px 0px 0px'
-      }
-    );
-
-    observer.observe(target);
-    updateCompactState();
-    window.addEventListener('scroll', updateCompactState, { passive: true });
-    window.addEventListener('resize', updateCompactState);
-    scrollParents.forEach((el) => el.addEventListener('scroll', updateCompactState, { passive: true }));
-
-    return () => {
-      cancelAnimationFrame(rafId);
-      observer.disconnect();
-      window.removeEventListener('scroll', updateCompactState);
-      window.removeEventListener('resize', updateCompactState);
-      scrollParents.forEach((el) => el.removeEventListener('scroll', updateCompactState));
-    };
-  }, [id, isMobile, complaint?._id]);
-
-  useEffect(() => {
-    if (!isMobile || !isAddSolutionCompact) {
+    if (!isMobile) {
       setIsAnswersStripCollapsed(false);
     }
-  }, [isMobile, isAddSolutionCompact]);
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!isDesktopThreadMenuOpen) return;
+
+    const onPointerDown = (event) => {
+      if (!desktopMenuRef.current?.contains(event.target)) {
+        setIsDesktopThreadMenuOpen(false);
+      }
+    };
+
+    const onEscape = (event) => {
+      if (event.key === 'Escape') {
+        setIsDesktopThreadMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onEscape);
+    };
+  }, [isDesktopThreadMenuOpen]);
 
   const filteredSolutions = useMemo(() => {
     if (!complaint) return [];
@@ -295,7 +266,7 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
 
   const submitSolution = async (e) => {
     e.preventDefault();
-    if (!form.body.trim()) return;
+    if (!form.body.trim()) return false;
     try {
       await postComplaintSolution(id, {
         authorName: trusted ? (role === 'ADMIN' ? 'Admin' : 'Developer') : form.authorName,
@@ -304,8 +275,17 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
       });
       setForm((prev) => ({ ...prev, body: '' }));
       await load();
+      return true;
     } catch (err) {
       alert(err?.response?.data?.error || 'Unable to post solution');
+      return false;
+    }
+  };
+
+  const submitSolutionFromDesktopPopup = async (e) => {
+    const success = await submitSolution(e);
+    if (success) {
+      setIsDesktopSolutionPopupOpen(false);
     }
   };
 
@@ -449,18 +429,15 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
 
   const listPath =
     mode === 'developer' ? '/developer/complaints' : mode === 'admin' ? '/admin/complaints' : '/complaints';
-  const showCompactAnswerControls = isMobile && isAddSolutionCompact;
-  const isAnswersStripCollapsedOnMobile = showCompactAnswerControls && isAnswersStripCollapsed;
-  const scrollToAddSolutionCard = () =>
-    addSolutionCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
   return (
     <div className="complaint-detail-page">
       <div className="complaint-detail-container">
-        <Link className="thread-back-btn" to={listPath}>
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-          Back to List
-        </Link>
+        <div className="thread-top-nav">
+          <Link className="thread-back-btn" to={listPath}>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            Back to List
+          </Link>
+        </div>
 
         <section className="thread-issue-card" ref={issueCardRef}>
           <div className="thread-issue-head">
@@ -519,7 +496,7 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
           </div>
         </section>
 
-        <section className="thread-add-solution-card" ref={addSolutionCardRef}>
+        <section className="thread-add-solution-card">
           <h2>Contribute a Solution</h2>
           <p className="subtitle">Guest replies are allowed, but only admin/developer replies are marked trusted.</p>
           <form onSubmit={submitSolution}>
@@ -552,97 +529,123 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
         </section>
 
         <section className="thread-solutions-block">
-          <div
-            className={`thread-solutions-strip ${showCompactAnswerControls ? 'mobile-compact' : ''} ${
-              isAnswersStripCollapsedOnMobile ? 'strip-collapsed-mobile' : ''
-            }`}
-          >
-            {!isAnswersStripCollapsedOnMobile && (
-              <>
-                <div className={`thread-solutions-title-row ${showCompactAnswerControls ? 'compact-mode' : ''}`}>
-                  {showCompactAnswerControls && (
-                    <Link className="thread-header-icon-btn" to={listPath} aria-label="Back to complaints list">
-                      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                        <path d="M11,17a1,1,0,0,1-.71-1.71L13.59,12,10.29,8.71a1,1,0,0,1,1.41-1.41l4,4a1,1,0,0,1,0,1.41l-4,4A1,1,0,0,1,11,17Z"></path>
-                        <path d="M15 13H5a1 1 0 0 1 0-2H15a1 1 0 0 1 0 2zM19 20a1 1 0 0 1-1-1V5a1 1 0 0 1 2 0V19A1 1 0 0 1 19 20z"></path>
-                      </svg>
-                    </Link>
-                  )}
-                  <h2>Solutions ({filteredSolutions.length})</h2>
-                  {showCompactAnswerControls && (
-                    <button
-                      type="button"
-                      className="thread-header-action-btn"
-                      onClick={() => setIsQuestionPopupOpen(true)}
-                    >
-                      View Question
-                    </button>
-                  )}
-                </div>
-
-                <div
-                  className={`thread-solutions-controls ${
-                    showCompactAnswerControls ? 'mobile-compact-controls' : ''
-                  }`}
-                >
-                  <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                    {SORT_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  {showCompactAnswerControls && (
-                    <button type="button" className="thread-inline-add-btn" onClick={scrollToAddSolutionCard}>
-                      Add a Solution
-                    </button>
-                  )}
-                  <div className="thread-solutions-search">
-                    <SearchIcon className="search-icon" fontSize="small" />
-                    <input
-                      type="text"
-                      placeholder="Search solutions..."
-                      value={searchInput}
-                      onChange={(e) => {
-                        const next = e.target.value;
-                        setSearchInput(next);
-                        if (!next.trim()) setAppliedSearch('');
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') setAppliedSearch(searchInput.trim());
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {showCompactAnswerControls && (
+          {!isAnswersStripCollapsed && (
+            <div className="thread-solutions-strip">
+              <div className="thread-solutions-title-row">
+                <h2>Solutions ({filteredSolutions.length})</h2>
+                <div className="thread-desktop-menu" ref={desktopMenuRef}>
                   <button
                     type="button"
-                    className="thread-strip-toggle thread-strip-toggle--bottom"
-                    onClick={() => setIsAnswersStripCollapsed(true)}
-                    aria-label="Collapse answers strip"
+                    className="thread-desktop-menu-btn"
+                    aria-label="Open thread actions menu"
+                    aria-haspopup="menu"
+                    aria-expanded={isDesktopThreadMenuOpen}
+                    onClick={() => setIsDesktopThreadMenuOpen((prev) => !prev)}
                   >
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="18 15 12 9 6 15"></polyline>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <line x1="4" y1="7" x2="20" y2="7"></line>
+                      <line x1="4" y1="12" x2="20" y2="12"></line>
+                      <line x1="4" y1="17" x2="20" y2="17"></line>
                     </svg>
                   </button>
-                )}
-              </>
-            )}
 
-            {showCompactAnswerControls && isAnswersStripCollapsedOnMobile && (
-              <button
-                type="button"
-                className="thread-strip-toggle thread-strip-toggle--floating"
-                onClick={() => setIsAnswersStripCollapsed(false)}
-                aria-label="Expand answers strip"
-              >
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-              </button>
-            )}
-          </div>
+                  {isDesktopThreadMenuOpen && (
+                    <div className="thread-desktop-menu-panel" role="menu">
+                      <Link
+                        className="thread-desktop-menu-item"
+                        to={listPath}
+                        role="menuitem"
+                        onClick={() => setIsDesktopThreadMenuOpen(false)}
+                      >
+                        Back to list
+                      </Link>
+                      {isMobile && (
+                        <button
+                          type="button"
+                          className="thread-desktop-menu-item"
+                          role="menuitem"
+                          onClick={() => {
+                            setIsDesktopThreadMenuOpen(false);
+                            setIsAnswersStripCollapsed(true);
+                          }}
+                        >
+                          Collapse strip
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="thread-desktop-menu-item"
+                        role="menuitem"
+                        onClick={() => {
+                          setIsDesktopThreadMenuOpen(false);
+                          setIsQuestionPopupOpen(true);
+                        }}
+                      >
+                        Issue
+                      </button>
+                      <button
+                        type="button"
+                        className="thread-desktop-menu-item"
+                        role="menuitem"
+                        onClick={() => {
+                          setIsDesktopThreadMenuOpen(false);
+                          setIsDesktopSolutionPopupOpen(true);
+                        }}
+                      >
+                        Contribute a solution
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="thread-solutions-controls">
+                <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                  {SORT_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="thread-solutions-search">
+                  <button
+                    type="button"
+                    className="thread-solutions-search-btn"
+                    onClick={() => setAppliedSearch(searchInput.trim())}
+                    aria-label="Search solutions"
+                  >
+                    <SearchIcon className="search-icon" fontSize="small" />
+                  </button>
+                  <input
+                    type="text"
+                    placeholder="Search solutions..."
+                    value={searchInput}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setSearchInput(next);
+                      if (!next.trim()) setAppliedSearch('');
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') setAppliedSearch(searchInput.trim());
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isMobile && isAnswersStripCollapsed && (
+            <button
+              type="button"
+              className="thread-strip-toggle thread-strip-toggle--restore-mobile"
+              onClick={() => setIsAnswersStripCollapsed(false)}
+              aria-label="Expand solutions strip"
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 6 15 12 9 18"></polyline>
+              </svg>
+            </button>
+          )}
 
           <section className="thread-solutions-card">
             <div className="thread-solutions-list">
@@ -786,6 +789,52 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
           </section>
         </section>
       </div>
+
+      {isDesktopSolutionPopupOpen && (
+        <div className="thread-solution-modal-backdrop" onClick={() => setIsDesktopSolutionPopupOpen(false)}>
+          <section className="thread-add-solution-card thread-add-solution-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="thread-solution-modal-head">
+              <h2>Contribute a Solution</h2>
+              <button
+                type="button"
+                className="thread-solution-modal-close"
+                onClick={() => setIsDesktopSolutionPopupOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+            <p className="subtitle">Guest replies are allowed, but only admin/developer replies are marked trusted.</p>
+            <form onSubmit={submitSolutionFromDesktopPopup}>
+              {!trusted && (
+                <div className="form-row">
+                  <input
+                    type="text"
+                    placeholder="Your Name *"
+                    value={form.authorName}
+                    onChange={(e) => setForm((prev) => ({ ...prev, authorName: e.target.value }))}
+                    required
+                  />
+                  <input
+                    type="email"
+                    placeholder="Your Email *"
+                    value={form.authorEmail}
+                    onChange={(e) => setForm((prev) => ({ ...prev, authorEmail: e.target.value }))}
+                    required
+                  />
+                </div>
+              )}
+              <textarea
+                placeholder="Write your solution..."
+                value={form.body}
+                onChange={(e) => setForm((prev) => ({ ...prev, body: e.target.value }))}
+                required
+              />
+              <button type="submit" className="submit-btn">Post Solution</button>
+            </form>
+          </section>
+        </div>
+      )}
+
       {isQuestionPopupOpen && (
         <div className="thread-question-modal-backdrop" onClick={() => setIsQuestionPopupOpen(false)}>
           <div className="thread-question-modal" onClick={(e) => e.stopPropagation()}>

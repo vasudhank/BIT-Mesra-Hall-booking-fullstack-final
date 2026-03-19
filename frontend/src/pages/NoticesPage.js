@@ -539,6 +539,24 @@ export default function NoticesPage({ mode = 'public' }) {
         '--notices-mobile-strip-height': `${mobileHeaderStripHeight}px`
       }}
     >
+      {!showMobileNoticesControls && !allowAdminComposer && (
+        <div className="notices-fixed-top-actions">
+          <Link className="notices-hero-home" to="/"><Icons.Home /> Home</Link>
+          <Link className="notices-hero-trash-btn" to="/trash" title="Open Trash" aria-label="Open Trash">
+            <Icons.Trash />
+            <span>Trash</span>
+          </Link>
+          <QuickPageMenu
+            buttonLabel="Menu"
+            buttonClassName="notices-hero-menu-btn"
+            panelClassName={noticesMenuPanelClass}
+            itemClassName="notices-hero-menu-item"
+            hideThemeToggle
+            align="right"
+          />
+        </div>
+      )}
+
       <div className={allowAdminComposer ? "notices-layout-grid" : "notices-layout-center"}>
         
         {/* LEFT SIDEBAR */}
@@ -547,22 +565,23 @@ export default function NoticesPage({ mode = 'public' }) {
             <header className="notices-hero notices-hero-sidebar">
               <h1>Notice Board</h1>
               <p>Manage and broadcast institutional updates instantly.</p>
-              <div className="notices-hero-quick-actions">
-                <Link className="notices-hero-home" to="/"><Icons.Home /> Home</Link>
-                <Link className="notices-hero-trash-btn" to="/trash" title="Open Trash" aria-label="Open Trash">
-                  <Icons.Trash />
-                  <span>Trash</span>
-                </Link>
-                <QuickPageMenu
-                  buttonLabel="Menu"
-                  buttonClassName="notices-hero-menu-btn"
-                  panelClassName={noticesMenuPanelClass}
-                  itemClassName="notices-hero-menu-item"
-                  hideThemeToggle
-                  align="right"
-                />
-              </div>
             </header>
+
+            <div className="notices-hero-quick-actions notices-sidebar-quick-actions">
+              <Link className="notices-hero-home" to="/"><Icons.Home /> Home</Link>
+              <Link className="notices-hero-trash-btn" to="/trash" title="Open Trash" aria-label="Open Trash">
+                <Icons.Trash />
+                <span>Trash</span>
+              </Link>
+              <QuickPageMenu
+                buttonLabel="Menu"
+                buttonClassName="notices-hero-menu-btn"
+                panelClassName={noticesMenuPanelClass}
+                itemClassName="notices-hero-menu-item"
+                hideThemeToggle
+                align="left"
+              />
+            </div>
 
             {isComposerMaximized && (
               <div className="composer-backdrop" onClick={() => setIsComposerMaximized(false)} />
@@ -579,21 +598,6 @@ export default function NoticesPage({ mode = 'public' }) {
             <header className="notices-hero" style={{marginBottom: '24px'}}>
               <h1>Notice Board</h1>
               <p>Stay informed with the latest institutional announcements.</p>
-              <div className="notices-hero-quick-actions">
-                <Link className="notices-hero-home" to="/"><Icons.Home /> Home</Link>
-                <Link className="notices-hero-trash-btn" to="/trash" title="Open Trash" aria-label="Open Trash">
-                  <Icons.Trash />
-                  <span>Trash</span>
-                </Link>
-                <QuickPageMenu
-                  buttonLabel="Menu"
-                  buttonClassName="notices-hero-menu-btn"
-                  panelClassName={noticesMenuPanelClass}
-                  itemClassName="notices-hero-menu-item"
-                  hideThemeToggle
-                  align="right"
-                />
-              </div>
             </header>
           )}
 
@@ -639,12 +643,12 @@ export default function NoticesPage({ mode = 'public' }) {
                   )}
                   {!showMobileNoticesControls && (
                     <>
-                      <select className="premium-input" style={{width: 'auto'}} value={sort} onChange={(e) => setSort(e.target.value)}>
+                      <select className="premium-input notice-strip-sort-select" value={sort} onChange={(e) => setSort(e.target.value)}>
                         <option value="LATEST">Latest First</option>
                         <option value="OLDEST">Oldest First</option>
                         <option value="HOLIDAY_FIRST">Holidays First</option>
                       </select>
-                      <select className="premium-input" style={{width: 'auto'}} value={kind} onChange={(e) => setKind(e.target.value)}>
+                      <select className="premium-input notice-strip-sort-select" value={kind} onChange={(e) => setKind(e.target.value)}>
                         <option value="ALL">All Categories</option>
                         <option value="GENERAL">General</option>
                         <option value="HOLIDAY">Closures</option>
@@ -655,12 +659,12 @@ export default function NoticesPage({ mode = 'public' }) {
 
                 {showMobileNoticesControls && (
                   <div className="strip-mobile-sort-row">
-                    <select className="premium-input" value={kind} onChange={(e) => setKind(e.target.value)}>
+                    <select className="premium-input notice-strip-sort-select" value={kind} onChange={(e) => setKind(e.target.value)}>
                       <option value="ALL">All Categories</option>
                       <option value="GENERAL">General</option>
                       <option value="HOLIDAY">Closures</option>
                     </select>
-                    <select className="premium-input" value={sort} onChange={(e) => setSort(e.target.value)}>
+                    <select className="premium-input notice-strip-sort-select" value={sort} onChange={(e) => setSort(e.target.value)}>
                       <option value="LATEST">Latest First</option>
                       <option value="OLDEST">Oldest First</option>
                       <option value="HOLIDAY_FIRST">Holidays First</option>

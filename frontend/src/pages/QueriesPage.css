@@ -1,9 +1,9 @@
 @import './supportTheme.css';
 
 .queries-page {
-  --support-accent: #d3d3dd;
-  --support-accent-strong: #cdcdd5;
-  --support-accent-soft: color-mix(in srgb, #acacba 18%, transparent);
+  --support-accent: #3b82f6;
+  --support-accent-strong: #1d4ed8;
+  --support-accent-soft: color-mix(in srgb, #3b82f6 18%, transparent);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -16,15 +16,11 @@
 
 .queries-page .support-page,
 .queries-page.support-page {
-  background:
-    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--support-accent) 18%, transparent) 0%, transparent 44%),
-    radial-gradient(circle at 100% 8%, color-mix(in srgb, var(--support-info) 12%, transparent) 0%, transparent 46%),
-    linear-gradient(180deg, var(--support-bg-elev) 0%, var(--support-bg) 100%);
-    
+  background: var(--support-bg);
 }
 
 .queries-page .support-thread-card {
-  border-left: 3px solid color-mix(in srgb, var(--support-accent) 30%, transparent);
+  border-left: none;
 }
 
 .queries-page .support-primary-btn {
@@ -45,7 +41,7 @@
 
 @media (min-width: 1281px) {
   .queries-page {
-    --queries-left-panel-top-desktop: 10px;
+    --queries-left-panel-top-desktop: 20px;
     --queries-left-panel-bottom-desktop: 12px;
     --queries-left-panel-width-desktop: 340px;
     --queries-left-panel-left-desktop: calc((100vw - min(1680px, 100vw)) / 2 + 28px);
@@ -54,7 +50,7 @@
 
 @media (min-width: 961px) and (max-width: 1280px) {
   .queries-page {
-    --queries-left-panel-top-desktop: 10px;
+    --queries-left-panel-top-desktop: 20px;
     --queries-left-panel-bottom-desktop: 12px;
     --queries-left-panel-width-desktop: 320px;
     --queries-left-panel-left-desktop: calc((100vw - min(1680px, 100vw)) / 2 + 22px);

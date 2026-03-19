@@ -1,6 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import SearchIcon from '@mui/icons-material/Search';
+import OpenInFullIcon from '@mui/icons-material/OpenInFull';
+import CloseFullscreenIcon from '@mui/icons-material/CloseFullscreen';
 import { useSelector } from 'react-redux';
 import api from '../api/axiosInstance';
 import {
@@ -53,10 +55,12 @@ export default function QueriesPage({ mode = 'public' }) {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [queries, setQueries] = useState([]);
+  const [counts, setCounts] = useState({ active: 0, resolved: 0, all: 0 });
   const [quickSolutionById, setQuickSolutionById] = useState({});
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 960px)').matches : false
   );
+  const [fullscreenComposer, setFullscreenComposer] = useState(false);
   const [isHeaderStripCollapsed, setIsHeaderStripCollapsed] = useState(false);
   const [isComposeModalOpen, setIsComposeModalOpen] = useState(false);
 
@@ -77,12 +81,6 @@ export default function QueriesPage({ mode = 'public' }) {
     navigate('/developer/login', { replace: true });
   };
 
-  const counts = useMemo(() => {
-    const active = queries.filter((c) => c.status === 'IN_PROGRESS' || c.status === 'REOPENED').length;
-    const resolved = queries.filter((c) => c.status === 'RESOLVED' || c.status === 'CLOSED').length;
-    return { active, resolved };
-  }, [queries]);
-
   const fetchSessionEmail = async () => {
     try {
       const { data } = await api.get('/details', { withCredentials: true });
@@ -98,15 +96,35 @@ export default function QueriesPage({ mode = 'public' }) {
   const loadQueries = async () => {
     setLoading(true);
     try {
-      const res = await listQueries({
-        filter,
-        sort,
-        q: appliedSearch
+      const [res, countRes] = await Promise.all([
+        listQueries({
+          filter,
+          sort,
+          q: appliedSearch
+        }),
+        listQueries({
+          filter: 'ALL',
+          sort: 'DATE_DESC',
+          q: appliedSearch
+        })
+      ]);
+
+      const visibleQueries = Array.isArray(res.queries) ? res.queries : [];
+      const allQueries = Array.isArray(countRes.queries) ? countRes.queries : [];
+
+      const activeCount = allQueries.filter((item) => item.status === 'IN_PROGRESS' || item.status === 'REOPENED').length;
+      const resolvedCount = allQueries.filter((item) => item.status === 'RESOLVED' || item.status === 'CLOSED').length;
+
+      setQueries(visibleQueries);
+      setCounts({
+        active: activeCount,
+        resolved: resolvedCount,
+        all: allQueries.length
       });
-      setQueries(Array.isArray(res.queries) ? res.queries : []);
     } catch (err) {
       console.error('Failed to load queries', err);
       setQueries([]);
+      setCounts({ active: 0, resolved: 0, all: 0 });
     } finally {
       setLoading(false);
     }
@@ -147,6 +165,12 @@ export default function QueriesPage({ mode = 'public' }) {
     }
   }, [hideComposer, isMobile]);
 
+  useEffect(() => {
+    if (hideComposer || isMobile) {
+      setFullscreenComposer(false);
+    }
+  }, [hideComposer, isMobile]);
+
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!form.email.trim() || !form.title.trim() || !form.message.trim()) return;
@@ -158,6 +182,7 @@ export default function QueriesPage({ mode = 'public' }) {
         message: form.message.trim()
       });
       setForm((prev) => ({ ...prev, title: '', message: '' }));
+      setFullscreenComposer(false);
       await loadQueries();
     } catch (err) {
       console.error('Query submit failed', err);
@@ -263,14 +288,20 @@ export default function QueriesPage({ mode = 'public' }) {
                     className={`support-filter-btn ${filter === 'ALL' ? 'active' : ''}`}
                     onClick={() => setFilter('ALL')}
                   >
-                    All <span className="filter-count">{queries.length}</span>
+                    All <span className="filter-count">{counts.all}</span>
                   </button>
                 </div>
               </div>
               <div className="support-top-right">
-                <label>SEARCH</label>
                 <div className="support-search-box">
-                  <SearchIcon className="search-icon"/>
+                  <button
+                    type="button"
+                    className="search-icon-btn"
+                    onClick={() => setAppliedSearch(searchInput.trim())}
+                    aria-label="Search queries"
+                  >
+                    <SearchIcon className="search-icon" />
+                  </button>
                   <input
                     type="text"
                     value={searchInput}
@@ -282,6 +313,7 @@ export default function QueriesPage({ mode = 'public' }) {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') setAppliedSearch(searchInput.trim());
                     }}
+                    aria-label="Search queries"
                     placeholder="Search queries..."
                   />
                 </div>
@@ -336,42 +368,54 @@ export default function QueriesPage({ mode = 'public' }) {
               </select>
             </div>
 
-            <form className="support-raise-card" onSubmit={onSubmit} ref={composeCardRef}>
-              <h2>Ask a Query</h2>
-              <p>Your email helps trusted responders follow up accurately.</p>
-              <label className="support-input-label">
-                <span>Your Email *</span>
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-                  placeholder="name@example.com"
-                  required
-                />
-              </label>
-              <label className="support-input-label">
-                <span>Query Title *</span>
-                <input
-                  type="text"
-                  value={form.title}
-                  onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-                  placeholder="What is your question?"
-                  required
-                />
-              </label>
-              <label className="support-input-label">
-                <span>Describe your question *</span>
-                <textarea
-                  value={form.message}
-                  onChange={(e) => setForm((prev) => ({ ...prev, message: e.target.value }))}
-                  placeholder="Elaborate on your question here..."
-                  required
-                />
-              </label>
-              <button className="support-primary-btn" type="submit" disabled={submitting}>
-                {submitting ? 'Submitting...' : 'Submit Query'}
-              </button>
-            </form>
+            {!fullscreenComposer && (
+              <form className="support-raise-card" onSubmit={onSubmit} ref={composeCardRef}>
+                <div className="support-compose-head">
+                  <h2>Ask a Query</h2>
+                  <button
+                    type="button"
+                    className="support-expand-btn"
+                    onClick={() => setFullscreenComposer(true)}
+                    aria-label="Maximize ask query card"
+                  >
+                    <OpenInFullIcon fontSize="small" />
+                  </button>
+                </div>
+                <p>Your email helps trusted responders follow up accurately.</p>
+                <label className="support-input-label">
+                  <span>Your Email *</span>
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                    placeholder="name@example.com"
+                    required
+                  />
+                </label>
+                <label className="support-input-label">
+                  <span>Query Title *</span>
+                  <input
+                    type="text"
+                    value={form.title}
+                    onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+                    placeholder="What is your question?"
+                    required
+                  />
+                </label>
+                <label className="support-input-label">
+                  <span>Describe your question *</span>
+                  <textarea
+                    value={form.message}
+                    onChange={(e) => setForm((prev) => ({ ...prev, message: e.target.value }))}
+                    placeholder="Elaborate on your question here..."
+                    required
+                  />
+                </label>
+                <button className="support-primary-btn" type="submit" disabled={submitting}>
+                  {submitting ? 'Submitting...' : 'Submit Query'}
+                </button>
+              </form>
+            )}
 
             <div className="support-home-menu-row">
               <Link className="support-home-btn" to="/">
@@ -468,6 +512,61 @@ export default function QueriesPage({ mode = 'public' }) {
           </div>
         </section>
       </div>
+
+      {!hideComposer && !isMobile && fullscreenComposer && (
+        <div className="support-compose-overlay-backdrop" onClick={() => setFullscreenComposer(false)}>
+          <form
+            className="support-raise-card support-compose-overlay-card"
+            onSubmit={onSubmit}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="support-compose-head">
+              <h2>Ask a Query</h2>
+              <button
+                type="button"
+                className="support-expand-btn"
+                onClick={() => setFullscreenComposer(false)}
+                aria-label="Close maximized ask query card"
+              >
+                <CloseFullscreenIcon fontSize="small" />
+              </button>
+            </div>
+            <p>Your email helps trusted responders follow up accurately.</p>
+            <label className="support-input-label">
+              <span>Your Email *</span>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                placeholder="name@example.com"
+                required
+              />
+            </label>
+            <label className="support-input-label">
+              <span>Query Title *</span>
+              <input
+                type="text"
+                value={form.title}
+                onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+                placeholder="What is your question?"
+                required
+              />
+            </label>
+            <label className="support-input-label">
+              <span>Describe your question *</span>
+              <textarea
+                value={form.message}
+                onChange={(e) => setForm((prev) => ({ ...prev, message: e.target.value }))}
+                placeholder="Elaborate on your question here..."
+                required
+              />
+            </label>
+            <button className="support-primary-btn" type="submit" disabled={submitting}>
+              {submitting ? 'Submitting...' : 'Submit Query'}
+            </button>
+          </form>
+        </div>
+      )}
 
       {showMobileCompactControls && isComposeModalOpen && (
         <div className="support-mobile-compose-backdrop" onClick={() => setIsComposeModalOpen(false)}>

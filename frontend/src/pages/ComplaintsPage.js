@@ -1,6 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import SearchIcon from '@mui/icons-material/Search';
+import OpenInFullIcon from '@mui/icons-material/OpenInFull';
+import CloseFullscreenIcon from '@mui/icons-material/CloseFullscreen';
 import { useSelector } from 'react-redux';
 import api from '../api/axiosInstance';
 import {
@@ -59,10 +61,12 @@ export default function ComplaintsPage({ mode = 'public' }) {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [complaints, setComplaints] = useState([]);
+  const [counts, setCounts] = useState({ active: 0, resolved: 0, all: 0 });
   const [quickSolutionById, setQuickSolutionById] = useState({});
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 960px)').matches : false
   );
+  const [fullscreenComposer, setFullscreenComposer] = useState(false);
   const [isHeaderStripCollapsed, setIsHeaderStripCollapsed] = useState(false);
   const [isComposeModalOpen, setIsComposeModalOpen] = useState(false);
 
@@ -83,12 +87,6 @@ export default function ComplaintsPage({ mode = 'public' }) {
     navigate('/developer/login', { replace: true });
   };
 
-  const counts = useMemo(() => {
-    const active = complaints.filter((c) => c.status === 'IN_PROGRESS' || c.status === 'REOPENED').length;
-    const resolved = complaints.filter((c) => c.status === 'RESOLVED' || c.status === 'CLOSED').length;
-    return { active, resolved };
-  }, [complaints]);
-
   const fetchSessionEmail = async () => {
     try {
       const { data } = await api.get('/details', { withCredentials: true });
@@ -104,15 +102,35 @@ export default function ComplaintsPage({ mode = 'public' }) {
   const loadComplaints = async () => {
     setLoading(true);
     try {
-      const res = await listComplaints({
-        filter,
-        sort,
-        q: appliedSearch
+      const [res, countRes] = await Promise.all([
+        listComplaints({
+          filter,
+          sort,
+          q: appliedSearch
+        }),
+        listComplaints({
+          filter: 'ALL',
+          sort: 'DATE_DESC',
+          q: appliedSearch
+        })
+      ]);
+
+      const visibleComplaints = Array.isArray(res.complaints) ? res.complaints : [];
+      const allComplaints = Array.isArray(countRes.complaints) ? countRes.complaints : [];
+
+      const activeCount = allComplaints.filter((item) => item.status === 'IN_PROGRESS' || item.status === 'REOPENED').length;
+      const resolvedCount = allComplaints.filter((item) => item.status === 'RESOLVED' || item.status === 'CLOSED').length;
+
+      setComplaints(visibleComplaints);
+      setCounts({
+        active: activeCount,
+        resolved: resolvedCount,
+        all: allComplaints.length
       });
-      setComplaints(Array.isArray(res.complaints) ? res.complaints : []);
     } catch (err) {
       console.error('Failed to load complaints', err);
       setComplaints([]);
+      setCounts({ active: 0, resolved: 0, all: 0 });
     } finally {
       setLoading(false);
     }
@@ -168,6 +186,12 @@ export default function ComplaintsPage({ mode = 'public' }) {
     }
   }, [hideComposer, isMobile]);
 
+  useEffect(() => {
+    if (hideComposer || isMobile) {
+      setFullscreenComposer(false);
+    }
+  }, [hideComposer, isMobile]);
+
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!form.email.trim() || !form.title.trim() || !form.message.trim()) return;
@@ -179,6 +203,7 @@ export default function ComplaintsPage({ mode = 'public' }) {
         message: form.message.trim()
       });
       setForm((prev) => ({ ...prev, title: '', message: '' }));
+      setFullscreenComposer(false);
       await loadComplaints();
     } catch (err) {
       console.error('Complaint submit failed', err);
@@ -282,14 +307,20 @@ export default function ComplaintsPage({ mode = 'public' }) {
                     className={`support-filter-btn ${filter === 'ALL' ? 'active' : ''}`}
                     onClick={() => setFilter('ALL')}
                   >
-                    All <span className="filter-count">{complaints.length}</span>
+                    All <span className="filter-count">{counts.all}</span>
                   </button>
                 </div>
               </div>
               <div className="support-top-right">
-                <label>SEARCH</label>
                 <div className="support-search-box">
-                  <SearchIcon className="search-icon" />
+                  <button
+                    type="button"
+                    className="search-icon-btn"
+                    onClick={() => setAppliedSearch(searchInput.trim())}
+                    aria-label="Search complaints"
+                  >
+                    <SearchIcon className="search-icon" />
+                  </button>
                   <input
                     type="text"
                     value={searchInput}
@@ -301,6 +332,7 @@ export default function ComplaintsPage({ mode = 'public' }) {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') setAppliedSearch(searchInput.trim());
                     }}
+                    aria-label="Search complaints"
                     placeholder="Search titles, emails..."
                   />
                 </div>
@@ -355,42 +387,54 @@ export default function ComplaintsPage({ mode = 'public' }) {
               </select>
             </div>
 
-            <form className="support-raise-card" onSubmit={onSubmit} ref={composeCardRef}>
-              <h2>Raise a Complaint</h2>
-              <p>Your email will be used for follow-up solutions from admin/developer.</p>
-              <label className="support-input-label">
-                <span>Your Email *</span>
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-                  placeholder="name@example.com"
-                  required
-                />
-              </label>
-              <label className="support-input-label">
-                <span>Issue Title *</span>
-                <input
-                  type="text"
-                  value={form.title}
-                  onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-                  placeholder="Brief summary of the issue"
-                  required
-                />
-              </label>
-              <label className="support-input-label">
-                <span>Describe the issue *</span>
-                <textarea
-                  value={form.message}
-                  onChange={(e) => setForm((prev) => ({ ...prev, message: e.target.value }))}
-                  placeholder="Provide details to help us resolve this faster..."
-                  required
-                />
-              </label>
-              <button className="support-primary-btn" type="submit" disabled={submitting}>
-                {submitting ? 'Submitting...' : 'Submit Complaint'}
-              </button>
-            </form>
+            {!fullscreenComposer && (
+              <form className="support-raise-card" onSubmit={onSubmit} ref={composeCardRef}>
+                <div className="support-compose-head">
+                  <h2>Raise a Complaint</h2>
+                  <button
+                    type="button"
+                    className="support-expand-btn"
+                    onClick={() => setFullscreenComposer(true)}
+                    aria-label="Maximize raise complaint card"
+                  >
+                    <OpenInFullIcon fontSize="small" />
+                  </button>
+                </div>
+                <p>Your email will be used for follow-up solutions from admin/developer.</p>
+                <label className="support-input-label">
+                  <span>Your Email *</span>
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                    placeholder="name@example.com"
+                    required
+                  />
+                </label>
+                <label className="support-input-label">
+                  <span>Issue Title *</span>
+                  <input
+                    type="text"
+                    value={form.title}
+                    onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+                    placeholder="Brief summary of the issue"
+                    required
+                  />
+                </label>
+                <label className="support-input-label">
+                  <span>Describe the issue *</span>
+                  <textarea
+                    value={form.message}
+                    onChange={(e) => setForm((prev) => ({ ...prev, message: e.target.value }))}
+                    placeholder="Provide details to help us resolve this faster..."
+                    required
+                  />
+                </label>
+                <button className="support-primary-btn" type="submit" disabled={submitting}>
+                  {submitting ? 'Submitting...' : 'Submit Complaint'}
+                </button>
+              </form>
+            )}
 
             <div className="support-home-menu-row">
               <Link className="support-home-btn" to="/">
@@ -448,7 +492,7 @@ export default function ComplaintsPage({ mode = 'public' }) {
                     {trusted && (
                       <>
                         <a
-                          className="support-secondary-btn outline"
+                          className="support-secondary-btn support-secondary-btn-outline"
                           href={`mailto:${item.email}?subject=${encodeURIComponent(`Regarding complaint: ${item.title}`)}&body=${encodeURIComponent(
                             `Complaint Ref: [Complaint#${item._id}]\nDo not change/remove subject or reference number for tracking.`
                           )}`}
@@ -498,6 +542,61 @@ export default function ComplaintsPage({ mode = 'public' }) {
           </div>
         </section>
       </div>
+
+      {!hideComposer && !isMobile && fullscreenComposer && (
+        <div className="support-compose-overlay-backdrop" onClick={() => setFullscreenComposer(false)}>
+          <form
+            className="support-raise-card support-compose-overlay-card"
+            onSubmit={onSubmit}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="support-compose-head">
+              <h2>Raise a Complaint</h2>
+              <button
+                type="button"
+                className="support-expand-btn"
+                onClick={() => setFullscreenComposer(false)}
+                aria-label="Close maximized raise complaint card"
+              >
+                <CloseFullscreenIcon fontSize="small" />
+              </button>
+            </div>
+            <p>Your email will be used for follow-up solutions from admin/developer.</p>
+            <label className="support-input-label">
+              <span>Your Email *</span>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                placeholder="name@example.com"
+                required
+              />
+            </label>
+            <label className="support-input-label">
+              <span>Issue Title *</span>
+              <input
+                type="text"
+                value={form.title}
+                onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+                placeholder="Brief summary of the issue"
+                required
+              />
+            </label>
+            <label className="support-input-label">
+              <span>Describe the issue *</span>
+              <textarea
+                value={form.message}
+                onChange={(e) => setForm((prev) => ({ ...prev, message: e.target.value }))}
+                placeholder="Provide details to help us resolve this faster..."
+                required
+              />
+            </label>
+            <button className="support-primary-btn" type="submit" disabled={submitting}>
+              {submitting ? 'Submitting...' : 'Submit Complaint'}
+            </button>
+          </form>
+        </div>
+      )}
 
       {showMobileCompactControls && isComposeModalOpen && (
         <div className="support-mobile-compose-backdrop" onClick={() => setIsComposeModalOpen(false)}>

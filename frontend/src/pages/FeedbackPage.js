@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import SearchIcon from '@mui/icons-material/Search';
 import OpenInFullIcon from '@mui/icons-material/OpenInFull';
@@ -41,6 +41,7 @@ export default function FeedbackPage({ mode = 'public' }) {
   const [appliedSearch, setAppliedSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [feedbacks, setFeedbacks] = useState([]);
+  const [counts, setCounts] = useState({ NEW: 0, IN_REVIEW: 0, DONE: 0, ALL: 0 });
   const [fullscreenComposer, setFullscreenComposer] = useState(false);
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 960px)').matches : false
@@ -54,26 +55,38 @@ export default function FeedbackPage({ mode = 'public' }) {
     rating: ''
   });
 
-  const counts = useMemo(() => {
-    const map = { NEW: 0, IN_REVIEW: 0, DONE: 0 };
-    feedbacks.forEach((item) => {
-      if (map[item.status] !== undefined) map[item.status] += 1;
-    });
-    return map;
-  }, [feedbacks]);
-
   const loadFeedback = async () => {
     setLoading(true);
     try {
-      const res = await listFeedback({
-        status: statusFilter,
-        sort,
-        q: appliedSearch
+      const [res, countRes] = await Promise.all([
+        listFeedback({
+          status: statusFilter,
+          sort,
+          q: appliedSearch
+        }),
+        listFeedback({
+          status: 'ALL',
+          sort: 'DATE_DESC',
+          q: appliedSearch
+        })
+      ]);
+
+      const visibleFeedback = Array.isArray(res.feedbacks) ? res.feedbacks : [];
+      const allFeedback = Array.isArray(countRes.feedbacks) ? countRes.feedbacks : [];
+
+      const statusCounts = { NEW: 0, IN_REVIEW: 0, DONE: 0, ALL: allFeedback.length };
+      allFeedback.forEach((item) => {
+        if (statusCounts[item.status] !== undefined) {
+          statusCounts[item.status] += 1;
+        }
       });
-      setFeedbacks(Array.isArray(res.feedbacks) ? res.feedbacks : []);
+
+      setFeedbacks(visibleFeedback);
+      setCounts(statusCounts);
     } catch (err) {
       console.error('Failed to load feedback', err);
       setFeedbacks([]);
+      setCounts({ NEW: 0, IN_REVIEW: 0, DONE: 0, ALL: 0 });
     } finally {
       setLoading(false);
     }
@@ -111,6 +124,12 @@ export default function FeedbackPage({ mode = 'public' }) {
   useEffect(() => {
     if (isDeveloperView || !isMobile) {
       setIsHeaderStripCollapsed(false);
+    }
+  }, [isDeveloperView, isMobile]);
+
+  useEffect(() => {
+    if (isDeveloperView || isMobile) {
+      setFullscreenComposer(false);
     }
   }, [isDeveloperView, isMobile]);
 
@@ -215,7 +234,6 @@ export default function FeedbackPage({ mode = 'public' }) {
               </div>
 
               <div className="feedback-search-wrap">
-                <label>SEARCH FEEDBACK</label>
                 <div className="feedback-search-box">
                   <input
                     type="text"
@@ -254,7 +272,7 @@ export default function FeedbackPage({ mode = 'public' }) {
               <div className="feedback-status-tabs">
                 {STATUS_OPTIONS.map((status) => {
                   const label = status === 'ALL' ? 'All' : status.replace('_', ' ');
-                  const count = status === 'ALL' ? feedbacks.length : (counts[status] || 0);
+                  const count = counts[status] || 0;
                   return (
                   <button
                     key={status}
@@ -302,73 +320,76 @@ export default function FeedbackPage({ mode = 'public' }) {
 
   return (
     <div
-      className={`feedback-page feedback-page--detached-strip ${!isDeveloperView && !isMobile ? 'feedback-page--has-left' : ''} ${fullscreenComposer ? 'composer-fullscreen' : ''}`.trim()}
+      className={`feedback-page feedback-page--detached-strip ${!isDeveloperView && !isMobile ? 'feedback-page--has-left' : ''}`.trim()}
     >
       {topStrip}
       <div className="feedback-layout">
         {!isDeveloperView && !isMobile && (
-          <aside className={`feedback-left ${fullscreenComposer ? 'fullscreen' : ''}`}>
-            <form className="feedback-compose-card" onSubmit={submitFeedback} ref={composeCardRef}>
-              <div className="feedback-compose-head">
-                <h2>Share Feedback</h2>
-                <button
-                  type="button"
-                  className="feedback-expand-btn"
-                  onClick={() => setFullscreenComposer((prev) => !prev)}
-                >
-                  {fullscreenComposer ? <CloseFullscreenIcon /> : <OpenInFullIcon />}
+          <aside className="feedback-left">
+            {!fullscreenComposer && (
+              <form className="feedback-compose-card" onSubmit={submitFeedback} ref={composeCardRef}>
+                <div className="feedback-compose-head">
+                  <h2>Share Feedback</h2>
+                  <button
+                    type="button"
+                    className="feedback-expand-btn"
+                    onClick={() => setFullscreenComposer(true)}
+                    aria-label="Maximize share feedback card"
+                  >
+                    <OpenInFullIcon fontSize="small" />
+                  </button>
+                </div>
+                <p>Help us improve with bugs, ideas, and appreciation.</p>
+                <label>
+                  <span>Type</span>
+                  <select
+                    value={form.type}
+                    onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))}
+                  >
+                    {TYPE_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Your Email (Optional)</span>
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                    placeholder="Your Email (Optional)"
+                  />
+                </label>
+                <label>
+                  <span>Rating (Optional)</span>
+                  <select
+                    value={form.rating}
+                    onChange={(e) => setForm((prev) => ({ ...prev, rating: e.target.value }))}
+                  >
+                    <option value="">Select Rating</option>
+                    <option value="5">5 - Excellent</option>
+                    <option value="4">4 - Good</option>
+                    <option value="3">3 - Average</option>
+                    <option value="2">2 - Poor</option>
+                    <option value="1">1 - Bad</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Your Message *</span>
+                  <textarea
+                    value={form.message}
+                    onChange={(e) => setForm((prev) => ({ ...prev, message: e.target.value }))}
+                    placeholder="Your Message *"
+                    required
+                  />
+                </label>
+                <button className="feedback-submit-btn" type="submit">
+                  Submit Feedback
                 </button>
-              </div>
-              <p>Help us improve with bugs, ideas, and appreciation.</p>
-              <label>
-                <span>Type</span>
-                <select
-                  value={form.type}
-                  onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))}
-                >
-                  {TYPE_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>Your Email (Optional)</span>
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-                  placeholder="Your Email (Optional)"
-                />
-              </label>
-              <label>
-                <span>Rating (Optional)</span>
-                <select
-                  value={form.rating}
-                  onChange={(e) => setForm((prev) => ({ ...prev, rating: e.target.value }))}
-                >
-                  <option value="">Select Rating</option>
-                  <option value="5">5 - Excellent</option>
-                  <option value="4">4 - Good</option>
-                  <option value="3">3 - Average</option>
-                  <option value="2">2 - Poor</option>
-                  <option value="1">1 - Bad</option>
-                </select>
-              </label>
-              <label>
-                <span>Your Message *</span>
-                <textarea
-                  value={form.message}
-                  onChange={(e) => setForm((prev) => ({ ...prev, message: e.target.value }))}
-                  placeholder="Your Message *"
-                  required
-                />
-              </label>
-              <button className="feedback-submit-btn" type="submit">
-                Submit Feedback
-              </button>
-            </form>
+              </form>
+            )}
 
             {!fullscreenComposer && (
               <div className="feedback-home-menu-row">
@@ -423,6 +444,77 @@ export default function FeedbackPage({ mode = 'public' }) {
           </div>
         </section>
       </div>
+
+      {!isDeveloperView && !isMobile && fullscreenComposer && (
+        <div className="feedback-compose-overlay-backdrop" onClick={() => setFullscreenComposer(false)}>
+          <form
+            className="feedback-compose-card feedback-compose-overlay-card"
+            onSubmit={submitFeedback}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="feedback-compose-head">
+              <h2>Share Feedback</h2>
+              <button
+                type="button"
+                className="feedback-expand-btn"
+                onClick={() => setFullscreenComposer(false)}
+                aria-label="Close maximized share feedback card"
+              >
+                <CloseFullscreenIcon fontSize="small" />
+              </button>
+            </div>
+            <p>Help us improve with bugs, ideas, and appreciation.</p>
+            <label>
+              <span>Type</span>
+              <select
+                value={form.type}
+                onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))}
+              >
+                {TYPE_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Your Email (Optional)</span>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                placeholder="Your Email (Optional)"
+              />
+            </label>
+            <label>
+              <span>Rating (Optional)</span>
+              <select
+                value={form.rating}
+                onChange={(e) => setForm((prev) => ({ ...prev, rating: e.target.value }))}
+              >
+                <option value="">Select Rating</option>
+                <option value="5">5 - Excellent</option>
+                <option value="4">4 - Good</option>
+                <option value="3">3 - Average</option>
+                <option value="2">2 - Poor</option>
+                <option value="1">1 - Bad</option>
+              </select>
+            </label>
+            <label>
+              <span>Your Message *</span>
+              <textarea
+                value={form.message}
+                onChange={(e) => setForm((prev) => ({ ...prev, message: e.target.value }))}
+                placeholder="Your Message *"
+                required
+              />
+            </label>
+            <button className="feedback-submit-btn" type="submit">
+              Submit Feedback
+            </button>
+          </form>
+        </div>
+      )}
 
       {showMobileCompactControls && isComposeModalOpen && (
         <div className="feedback-mobile-compose-backdrop" onClick={() => setIsComposeModalOpen(false)}>

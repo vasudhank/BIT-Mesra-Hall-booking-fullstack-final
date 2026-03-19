@@ -434,6 +434,12 @@
   z-index: 2600;
 }
 
+.gcal-user-menu .quick-page-menu {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
 .gcal-user-menu-item {
   width: 100%;
   text-align: left;
@@ -460,11 +466,12 @@
 .gcal-user-menu-quick-btn {
   justify-content: flex-start;
   gap: 8px;
-  border: 1px solid #dadce0;
+  border: none !important;
+  box-shadow: none;
 }
 
 .gcal-user-menu-quick-btn:hover {
-  border-color: #aecbfa;
+  border: none !important;
 }
 
 .gcal-user-menu-quick-panel {
@@ -473,6 +480,16 @@
   color: #3c4043 !important;
   box-shadow: none !important;
   margin-top: 6px !important;
+}
+
+.gcal-user-menu-quick-panel.quick-page-menu-panel.inline {
+  position: absolute;
+  top: calc(100% - 2px);
+  left: 0;
+  width: 100%;
+  margin-top: 0 !important;
+  z-index: 2605;
+  box-shadow: 0 10px 20px rgba(60, 64, 67, 0.24) !important;
 }
 
 .gcal-user-menu-quick-item {
@@ -4457,10 +4474,10 @@ al-search-result-date span,
   background: #3c4043;
 }
 .theme-dark .gcal-user-menu-quick-btn {
-  border-color: #5f6368;
+  border: none !important;
 }
 .theme-dark .gcal-user-menu-quick-btn:hover {
-  border-color: #8ab4f8;
+  border: none !important;
 }
 .theme-dark .gcal-user-menu-quick-panel {
   background: #202124 !important;
