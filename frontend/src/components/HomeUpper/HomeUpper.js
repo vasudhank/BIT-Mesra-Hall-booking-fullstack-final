@@ -1034,15 +1034,17 @@ export default function HomeUpper({
                   >
                     <DownloadOutlinedIcon fontSize="small" />
                   </button>
-                  <button
-                    type="button"
-                    className="modal-icon-action-btn"
-                    onClick={handleWishContactsPrint}
-                    title="Print contacts list"
-                    aria-label="Print contacts list"
-                  >
-                    <PrintOutlinedIcon fontSize="small" />
-                  </button>
+                  {!isMobile && (
+                    <button
+                      type="button"
+                      className="modal-icon-action-btn"
+                      onClick={handleWishContactsPrint}
+                      title="Print contacts list"
+                      aria-label="Print contacts list"
+                    >
+                      <PrintOutlinedIcon fontSize="small" />
+                    </button>
+                  )}
                   {isMobile && (
                     <button
                       type="button"

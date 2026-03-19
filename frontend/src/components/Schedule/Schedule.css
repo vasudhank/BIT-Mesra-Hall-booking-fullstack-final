@@ -37,6 +37,16 @@
   --schedule-mobile-select-icon-color: #475569;
   --schedule-mobile-select-icon-right: 8px;
   --schedule-mobile-date-icon-filter: none;
+  --schedule-desktop-sort-width: 90px;
+  --schedule-desktop-sort-pad-left: 10px;
+  --schedule-desktop-sort-pad-right: 28px;
+  --schedule-desktop-select-icon-color: #475569;
+  --schedule-desktop-select-icon-right: 10px;
+  --schedule-desktop-date-width: 140px;
+  --schedule-desktop-date-pad-left: 10px;
+  --schedule-desktop-date-pad-right: 10px;
+  --schedule-desktop-date-icon-filter: none;
+  --schedule-desktop-search-expanded-width: 250px;
 }
 
 body.dark-mode {
@@ -50,6 +60,8 @@ body.dark-mode {
   --schedule-grid-cell-applies-bg: rgba(30, 58, 138, 0.24);
   --schedule-mobile-select-icon-color: #f8fafc;
   --schedule-mobile-date-icon-filter: invert(1) brightness(1.15);
+  --schedule-desktop-select-icon-color: #f8fafc;
+  --schedule-desktop-date-icon-filter: invert(1) brightness(1.15);
 }
 
 .schedule-alert-marquee {
@@ -308,21 +320,29 @@ body.dark-mode {
 }
 
 .schedule-strip-restore-btn {
+  --schedule-collapsed-arrow-offset-x: -2px;
+  --schedule-collapsed-arrow-offset-y: -2px;
   position: fixed;
   left: 0;
-  width: 28px;
-  height: 28px;
+  top: 0;
+  width: 26px;
+  height: 26px;
   border: 1.5px solid var(--border-color);
   border-left: none;
   border-top: none;
   border-radius: 0 0 999px 0;
   background: var(--bg-paper);
   color: var(--text-primary);
-  z-index: 1705;
+  z-index: 2205;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.2);
+  transform: none;
+}
+
+.schedule-strip-restore-btn svg {
+  transform: translate(var(--schedule-collapsed-arrow-offset-x), var(--schedule-collapsed-arrow-offset-y));
 }
 
 .schedule-strip-restore-btn:hover {

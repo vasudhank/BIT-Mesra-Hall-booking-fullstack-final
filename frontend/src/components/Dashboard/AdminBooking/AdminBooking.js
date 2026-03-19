@@ -19,10 +19,18 @@ import { fuzzyFilterAndRank } from '../../../utils/fuzzySearch';
 const SORT_MODE_INLINE_LABELS = {
   TIME_ASC: 'Time ↑',
   TIME_DESC: 'Time ↓',
-  HALL_ASC: 'Hall A-Z',
-  HALL_DESC: 'Hall Z-A',
-  FACULTY_ASC: 'Faculty'
+  HALL_ASC: 'Hall ↑',
+  HALL_DESC: 'Hall ↓',
+  FACULTY_ASC: 'Faculty ↑'
 };
+
+const SORT_MODE_OPTIONS = [
+  { value: 'TIME_ASC', label: 'Time (Earlier-Later)', displayLabel: 'Time ↑' },
+  { value: 'TIME_DESC', label: 'Time (Later-Earlier)', displayLabel: 'Time ↓' },
+  { value: 'HALL_ASC', label: 'Hall (A-Z)', displayLabel: 'Hall ↑' },
+  { value: 'HALL_DESC', label: 'Hall (Z-A)', displayLabel: 'Hall ↓' },
+  { value: 'FACULTY_ASC', label: 'Faculty Grouped', displayLabel: 'Faculty ↑' }
+];
 
 export default function AdminBooking() {
 
@@ -567,19 +575,51 @@ export default function AdminBooking() {
       </Backdrop>
 
       <div ref={pageRootRef} className='admin-booking-body'>
-        {showAppbar && (
+        {(showAppbar || isMobile) && (
           <Appbar
-            showSearch={viewMode === 'ALL'}
+            showSearch={true}
             searchValue={search}
             onSearchChange={onSearchChange}
             onSearchSubmit={onSearchSubmit}
-            mobileStripToggleVisible={!showViewportStrip}
+            mobileTopActions={
+              isMobile
+                ? [
+                    {
+                      key: 'mobile-toggle-appbar',
+                      label: showAppbar ? 'Hide Appbar' : 'Show Appbar',
+                      onClick: () => setShowAppbar((v) => !v)
+                    },
+                    {
+                      key: 'mobile-toggle-select-strip',
+                      label: showBulkStrip ? 'Hide Select Strip' : 'Show Select Strip',
+                      onClick: () => setShowBulkStrip((v) => !v)
+                    },
+                    {
+                      key: 'mobile-toggle-conflict-strip',
+                      label: showConflictStrip ? 'Hide Conflict Strip' : 'Show Conflict Strip',
+                      onClick: () => setShowConflictStrip((v) => !v)
+                    },
+                    {
+                      key: 'mobile-toggle-title',
+                      label: showHeaderTitle ? 'Hide Title' : 'Show Title',
+                      onClick: () => setShowHeaderTitle((v) => !v)
+                    }
+                  ]
+                : []
+            }
+            mobileSearchExpandable={isMobile}
+            mobileSortVisible={isMobile}
+            mobileSortValue={sortMode}
+            onMobileSortChange={(value) => setSortMode(value)}
+            mobileSortOptions={SORT_MODE_OPTIONS}
+            mobileStripToggleVisible={false}
             onMobileStripToggle={() => setShowViewportStrip(true)}
+            collapsedMobile={!showAppbar && isMobile}
           />
         )}
 
         <Container maxWidth="xl" sx={{ mt: 0, pt: `${contentTopOffset}px` }}> 
-          {showViewportStrip ? (
+          {!isMobile && showViewportStrip ? (
             <div
               ref={viewportToolsRef}
               className='booking-viewport-tools'
@@ -605,27 +645,28 @@ export default function AdminBooking() {
                   <button className='viewport-tool-btn' onClick={() => setShowHeaderTitle((v) => !v)}>
                     {showHeaderTitle ? 'Hide Title' : 'Show Title'}
                   </button>
-
-                  <div className='booking-sort-wrap'>
-                    <FormControl size='small' className='booking-sort-control'>
-                      <Select
-                        value={sortMode}
-                        onChange={(e) => setSortMode(e.target.value)}
-                        renderValue={(selected) => `Sort: ${SORT_MODE_INLINE_LABELS[selected] || 'Time ↑'}`}
-                      >
-                        <MenuItem value='TIME_ASC'>Time (Earlier-Later)</MenuItem>
-                        <MenuItem value='TIME_DESC'>Time (Later-Earlier)</MenuItem>
-                        <MenuItem value='HALL_ASC'>Hall (A-Z)</MenuItem>
-                        <MenuItem value='HALL_DESC'>Hall (Z-A)</MenuItem>
-                        <MenuItem value='FACULTY_ASC'>Faculty Grouped</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </div>
+                  {!isMobile && (
+                    <div className='booking-sort-wrap'>
+                      <FormControl size='small' className='booking-sort-control'>
+                        <Select
+                          value={sortMode}
+                          onChange={(e) => setSortMode(e.target.value)}
+                          renderValue={(selected) => SORT_MODE_INLINE_LABELS[selected] || 'Time ↑'}
+                        >
+                          {SORT_MODE_OPTIONS.map((option) => (
+                            <MenuItem key={option.value} value={option.value}>
+                              {option.label}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           ) : (
-            (!isMobile || !showAppbar || viewMode !== 'ALL') && (
+            (!isMobile && (!showAppbar || viewMode !== 'ALL')) && (
             <button
               className='booking-tools-toggle-btn'
               style={{ top: showAppbar ? appbarHeight + 12 : 10 }}

@@ -55,6 +55,52 @@
     fill: currentColor;
 }
 
+.appbar-mobile-search-toggle {
+    width: 36px !important;
+    height: 36px !important;
+    border: 1px solid rgba(255, 255, 255, 0.36) !important;
+    border-radius: 12px !important;
+    background: rgba(255, 255, 255, 0.12) !important;
+    color: #f8fafc !important;
+}
+
+.appbar-mobile-search-toggle:hover {
+    background: rgba(255, 255, 255, 0.2) !important;
+}
+
+.appbar-collapsed-launcher {
+    --appbar-collapsed-arrow-offset-x: -2px;
+    --appbar-collapsed-arrow-offset-y: -2px;
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 20px;
+    height: 20px;
+    border: 1.5px solid rgba(255, 255, 255, 0.34);
+    border-left: none;
+    border-top: none;
+    border-radius: 0 0 999px 0;
+    background: rgba(12, 20, 36, 0.95);
+    color: #e9f4ff;
+    z-index: 2205;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.24);
+    cursor: pointer;
+}
+
+.appbar-collapsed-launcher svg {
+    width: 13px;
+    height: 13px;
+    fill: currentColor;
+    transform: translate(var(--appbar-collapsed-arrow-offset-x), var(--appbar-collapsed-arrow-offset-y));
+}
+
+.appbar-collapsed-launcher:hover {
+    background: rgba(26, 37, 63, 0.98);
+}
+
 .appbar-user-menu-btn {
     width: 100%;
     justify-content: flex-start;
@@ -101,6 +147,10 @@ body.dark-mode .appbar-user-menu-btn:hover {
 }
 
 @media (max-width: 900px) {
+  .appbar-mobile-sort-field .MuiSelect-icon {
+    color: #f8fafc !important;
+  }
+
   body.dark-mode .appbar-user-submenu-panel {
     border-color: rgba(148, 163, 184, 0.46) !important;
     background: rgba(8, 12, 22, 0.96) !important;

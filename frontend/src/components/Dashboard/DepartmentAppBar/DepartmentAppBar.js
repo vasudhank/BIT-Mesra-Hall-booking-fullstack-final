@@ -142,6 +142,10 @@ export default function DepartmentAppBar({
   const mobileMenuDangerColor = effectiveMode === 'dark' ? '#FCA5A5' : '#D32F2F';
   const mobileMenuDividerColor = effectiveMode === 'dark' ? 'rgba(248, 250, 252, 0.28)' : 'rgba(37, 53, 79, 0.2)';
   const mobileMenuItemSx = isMobileMenu ? { minHeight: 42, justifyContent: 'center', px: 1.5 } : undefined;
+  const getCompactSortLabel = (selected) => {
+    const option = sortOptions.find((item) => item.value === selected);
+    return option?.displayLabel || option?.label || '';
+  };
 
   return (
     <AppBar position="fixed" className="appbar">
@@ -176,6 +180,9 @@ export default function DepartmentAppBar({
                   size="small"
                   value={sortValue}
                   onChange={(e) => onSortChange && onSortChange(e.target.value)}
+                  SelectProps={{
+                    renderValue: (selected) => getCompactSortLabel(selected)
+                  }}
                   sx={{
                     minWidth: 185,
                     '& .MuiOutlinedInput-root': {
@@ -256,6 +263,9 @@ export default function DepartmentAppBar({
                   size="small"
                   value={sortValue}
                   onChange={(e) => onSortChange && onSortChange(e.target.value)}
+                  SelectProps={{
+                    renderValue: (selected) => getCompactSortLabel(selected)
+                  }}
                   sx={{
                     minWidth: 140,
                     maxWidth: 150,

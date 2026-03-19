@@ -25,6 +25,10 @@
   padding-top: 64px;
 }
 
+.admin-department-body.admin-department-appbar-hidden {
+  padding-top: 0;
+}
+
 /* Force MUI Cards/Paper inside this page to use the custom variables */
 .admin-department-body .MuiCard-root, 
 .admin-department-body .MuiPaper-root {
@@ -293,6 +297,10 @@
     padding: 15px;
     padding-top: 82px; 
     padding-bottom: 80px;
+  }
+
+  .admin-department-body.admin-department-appbar-hidden {
+    padding-top: 0;
   }
 
   .admin-department-title {

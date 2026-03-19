@@ -129,6 +129,7 @@ const HamburgerGlyph = () => (
 );
 
 export default function QuickPageMenu({
+  topItems = [],
   includeKeys,
   excludeKeys = [],
   extraItems = [],
@@ -201,6 +202,25 @@ export default function QuickPageMenu({
       .filter(Boolean)
       .filter((item) => !item.path || normalizePath(item.path) !== normalizePath(location.pathname));
   }, [extraItems, location.pathname]);
+
+  const topCustomItems = useMemo(() => {
+    if (!Array.isArray(topItems)) return [];
+    return topItems
+      .map((item, index) => {
+        if (!item || typeof item !== 'object') return null;
+        const key = toLowerTrim(item.key || item.label || `top-custom-${index}`) || `top-custom-${index}`;
+        const label = String(item.label || '').trim();
+        if (!label) return null;
+        return {
+          key,
+          label,
+          path: typeof item.path === 'string' ? item.path : '',
+          onClick: typeof item.onClick === 'function' ? item.onClick : null
+        };
+      })
+      .filter(Boolean)
+      .filter((item) => !item.path || normalizePath(item.path) !== normalizePath(location.pathname));
+  }, [topItems, location.pathname]);
 
   const syncEffectiveMode = useCallback(() => {
     setEffectiveMode(resolveEffectiveThemeMode(location.pathname, readGlobalThemeMode()));
@@ -430,6 +450,26 @@ export default function QuickPageMenu({
       aria-label="Page menu"
       style={inlinePanel ? undefined : panelStyle}
     >
+      {topCustomItems.length > 0 && (
+        <>
+          {topCustomItems.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              role="menuitem"
+              className={`quick-page-menu-item ${itemClassName}`.trim()}
+              onClick={() => handleCustomItem(item)}
+            >
+              {item.label}
+            </button>
+          ))}
+
+          {(!hideThemeToggle || [...customItems, ...menuItems].length > 0) && (
+            <div className="quick-page-menu-divider" />
+          )}
+        </>
+      )}
+
       {!hideThemeToggle && (
         <>
           <button

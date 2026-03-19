@@ -104,7 +104,8 @@ export default function WishYourDayOverlay() {
   const [appliedSearch, setAppliedSearch] = useState('');
   const [selectedKeys, setSelectedKeys] = useState([]);
   const [mobilePrintPdfBusy, setMobilePrintPdfBusy] = useState(false);
-  const selectAllRef = useRef(null);
+  const selectAllHeadRef = useRef(null);
+  const selectAllFooterRef = useRef(null);
   const mobilePrintFallbackEnabled = isLikelyMobile();
 
   const closeOverlay = () => {
@@ -174,8 +175,10 @@ export default function WishYourDayOverlay() {
     !isAllVisibleSelected;
 
   useEffect(() => {
-    if (!selectAllRef.current) return;
-    selectAllRef.current.indeterminate = isPartiallyVisibleSelected;
+    [selectAllHeadRef.current, selectAllFooterRef.current].forEach((node) => {
+      if (!node) return;
+      node.indeterminate = isPartiallyVisibleSelected;
+    });
   }, [isPartiallyVisibleSelected, isAllVisibleSelected]);
 
   const toggleSelectAllVisible = () => {
@@ -327,7 +330,7 @@ export default function WishYourDayOverlay() {
         <div className="quick-contacts-head-wrap">
           <label className="quick-contacts-head-check" title="Select all visible contacts">
             <input
-              ref={selectAllRef}
+              ref={selectAllHeadRef}
               type="checkbox"
               checked={isAllVisibleSelected}
               onChange={toggleSelectAllVisible}
@@ -377,14 +380,25 @@ export default function WishYourDayOverlay() {
         </div>
 
         <div className="quick-contacts-footer">
+          <label className="quick-contacts-footer-select" title="Select all visible contacts">
+            <input
+              ref={selectAllFooterRef}
+              type="checkbox"
+              checked={isAllVisibleSelected}
+              onChange={toggleSelectAllVisible}
+              aria-label="Select all contacts"
+            />
+          </label>
           <p>Click on phone or email to copy</p>
           <div className="actions">
             <button type="button" onClick={handleDownload} aria-label="Download contacts as VCF" title="Download contacts">
               <DownloadOutlinedIcon fontSize="small" />
             </button>
-            <button type="button" onClick={handlePrint} aria-label="Print contacts list" title="Print contacts">
-              <PrintOutlinedIcon fontSize="small" />
-            </button>
+            {!mobilePrintFallbackEnabled && (
+              <button type="button" onClick={handlePrint} aria-label="Print contacts list" title="Print contacts">
+                <PrintOutlinedIcon fontSize="small" />
+              </button>
+            )}
             {mobilePrintFallbackEnabled && (
               <button
                 type="button"

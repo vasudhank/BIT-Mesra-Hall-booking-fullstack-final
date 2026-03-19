@@ -44,7 +44,14 @@ export default function Appbar({
   onSearchSubmit,
   searchPlaceholder = "Search",
   mobileStripToggleVisible = false,
-  onMobileStripToggle
+  onMobileStripToggle,
+  mobileTopActions = [],
+  mobileSearchExpandable = false,
+  mobileSortVisible = false,
+  mobileSortValue = "",
+  onMobileSortChange,
+  mobileSortOptions = [],
+  collapsedMobile = false
 }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -54,9 +61,13 @@ export default function Appbar({
   const [anchorElUser, setAnchorElUser] = React.useState(null);
   const [dateTime, setDateTime] = React.useState("");
   const isMobileMenu = useMediaQuery('(max-width:900px)');
+  const [mobileSearchExpanded, setMobileSearchExpanded] = React.useState(false);
   const [effectiveMode, setEffectiveMode] = React.useState(() =>
     resolveEffectiveThemeMode(location.pathname, readGlobalThemeMode())
   );
+  const mobileSearchAreaRef = React.useRef(null);
+  const mobileSearchInputRef = React.useRef(null);
+  const isCollapsedMobileMode = collapsedMobile && isMobileMenu;
 
   const searchInputSx = {
     '& .MuiOutlinedInput-root': {
@@ -76,6 +87,14 @@ export default function Appbar({
       }
     }
   };
+  const normalizedMobileTopActions = React.useMemo(
+    () =>
+      Array.isArray(mobileTopActions)
+        ? mobileTopActions.filter((action) => action && typeof action.label === 'string' && typeof action.onClick === 'function')
+        : [],
+    [mobileTopActions]
+  );
+  const shouldUseMobileExpandableSearch = isMobileMenu && showSearch && mobileSearchExpandable;
 
   const logout = async () => {
     try {
@@ -122,6 +141,38 @@ export default function Appbar({
     };
   }, [syncEffectiveMode]);
 
+  React.useEffect(() => {
+    if (!shouldUseMobileExpandableSearch && mobileSearchExpanded) {
+      setMobileSearchExpanded(false);
+    }
+  }, [shouldUseMobileExpandableSearch, mobileSearchExpanded]);
+
+  React.useEffect(() => {
+    if (!mobileSearchExpanded) return;
+    const timer = window.setTimeout(() => {
+      mobileSearchInputRef.current?.focus?.();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [mobileSearchExpanded]);
+
+  React.useEffect(() => {
+    if (!shouldUseMobileExpandableSearch || !mobileSearchExpanded) return;
+
+    const handlePointerDownOutside = (event) => {
+      if (!mobileSearchAreaRef.current?.contains(event.target)) {
+        setMobileSearchExpanded(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDownOutside, true);
+    document.addEventListener('touchstart', handlePointerDownOutside, true);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDownOutside, true);
+      document.removeEventListener('touchstart', handlePointerDownOutside, true);
+    };
+  }, [shouldUseMobileExpandableSearch, mobileSearchExpanded]);
+
   const handleOpenNavMenu = (event) => { setAnchorElNav(event.currentTarget); };
   const handleOpenUserMenu = (event) => { setAnchorElUser(event.currentTarget); };
   const handleCloseNavMenu = () => { setAnchorElNav(null); };
@@ -137,6 +188,113 @@ export default function Appbar({
   const mobileMenuTextColor = effectiveMode === 'dark' ? '#F8FAFC' : '#25354F';
   const mobileMenuDangerColor = effectiveMode === 'dark' ? '#FCA5A5' : '#D32F2F';
   const mobileMenuDividerColor = effectiveMode === 'dark' ? 'rgba(248, 250, 252, 0.28)' : 'rgba(37, 53, 79, 0.2)';
+  const mobileMenuPaperSx = {
+    backgroundColor: effectiveMode === 'dark' ? 'rgba(8, 12, 22, 0.96)' : 'rgba(255, 255, 255, 0.96)',
+    backdropFilter: 'blur(10px)',
+    color: mobileMenuTextColor,
+    border: effectiveMode === 'dark' ? '1px solid rgba(248, 250, 252, 0.18)' : '1px solid rgba(37, 53, 79, 0.14)',
+    borderRadius: isCollapsedMobileMode ? '0 16px 16px 16px' : '16px',
+    minWidth: '200px',
+    mt: isCollapsedMobileMode ? 0 : 1
+  };
+  const mobileMenuContent = (
+    <>
+      {normalizedMobileTopActions.map((action) => (
+        <MenuItem
+          key={`mobile-top-action-${action.key || action.label}`}
+          onClick={() => {
+            handleCloseNavMenu();
+            action.onClick();
+          }}
+        >
+          <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', fontWeight: 700, color: mobileMenuTextColor }}>
+            {action.label}
+          </Typography>
+        </MenuItem>
+      ))}
+      {normalizedMobileTopActions.length > 0 && (
+        <Divider sx={{ my: 1, borderColor: mobileMenuDividerColor, borderBottomWidth: '1px', opacity: 1 }} />
+      )}
+      {pages.map(([label, path]) => (
+        <MenuItem key={label} onClick={() => { handleCloseNavMenu(); navigate(path); }}>
+          <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', fontWeight: 700, color: mobileMenuTextColor }}>{label}</Typography>
+        </MenuItem>
+      ))}
+      <Divider sx={{ my: 1, borderColor: mobileMenuDividerColor, borderBottomWidth: '1px', opacity: 1 }} />
+      <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/'); }}>
+        <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: mobileMenuTextColor }}>HOME</Typography>
+      </MenuItem>
+      <MenuItem
+        disableRipple
+        sx={{ px: 1.25, py: 0.8, width: '100%', display: 'flex', justifyContent: 'center' }}
+      >
+        <QuickPageMenu
+          buttonLabel="MENU"
+          className="appbar-user-menu-root-mobile"
+          buttonClassName="appbar-user-menu-btn appbar-user-menu-btn-mobile"
+          panelClassName="appbar-user-submenu-panel"
+          itemClassName="appbar-user-submenu-item"
+          hideThemeToggle
+          align="left"
+          includeKeys={['schedule', 'ai', 'contacts', 'notices', 'calendar', 'complaints', 'queries', 'feedback']}
+          matchParentMenuWidth
+          panelOffsetX={-10}
+          closeParentMenu={handleCloseNavMenu}
+        />
+      </MenuItem>
+      <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/admin/account'); }}>
+        <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: mobileMenuTextColor }}>ACCOUNTS</Typography>
+      </MenuItem>
+      <Divider sx={{ my: 0.4, borderColor: mobileMenuDividerColor, borderBottomWidth: '1px', opacity: 1 }} />
+      <MenuItem onClick={togglePageTheme}>
+        <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: isMobileMenu ? 'center' : 'space-between', gap: 1.2 }}>
+          <Typography textAlign="center" className="dropdown-text" sx={{ width: isMobileMenu ? 'auto' : '100%', color: mobileMenuTextColor }}>
+            {themeActionLabel}
+          </Typography>
+          {!isMobileMenu && (
+            <Typography sx={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.02em' }}>
+              {themeShortcutLabel}
+            </Typography>
+          )}
+        </Box>
+      </MenuItem>
+      <MenuItem onClick={() => { handleCloseNavMenu(); logout(); }}>
+        <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: mobileMenuDangerColor }}>LOGOUT</Typography>
+      </MenuItem>
+    </>
+  );
+
+  if (isCollapsedMobileMode) {
+    return (
+      <>
+        <button
+          type="button"
+          className="appbar-collapsed-launcher"
+          onClick={handleOpenNavMenu}
+          aria-label="Open user menu"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 5l8 7-8 7z" />
+          </svg>
+        </button>
+        <Menu
+          id="menu-appbar-collapsed"
+          anchorEl={anchorElNav}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+          keepMounted
+          transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+          open={Boolean(anchorElNav)}
+          onClose={handleCloseNavMenu}
+          sx={{
+            display: { xs: 'block', md: 'none' },
+            '& .MuiPaper-root': mobileMenuPaperSx
+          }}
+        >
+          {mobileMenuContent}
+        </Menu>
+      </>
+    );
+  }
 
   return (
     <AppBar position="fixed" className="appbar">
@@ -257,9 +415,9 @@ export default function Appbar({
             </Typography>
 
             {/* ROW 2: Search Box + Hamburger (Horizontal) */}
-            <Box sx={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+            <Box sx={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: 0.25 }}>
 
-              <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, minWidth: 0, gap: 1 }}>
+              <Box ref={mobileSearchAreaRef} sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, minWidth: 0, gap: 1 }}>
                 {showSearch && mobileStripToggleVisible && typeof onMobileStripToggle === 'function' && (
                   <IconButton
                     className="appbar-mobile-strip-toggle"
@@ -278,7 +436,113 @@ export default function Appbar({
                 )}
 
                 {/* Search Box */}
-                {showSearch ? (
+                {showSearch && shouldUseMobileExpandableSearch ? (
+                  <>
+                    <IconButton
+                      size="small"
+                      className="appbar-mobile-search-toggle"
+                      onClick={() => setMobileSearchExpanded(true)}
+                      aria-label="Open search"
+                    >
+                      <SearchIcon fontSize="small" />
+                    </IconButton>
+
+                    {mobileSearchExpanded ? (
+                      <TextField
+                        inputRef={mobileSearchInputRef}
+                        value={searchValue}
+                        onChange={onSearchChange}
+                        onKeyDown={(e) => e.key === 'Enter' && onSearchSubmit()}
+                        placeholder={searchPlaceholder}
+                        size="small"
+                        fullWidth
+                        sx={{
+                          flex: 1,
+                          minWidth: 0,
+                          ...searchInputSx,
+                          '& .MuiOutlinedInput-root': {
+                            ...searchInputSx['& .MuiOutlinedInput-root'],
+                            fontSize: '0.9rem',
+                            height: '40px'
+                          }
+                        }}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <IconButton size="small" onClick={onSearchSubmit}>
+                                <SearchIcon fontSize="small" />
+                              </IconButton>
+                            </InputAdornment>
+                          )
+                        }}
+                      />
+                    ) : (
+                      mobileSortVisible &&
+                      typeof onMobileSortChange === 'function' &&
+                      Array.isArray(mobileSortOptions) &&
+                      mobileSortOptions.length > 0 && (
+                        <TextField
+                          select
+                          size="small"
+                          value={mobileSortValue}
+                          onChange={(event) => onMobileSortChange(event.target.value)}
+                          className="appbar-mobile-sort-field"
+                          SelectProps={{
+                            renderValue: (selected) => {
+                              const option = mobileSortOptions.find((item) => item.value === selected);
+                              return option?.displayLabel || option?.label || '';
+                            }
+                          }}
+                          sx={{
+                            minWidth: 122,
+                            maxWidth: 150,
+                            flex: '0 0 auto',
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: '999px',
+                              background: 'rgba(255,255,255,0.18)',
+                              '& fieldset': {
+                                borderColor: 'rgba(255,255,255,0.3)'
+                              },
+                              '&:hover fieldset': {
+                                borderColor: 'rgba(255,255,255,0.45)'
+                              },
+                              '&.Mui-focused fieldset': {
+                                borderColor: 'rgba(255,255,255,0.6)'
+                              }
+                            },
+                            '& .MuiSelect-select': {
+                              color: '#f8fafc',
+                              fontFamily: 'Inter',
+                              fontSize: '0.74rem',
+                              fontWeight: 700,
+                              py: 0.62,
+                              pr: 3.1,
+                              pl: 1.25,
+                              textAlign: 'center',
+                              textAlignLast: 'center',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            },
+                            '& .MuiSelect-icon': {
+                              color: '#f8fafc',
+                              right: '8px',
+                              fontSize: '1rem'
+                            },
+                            '& .MuiMenuItem-root': {
+                              fontSize: '0.8rem'
+                            }
+                          }}
+                        >
+                          {mobileSortOptions.map((option) => (
+                            <MenuItem key={option.value} value={option.value}>
+                              {option.label}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      )
+                    )}
+                  </>
+                ) : showSearch ? (
                   <TextField
                     value={searchValue}
                     onChange={onSearchChange}
@@ -316,7 +580,7 @@ export default function Appbar({
                   aria-haspopup="true"
                   onClick={handleOpenNavMenu}
                   color="inherit"
-                  sx={{ ml: 1 }}
+                  sx={{ ml: 0 }}
                 >
                   <MenuIcon fontSize="inherit" />
                 </IconButton>
@@ -331,62 +595,13 @@ export default function Appbar({
                   sx={{
                     display: { xs: 'block', md: 'none' },
                     '& .MuiPaper-root': {
-                      backgroundColor: effectiveMode === 'dark' ? 'rgba(8, 12, 22, 0.96)' : 'rgba(255, 255, 255, 0.96)',
-                      backdropFilter: 'blur(10px)',
-                      color: mobileMenuTextColor,
-                      border: effectiveMode === 'dark' ? '1px solid rgba(248, 250, 252, 0.18)' : '1px solid rgba(37, 53, 79, 0.14)',
+                      ...mobileMenuPaperSx,
                       borderRadius: '16px',
-                      minWidth: '200px',
                       mt: 1
                     }
                   }}
                 >
-                  {pages.map(([label, path]) => (
-                    <MenuItem key={label} onClick={() => { handleCloseNavMenu(); navigate(path); }}>
-                      <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', fontWeight: 700, color: mobileMenuTextColor }}>{label}</Typography>
-                    </MenuItem>
-                  ))}
-                  <Divider sx={{ my: 1, borderColor: mobileMenuDividerColor, borderBottomWidth: '1px', opacity: 1 }} />
-                  <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/'); }}>
-                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: mobileMenuTextColor }}>HOME</Typography>
-                  </MenuItem>
-                  <MenuItem
-                    disableRipple
-                    sx={{ px: 1.25, py: 0.8, width: '100%', display: 'flex', justifyContent: 'center' }}
-                  >
-                    <QuickPageMenu
-                      buttonLabel="MENU"
-                      className="appbar-user-menu-root-mobile"
-                      buttonClassName="appbar-user-menu-btn appbar-user-menu-btn-mobile"
-                      panelClassName="appbar-user-submenu-panel"
-                      itemClassName="appbar-user-submenu-item"
-                      hideThemeToggle
-                      align="left"
-                      includeKeys={['schedule', 'ai', 'contacts', 'notices', 'calendar', 'complaints', 'queries', 'feedback']}
-                      matchParentMenuWidth
-                      panelOffsetX={-10}
-                      closeParentMenu={handleCloseNavMenu}
-                    />
-                  </MenuItem>
-                  <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/admin/account'); }}>
-                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: mobileMenuTextColor }}>ACCOUNTS</Typography>
-                  </MenuItem>
-                  <Divider sx={{ my: 0.4, borderColor: mobileMenuDividerColor, borderBottomWidth: '1px', opacity: 1 }} />
-                  <MenuItem onClick={togglePageTheme}>
-                    <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: isMobileMenu ? 'center' : 'space-between', gap: 1.2 }}>
-                      <Typography textAlign="center" className="dropdown-text" sx={{ width: isMobileMenu ? 'auto' : '100%', color: mobileMenuTextColor }}>
-                        {themeActionLabel}
-                      </Typography>
-                      {!isMobileMenu && (
-                        <Typography sx={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.02em' }}>
-                          {themeShortcutLabel}
-                        </Typography>
-                      )}
-                    </Box>
-                  </MenuItem>
-                  <MenuItem onClick={() => { handleCloseNavMenu(); logout(); }}>
-                    <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: mobileMenuDangerColor }}>LOGOUT</Typography>
-                  </MenuItem>
+                  {mobileMenuContent}
                 </Menu>
               </Box>
             </Box>

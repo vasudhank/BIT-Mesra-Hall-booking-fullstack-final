@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import "./AdminHall.css";
 
 import Grid from '@mui/material/Grid';
@@ -26,21 +26,21 @@ import { createHallApi } from '../../../api/createhallapi';
 import { clearHallApi } from '../../../api/clearhallapi';
 
 const SORT_OPTIONS = [
-  { value: 'NAME_ASC', label: 'Hall Name (A-Z)' },
-  { value: 'NAME_DESC', label: 'Hall Name (Z-A)' },
-  { value: 'CAPACITY_ASC', label: 'Capacity (Low-High)' },
-  { value: 'CAPACITY_DESC', label: 'Capacity (High-Low)' },
-  { value: 'STATUS_BOOKED_FIRST', label: 'Booked First' },
-  { value: 'STATUS_NOT_BOOKED_FIRST', label: 'Not Booked First' }
+  { value: 'NAME_ASC', label: 'Hall Name (A-Z)', displayLabel: 'Hall Name ↑' },
+  { value: 'NAME_DESC', label: 'Hall Name (Z-A)', displayLabel: 'Hall Name ↓' },
+  { value: 'CAPACITY_ASC', label: 'Capacity (Low-High)', displayLabel: 'Capacity ↑' },
+  { value: 'CAPACITY_DESC', label: 'Capacity (High-Low)', displayLabel: 'Capacity ↓' },
+  { value: 'STATUS_BOOKED_FIRST', label: 'Booked First', displayLabel: 'Filled ↑' },
+  { value: 'STATUS_NOT_BOOKED_FIRST', label: 'Not Booked First', displayLabel: 'Free ↑' }
 ];
 
 const SORT_INLINE_LABELS = {
-  NAME_ASC: 'Sort: Name A-Z',
-  NAME_DESC: 'Sort: Name Z-A',
-  CAPACITY_ASC: 'Sort: Cap Low',
-  CAPACITY_DESC: 'Sort: Cap High',
-  STATUS_BOOKED_FIRST: 'Sort: Booked',
-  STATUS_NOT_BOOKED_FIRST: 'Sort: Free'
+  NAME_ASC: 'Hall Name ↑',
+  NAME_DESC: 'Hall Name ↓',
+  CAPACITY_ASC: 'Capacity ↑',
+  CAPACITY_DESC: 'Capacity ↓',
+  STATUS_BOOKED_FIRST: 'Filled ↑',
+  STATUS_NOT_BOOKED_FIRST: 'Free ↑'
 };
 
 const compareHalls = (a, b, mode) => {
@@ -67,6 +67,8 @@ export default function AdminHall() {
   const [showAppbar, setShowAppbar] = useState(true);
   const [showControlStrip, setShowControlStrip] = useState(true);
   const [appbarHeight, setAppbarHeight] = useState(64);
+  const controlsStripRef = useRef(null);
+  const [controlsStripHeight, setControlsStripHeight] = useState(84);
 
   const [modal, setModal] = useState(false);
   const [name, setName] = useState('');
@@ -112,6 +114,27 @@ export default function AdminHall() {
       window.removeEventListener('resize', measureAppbar);
     };
   }, [showAppbar, isMobile]);
+
+  useEffect(() => {
+    if (!showControlStrip) return;
+    const node = controlsStripRef.current;
+    if (!node) return;
+
+    const measure = () => {
+      setControlsStripHeight(node.offsetHeight || 84);
+    };
+    measure();
+
+    const observer =
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    if (observer) observer.observe(node);
+    window.addEventListener('resize', measure);
+
+    return () => {
+      if (observer) observer.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [showControlStrip, isMobile, showAppbar, halls.length, selectedHallIds.length]);
 
   const filteredHalls = useMemo(() => {
     const query = search.trim();
@@ -235,14 +258,36 @@ export default function AdminHall() {
 
   return (
     <div className={`admin-hall-body${!showAppbar ? ' admin-hall-appbar-hidden' : ''}`}>
-      {showAppbar && (
+      {(showAppbar || isMobile) && (
         <Appbar
           showSearch={true}
           searchValue={search}
           onSearchChange={onSearchChange}
           onSearchSubmit={onSearchSubmit}
-          mobileStripToggleVisible={!showControlStrip}
+          mobileTopActions={
+            isMobile
+              ? [
+                  {
+                    key: 'mobile-hide-appbar',
+                    label: showAppbar ? 'Hide Appbar' : 'Show Appbar',
+                    onClick: () => setShowAppbar((v) => !v)
+                  },
+                  {
+                    key: 'mobile-collapse-strip',
+                    label: showControlStrip ? 'Collapse Strip' : 'Show Strip',
+                    onClick: () => setShowControlStrip((v) => !v)
+                  }
+                ]
+              : []
+          }
+          mobileSearchExpandable={isMobile}
+          mobileSortVisible={isMobile}
+          mobileSortValue={sortMode}
+          onMobileSortChange={(value) => setSortMode(value)}
+          mobileSortOptions={SORT_OPTIONS}
+          mobileStripToggleVisible={false}
           onMobileStripToggle={() => setShowControlStrip(true)}
+          collapsedMobile={!showAppbar && isMobile}
         />
       )}
 
@@ -297,6 +342,7 @@ export default function AdminHall() {
 
         {showControlStrip ? (
           <Box
+            ref={controlsStripRef}
             className='admin-hall-controls-strip'
             style={{
               ...(isMobile ? { top: `${showAppbar ? appbarHeight : 0}px` } : {}),
@@ -346,6 +392,16 @@ export default function AdminHall() {
                 </span>
               </label>
 
+              {isMobile && (
+                <Button
+                  size='small'
+                  className='admin-hall-bulk-btn bulk-create'
+                  onClick={handleOpen}
+                >
+                  Create Hall
+                </Button>
+              )}
+
               <Button
                 size='small'
                 className='admin-hall-bulk-btn bulk-delete'
@@ -355,65 +411,80 @@ export default function AdminHall() {
                 Delete Selected
               </Button>
 
-              <FormControl size='small' className='admin-hall-sort-control'>
-                <Select
-                  value={sortMode}
-                  onChange={(e) => setSortMode(e.target.value)}
-                  renderValue={(selected) => SORT_INLINE_LABELS[selected] || 'Sort: Name A-Z'}
-                >
-                  {SORT_OPTIONS.map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
-                      {option.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              {!isMobile && (
+                <FormControl size='small' className='admin-hall-sort-control'>
+                  <Select
+                    value={sortMode}
+                    onChange={(e) => setSortMode(e.target.value)}
+                    renderValue={(selected) => SORT_INLINE_LABELS[selected] || 'Hall Name ↑'}
+                  >
+                    {SORT_OPTIONS.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
             </Box>
 
+            {!isMobile && (
             <Box className='admin-hall-controls-right'>
-              <Button
-                size='small'
-                className='admin-hall-viewport-btn'
-                onClick={() => setShowAppbar((v) => !v)}
-              >
-                {showAppbar ? 'Hide Appbar' : 'Show Appbar'}
-              </Button>
+              {(!isMobile || !showAppbar) && (
+                <Button
+                  size='small'
+                  className='admin-hall-viewport-btn'
+                  onClick={() => setShowAppbar((v) => !v)}
+                >
+                  {showAppbar ? 'Hide Appbar' : 'Show Appbar'}
+                </Button>
+              )}
 
-              <Button
-                size='small'
-                className='admin-hall-viewport-btn admin-hall-collapse-btn'
-                onClick={() => setShowControlStrip(false)}
-              >
-                Collapse Strip
-              </Button>
+              {!isMobile && (
+                <Button
+                  size='small'
+                  className='admin-hall-viewport-btn admin-hall-collapse-btn'
+                  onClick={() => setShowControlStrip(false)}
+                >
+                  Collapse Strip
+                </Button>
+              )}
 
-              <Button className='btn-admin-hall-create' onClick={handleOpen}>
-                CREATE HALL
-              </Button>
+              {!isMobile && (
+                <Button className='btn-admin-hall-create' onClick={handleOpen}>
+                  CREATE HALL
+                </Button>
+              )}
             </Box>
+            )}
           </Box>
         ) : (
-          (!isMobile || !showAppbar) && (
-          <button
-            className='admin-hall-strip-toggle-btn'
-            style={{ top: showAppbar ? (isMobile ? 88 : 78) : 10 }}
-            onClick={() => setShowControlStrip(true)}
-            aria-label='Show hall controls'
-            title='Show controls'
-          >
-            <span className='admin-hall-strip-toggle-icon' aria-hidden='true'>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="collapse-right">
-                <path d="M11,17a1,1,0,0,1-.71-1.71L13.59,12,10.29,8.71a1,1,0,0,1,1.41-1.41l4,4a1,1,0,0,1,0,1.41l-4,4A1,1,0,0,1,11,17Z"></path>
-                <path d="M15 13H5a1 1 0 0 1 0-2H15a1 1 0 0 1 0 2zM19 20a1 1 0 0 1-1-1V5a1 1 0 0 1 2 0V19A1 1 0 0 1 19 20z"></path>
-              </svg>
-            </span>
-          </button>
+          !isMobile && (
+            <button
+              className='admin-hall-strip-toggle-btn'
+              style={{ top: showAppbar ? 78 : 10 }}
+              onClick={() => setShowControlStrip(true)}
+              aria-label='Show hall controls'
+              title='Show controls'
+            >
+              <span className='admin-hall-strip-toggle-icon' aria-hidden='true'>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" id="collapse-right">
+                  <path d="M11,17a1,1,0,0,1-.71-1.71L13.59,12,10.29,8.71a1,1,0,0,1,1.41-1.41l4,4a1,1,0,0,1,0,1.41l-4,4A1,1,0,0,1,11,17Z"></path>
+                  <path d="M15 13H5a1 1 0 0 1 0-2H15a1 1 0 0 1 0 2zM19 20a1 1 0 0 1-1-1V5a1 1 0 0 1 2 0V19A1 1 0 0 1 19 20z"></path>
+                </svg>
+              </span>
+            </button>
           )
         )}
-        {showControlStrip && <div className='admin-hall-controls-spacer' />}
+        {showControlStrip && (
+          <div
+            className='admin-hall-controls-spacer'
+            style={{ height: `${Math.max(0, controlsStripHeight - (isMobile ? 10 : 6))}px` }}
+          />
+        )}
       </Box>
 
-      <Container maxWidth={false} sx={{ mt: isMobile ? 0.75 : 2, padding: isMobile ? '0 !important' : '' }}>
+      <Container maxWidth={false} sx={{ mt: isMobile ? 0 : 2, padding: isMobile ? '0 !important' : '' }}>
         <Grid container spacing={isMobile ? 3 : 6} justifyContent="center">
           {filteredHalls.map((hall) => (
             <Grid key={hall._id} item xs={12} sm={7} md={5} lg={4} xl={4}>

@@ -18,7 +18,7 @@ import QuickPageMenu from '../Navigation/QuickPageMenu';
 
 dayjs.extend(isoWeek);
 
-const MOBILE_SORT_OPTIONS = [
+const SCHEDULE_SORT_OPTIONS = [
   { value: 'NONE', label: 'Sort' },
   { value: 'NAME_ASC', label: 'Name (A-Z)' },
   { value: 'NAME_DESC', label: 'Name (Z-A)' },
@@ -231,8 +231,9 @@ export default function Schedule() {
   const [viewMode, setViewMode] = useState(location.state?.mode || 'today'); 
   const [searchTerm, setSearchTerm] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [mobileSortMode, setMobileSortMode] = useState('NONE');
+  const [scheduleSortMode, setScheduleSortMode] = useState('NONE');
   const [mobileSearchExpanded, setMobileSearchExpanded] = useState(false);
+  const [desktopSearchExpanded, setDesktopSearchExpanded] = useState(false);
   const [mobileTopStripCollapsed, setMobileTopStripCollapsed] = useState(false);
   const [listNoticeListExpanded, setListNoticeListExpanded] = useState(false);
   const [todayNoticeListExpanded, setTodayNoticeListExpanded] = useState(false);
@@ -245,6 +246,7 @@ export default function Schedule() {
   
   const topStripRef = useRef(null);
   const mobileSearchAreaRef = useRef(null);
+  const desktopSearchAreaRef = useRef(null);
   const mobileDateInputRef = useRef(null);
   const [topStripHeight, setTopStripHeight] = useState(0);
   const [dateTime, setDateTime] = useState("");
@@ -308,7 +310,7 @@ export default function Schedule() {
       }
     });
     return () => window.cancelAnimationFrame(raf);
-  }, [isMobile, mobileTopStripCollapsed, mobileSearchExpanded]);
+  }, [isMobile, mobileTopStripCollapsed, mobileSearchExpanded, desktopSearchExpanded]);
 
   const weekDates = useMemo(() => {
     const dt = dayjs(selectedDate);
@@ -510,9 +512,9 @@ export default function Schedule() {
           (hall) => [hall?.capacity, hall?.status],
           { threshold: 0.48, nameThreshold: 0.4 }
         );
-    if (!isMobile || mobileSortMode === 'NONE') return searched;
-    return [...searched].sort((a, b) => compareScheduleHalls(a, b, mobileSortMode));
-  }, [halls, searchQuery, isMobile, mobileSortMode]);
+    if (scheduleSortMode === 'NONE') return searched;
+    return [...searched].sort((a, b) => compareScheduleHalls(a, b, scheduleSortMode));
+  }, [halls, searchQuery, scheduleSortMode]);
 
   // Process data for Grid/List views
   const gridData = useMemo(() => {
@@ -608,6 +610,8 @@ export default function Schedule() {
     if (!isMobile) {
       setMobileSearchExpanded(false);
       setMobileTopStripCollapsed(false);
+    } else {
+      setDesktopSearchExpanded(false);
     }
   }, [isMobile]);
 
@@ -629,6 +633,25 @@ export default function Schedule() {
       document.removeEventListener('touchstart', handleOutsideSearch);
     };
   }, [isMobile, mobileSearchExpanded]);
+
+  useEffect(() => {
+    if (isMobile || !desktopSearchExpanded) return undefined;
+
+    const handleOutsideDesktopSearch = (event) => {
+      if (!desktopSearchAreaRef.current) return;
+      if (!desktopSearchAreaRef.current.contains(event.target)) {
+        setDesktopSearchExpanded(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideDesktopSearch);
+    document.addEventListener('touchstart', handleOutsideDesktopSearch, { passive: true });
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideDesktopSearch);
+      document.removeEventListener('touchstart', handleOutsideDesktopSearch);
+    };
+  }, [isMobile, desktopSearchExpanded]);
 
   const rowHeaderWidth = isMobile ? '120px' : '220px';
   const dayColWidth = isMobile ? 'minmax(140px, 1fr)' : 'minmax(180px, 1fr)';
@@ -714,40 +737,108 @@ export default function Schedule() {
               {dateTime}
             </Typography>
             {!isMobile && (
-              <TextField
-                placeholder="Type your room name here"
-                value={searchTerm}
-                onChange={onSearchChange}
-                onKeyDown={onSearchKeyDown}
-                size="small"
-                variant="outlined"
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: '24px',
-                    paddingRight: 0,
-                  },
-                  minWidth: { xs: '100%', sm: 260 },
-                  flexGrow: { xs: 1, sm: 0 },
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'var(--border-color)',
-                  },
-                  '& input::placeholder': {
-                    fontSize: '12px',
-                    opacity: 1,
-                    color: 'var(--text-secondary)'
-                  }
-                }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end" sx={{ mr: 0 }}>
-                      <IconButton size="small" onClick={onSearchSubmit} aria-label="submit search">
-                        <SearchIcon sx={{ color: 'var(--text-secondary)' }} />
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                  sx: { paddingRight: '6px' }
-                }}
-              />
+              <Box ref={desktopSearchAreaRef} sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+                {desktopSearchExpanded ? (
+                  <TextField
+                    placeholder="Type your room name here"
+                    value={searchTerm}
+                    onChange={onSearchChange}
+                    onKeyDown={onSearchKeyDown}
+                    size="small"
+                    variant="outlined"
+                    autoFocus
+                    sx={{
+                      minWidth: 'var(--schedule-desktop-search-expanded-width)',
+                      maxWidth: 'var(--schedule-desktop-search-expanded-width)',
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '24px',
+                        height: 38
+                      },
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'var(--border-color)'
+                      },
+                      '& input::placeholder': {
+                        fontSize: '12px',
+                        opacity: 1,
+                        color: 'var(--text-secondary)'
+                      }
+                    }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start" sx={{ ml: 0.25, mr: 0.5 }}>
+                          <IconButton size="small" onClick={onSearchSubmit} aria-label="submit search">
+                            <SearchIcon sx={{ color: 'var(--text-secondary)' }} />
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                      sx: { pl: '2px' }
+                    }}
+                  />
+                ) : (
+                  <>
+                    <IconButton
+                      size="small"
+                      onClick={() => setDesktopSearchExpanded(true)}
+                      aria-label="open hall search"
+                      sx={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: '10px',
+                        border: '1px solid var(--border-color)',
+                        color: 'var(--text-primary)',
+                        backgroundColor: 'var(--bg-paper)'
+                      }}
+                    >
+                      <SearchIcon sx={{ color: 'var(--text-secondary)' }} />
+                    </IconButton>
+
+                    <TextField
+                      select
+                      size="small"
+                      value={scheduleSortMode}
+                      onChange={(e) => setScheduleSortMode(e.target.value)}
+                      SelectProps={{
+                        MenuProps: {
+                          anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
+                          transformOrigin: { vertical: 'top', horizontal: 'left' },
+                          sx: { zIndex: 2200 },
+                          PaperProps: {
+                            sx: {
+                              mt: 0.2,
+                              borderRadius: '10px',
+                              zIndex: 2200
+                            }
+                          }
+                        }
+                      }}
+                      sx={{
+                        minWidth: 'var(--schedule-desktop-sort-width)',
+                        maxWidth: 'var(--schedule-desktop-sort-width)',
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '12px',
+                          height: 36
+                        },
+                        '& .MuiSelect-select': {
+                          fontSize: '0.76rem',
+                          py: 0.6,
+                          pl: 'var(--schedule-desktop-sort-pad-left)',
+                          pr: 'var(--schedule-desktop-sort-pad-right) !important'
+                        },
+                        '& .MuiSelect-icon': {
+                          color: 'var(--schedule-desktop-select-icon-color) !important',
+                          right: 'var(--schedule-desktop-select-icon-right)'
+                        }
+                      }}
+                    >
+                      {SCHEDULE_SORT_OPTIONS.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </>
+                )}
+              </Box>
             )}
 
             {isMobile && (
@@ -813,8 +904,8 @@ export default function Schedule() {
                     <TextField
                       select
                       size="small"
-                      value={mobileSortMode}
-                      onChange={(e) => setMobileSortMode(e.target.value)}
+                      value={scheduleSortMode}
+                      onChange={(e) => setScheduleSortMode(e.target.value)}
                       SelectProps={{
                         MenuProps: {
                           anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
@@ -848,7 +939,7 @@ export default function Schedule() {
                         }
                       }}
                     >
-                      {MOBILE_SORT_OPTIONS.map((option) => (
+                      {SCHEDULE_SORT_OPTIONS.map((option) => (
                         <MenuItem key={option.value} value={option.value}>
                           {option.label}
                         </MenuItem>
@@ -900,7 +991,23 @@ export default function Schedule() {
                 onChange={(e) => setSelectedDate(e.target.value)}
                 InputLabelProps={{ shrink: true }}
                 size="small"
-                sx={{ flexGrow: { xs: 1, sm: 0 } }}
+                sx={{
+                  minWidth: 'var(--schedule-desktop-date-width)',
+                  maxWidth: 'var(--schedule-desktop-date-width)',
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '12px',
+                    height: 36
+                  },
+                  '& input': {
+                    fontSize: '0.84rem',
+                    py: 0.55,
+                    pl: 'var(--schedule-desktop-date-pad-left)',
+                    pr: 'var(--schedule-desktop-date-pad-right)'
+                  },
+                  '& input::-webkit-calendar-picker-indicator': {
+                    filter: 'var(--schedule-desktop-date-icon-filter)'
+                  }
+                }}
               />
             )}
 
@@ -947,7 +1054,7 @@ export default function Schedule() {
               panelClassName="schedule-menu-panel"
               itemClassName="schedule-menu-item"
               align="right"
-              extraItems={mobileScheduleMenuItems}
+              topItems={mobileScheduleMenuItems}
             />
             <IconButton
               size="small"
@@ -969,7 +1076,6 @@ export default function Schedule() {
           className="schedule-strip-restore-btn"
           onClick={expandTopStrip}
           aria-label="Expand schedule strip"
-          style={{ top: `${Math.max(8, weekHeaderStickyTop - 14)}px` }}
         >
           <KeyboardArrowDownRoundedIcon fontSize="small" />
         </button>

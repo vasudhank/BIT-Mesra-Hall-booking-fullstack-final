@@ -40,6 +40,7 @@ export default function AdminDepartment() {
   const [deletingIds, setDeletingIds] = useState([]);
   const [selectedDepartmentIds, setSelectedDepartmentIds] = useState([]);
   const [showControlStrip, setShowControlStrip] = useState(true);
+  const [showAppbar, setShowAppbar] = useState(true);
   
   // Search State
   const [search, setSearch] = useState("");
@@ -282,18 +283,37 @@ export default function AdminDepartment() {
         </Box>
       </Modal>
 
-      <div className='admin-department-body'>
+      <div className={`admin-department-body${!showAppbar ? ' admin-department-appbar-hidden' : ''}`}>
         
         {/* 1. Appbar */}
-        <Appbar
-          showSearch={true}
-          searchValue={search}
-          onSearchChange={onSearchChange}
-          onSearchSubmit={onSearchSubmit}
-          searchPlaceholder="Search departments..."
-          mobileStripToggleVisible={!showControlStrip}
-          onMobileStripToggle={() => setShowControlStrip(true)}
-        />
+        {(showAppbar || isMobile) && (
+          <Appbar
+            showSearch={true}
+            searchValue={search}
+            onSearchChange={onSearchChange}
+            onSearchSubmit={onSearchSubmit}
+            searchPlaceholder="Search departments..."
+            mobileTopActions={
+              isMobile
+                ? [
+                    {
+                      key: 'mobile-hide-appbar',
+                      label: showAppbar ? 'Hide Appbar' : 'Show Appbar',
+                      onClick: () => setShowAppbar((v) => !v)
+                    },
+                    {
+                      key: 'mobile-collapse-strip',
+                      label: showControlStrip ? 'Collapse Strip' : 'Show Strip',
+                      onClick: () => setShowControlStrip((v) => !v)
+                    }
+                  ]
+                : []
+            }
+            mobileStripToggleVisible={false}
+            onMobileStripToggle={() => setShowControlStrip(true)}
+            collapsedMobile={!showAppbar && isMobile}
+          />
+        )}
 
         <Container maxWidth="xl" sx={{ mt: 0 }}>
           
@@ -329,13 +349,15 @@ export default function AdminDepartment() {
               </Box>
 
               <Box className="admin-department-strip-right">
-                <Button
-                  size="small"
-                  className="btn-admin-department-strip-collapse"
-                  onClick={() => setShowControlStrip(false)}
-                >
-                  Collapse Strip
-                </Button>
+                {!isMobile && (
+                  <Button
+                    size="small"
+                    className="btn-admin-department-strip-collapse"
+                    onClick={() => setShowControlStrip(false)}
+                  >
+                    Collapse Strip
+                  </Button>
+                )}
 
                 <Button size="medium" className='btn-admin-department' onClick={createDepartment}>
                   CREATE FACULTY

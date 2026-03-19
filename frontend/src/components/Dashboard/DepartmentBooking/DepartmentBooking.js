@@ -11,12 +11,12 @@ import api from '../../../api/axiosInstance';
 import { fuzzyFilterHallLike } from '../../../utils/fuzzySearch';
 
 const SORT_OPTIONS = [
-  { value: 'NAME_ASC', label: 'Hall Name (A-Z)' },
-  { value: 'NAME_DESC', label: 'Hall Name (Z-A)' },
-  { value: 'CAPACITY_ASC', label: 'Capacity (Low-High)' },
-  { value: 'CAPACITY_DESC', label: 'Capacity (High-Low)' },
-  { value: 'STATUS_BOOKED_FIRST', label: 'Booked First' },
-  { value: 'STATUS_NOT_BOOKED_FIRST', label: 'Not Booked First' }
+  { value: 'NAME_ASC', label: 'Hall Name (A-Z)', displayLabel: 'Hall Name ↑' },
+  { value: 'NAME_DESC', label: 'Hall Name (Z-A)', displayLabel: 'Hall Name ↓' },
+  { value: 'CAPACITY_ASC', label: 'Capacity (Low-High)', displayLabel: 'Capacity ↑' },
+  { value: 'CAPACITY_DESC', label: 'Capacity (High-Low)', displayLabel: 'Capacity ↓' },
+  { value: 'STATUS_BOOKED_FIRST', label: 'Booked First', displayLabel: 'Filled ↑' },
+  { value: 'STATUS_NOT_BOOKED_FIRST', label: 'Not Booked First', displayLabel: 'Free ↑' }
 ];
 
 const compareHalls = (a, b, mode) => {

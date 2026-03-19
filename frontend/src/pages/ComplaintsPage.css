@@ -94,10 +94,38 @@
   outline: none;
   box-shadow: none;
   cursor: pointer;
+  font-size: 0 !important;
+  position: relative;
 }
 
 .support-sort-box select::-ms-expand {
   display: none;
+}
+
+.support-sort-box select option {
+  font-size: 0.95rem;
+}
+
+.support-sort-select-shell {
+  position: relative;
+  width: 100%;
+}
+
+.support-sort-select-shell::before {
+  content: attr(data-selected-label);
+  position: absolute;
+  left: 16px;
+  right: calc(var(--support-sort-arrow-offset, 18px) + 22px);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--support-text);
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
 }
 
 .support-raise-card {
@@ -485,6 +513,29 @@
   top: 10px;
   transform: translateX(-50%);
   z-index: 1000;
+}
+
+.support-strip-toggle--restore-corner {
+  --support-collapsed-arrow-offset-x: -2px;
+  --support-collapsed-arrow-offset-y: -2px;
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 20px;
+  height: 20px;
+  border-left: none;
+  border-top: none;
+  border-radius: 0 0 999px 0;
+  z-index: 1005;
+  transform: none !important;
+}
+
+.support-strip-toggle--restore-corner svg {
+  transform: translate(var(--support-collapsed-arrow-offset-x), var(--support-collapsed-arrow-offset-y));
+}
+
+.support-strip-toggle--restore-corner:hover {
+  transform: none !important;
 }
 
 .support-top-center {

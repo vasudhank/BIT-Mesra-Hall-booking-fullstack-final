@@ -635,6 +635,9 @@ export default function NoticesPage({ mode = 'public' }) {
                       itemClassName="notices-hero-menu-item"
                       hideThemeToggle
                       align="right"
+                      topItems={[
+                        { key: 'mobile-collapse-strip', label: 'Collapse Strip', onClick: () => setIsMobileHeaderCollapsed(true) }
+                      ]}
                       extraItems={mobileHeaderExtraMenuItems}
                     />
                   )}
@@ -738,25 +741,13 @@ export default function NoticesPage({ mode = 'public' }) {
                   </>
                 )}
 
-                {showMobileNoticesControls && (
-                  <button
-                    type="button"
-                    className="notices-strip-toggle notices-strip-toggle--bottom"
-                    onClick={() => setIsMobileHeaderCollapsed(true)}
-                    aria-label="Collapse notices header"
-                  >
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="18 15 12 9 6 15"></polyline>
-                    </svg>
-                  </button>
-                )}
               </>
             )}
 
             {showMobileNoticesControls && isMobileHeaderCollapsed && (
               <button
                 type="button"
-                className="notices-strip-toggle notices-strip-toggle--floating"
+                className="notices-strip-toggle notices-strip-toggle--restore-corner"
                 onClick={() => setIsMobileHeaderCollapsed(false)}
                 aria-label="Expand notices header"
               >

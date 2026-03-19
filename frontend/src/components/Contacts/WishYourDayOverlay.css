@@ -12,6 +12,7 @@
 }
 
 .quick-contacts-card {
+  --quick-contacts-search-placeholder-size: 0.92rem;
   width: 90%;
   max-width: 900px;
   max-height: calc(100vh - 30px);
@@ -78,6 +79,7 @@
 .quick-contacts-search-row input::placeholder {
   color: #000000;
   opacity: 0.78;
+  font-size: var(--quick-contacts-search-placeholder-size);
 }
 
 .quick-contacts-search-btn {
@@ -213,6 +215,20 @@
   gap: 10px;
 }
 
+.quick-contacts-footer-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  flex: 0 0 20px;
+}
+
+@media (min-width: 641px) {
+  .quick-contacts-footer-select {
+    display: none;
+  }
+}
+
 .quick-contacts-footer p {
   margin: 0;
   position: absolute;
@@ -256,7 +272,8 @@
 }
 
 .quick-contacts-row-check input[type='checkbox'],
-.quick-contacts-head-check input[type='checkbox'] {
+.quick-contacts-head-check input[type='checkbox'],
+.quick-contacts-footer-select input[type='checkbox'] {
   -webkit-appearance: none;
   appearance: none;
   width: 16px;
@@ -272,7 +289,8 @@
 }
 
 .quick-contacts-row-check input[type='checkbox']::before,
-.quick-contacts-head-check input[type='checkbox']::before {
+.quick-contacts-head-check input[type='checkbox']::before,
+.quick-contacts-footer-select input[type='checkbox']::before {
   content: '';
   width: 9px;
   height: 9px;
@@ -283,24 +301,28 @@
 }
 
 .quick-contacts-row-check input[type='checkbox']:checked,
-.quick-contacts-head-check input[type='checkbox']:checked {
+.quick-contacts-head-check input[type='checkbox']:checked,
+.quick-contacts-footer-select input[type='checkbox']:checked {
   background: #2563eb;
   border-color: #2563eb;
 }
 
 .quick-contacts-row-check input[type='checkbox']:checked::before,
-.quick-contacts-head-check input[type='checkbox']:checked::before {
+.quick-contacts-head-check input[type='checkbox']:checked::before,
+.quick-contacts-footer-select input[type='checkbox']:checked::before {
   transform: scale(1);
 }
 
 .quick-contacts-row-check input[type='checkbox']:indeterminate,
-.quick-contacts-head-check input[type='checkbox']:indeterminate {
+.quick-contacts-head-check input[type='checkbox']:indeterminate,
+.quick-contacts-footer-select input[type='checkbox']:indeterminate {
   background: #2563eb;
   border-color: #2563eb;
 }
 
 .quick-contacts-row-check input[type='checkbox']:indeterminate::before,
-.quick-contacts-head-check input[type='checkbox']:indeterminate::before {
+.quick-contacts-head-check input[type='checkbox']:indeterminate::before,
+.quick-contacts-footer-select input[type='checkbox']:indeterminate::before {
   clip-path: none;
   width: 9px;
   height: 2px;
@@ -329,6 +351,7 @@ body.dark-mode .quick-contacts-search-row input {
 
 body.dark-mode .quick-contacts-search-row input::placeholder {
   color: rgba(255, 255, 255, 0.7);
+  font-size: var(--quick-contacts-search-placeholder-size);
 }
 
 body.dark-mode .quick-contacts-search-btn {
@@ -382,15 +405,18 @@ body.dark-mode .quick-contacts-footer .actions button:hover {
 }
 
 body.dark-mode .quick-contacts-row-check input[type='checkbox'],
-body.dark-mode .quick-contacts-head-check input[type='checkbox'] {
+body.dark-mode .quick-contacts-head-check input[type='checkbox'],
+body.dark-mode .quick-contacts-footer-select input[type='checkbox'] {
   border-color: rgba(148, 163, 184, 0.6);
   background: #0f172a;
 }
 
 body.dark-mode .quick-contacts-row-check input[type='checkbox']:checked,
 body.dark-mode .quick-contacts-head-check input[type='checkbox']:checked,
+body.dark-mode .quick-contacts-footer-select input[type='checkbox']:checked,
 body.dark-mode .quick-contacts-row-check input[type='checkbox']:indeterminate,
-body.dark-mode .quick-contacts-head-check input[type='checkbox']:indeterminate {
+body.dark-mode .quick-contacts-head-check input[type='checkbox']:indeterminate,
+body.dark-mode .quick-contacts-footer-select input[type='checkbox']:indeterminate {
   background: #60a5fa;
   border-color: #60a5fa;
 }
@@ -486,6 +512,10 @@ body.dark-mode .quick-contacts-head-check input[type='checkbox']:indeterminate {
     flex-wrap: nowrap;
     justify-content: space-between;
     gap: 10px;
+  }
+
+  .quick-contacts-footer-select {
+    align-self: center;
   }
 
   .quick-contacts-footer p {

@@ -190,6 +190,15 @@
   justify-content: center !important;
 }
 
+.admin-hall-bulk-btn.bulk-create {
+  background: rgba(215, 106, 40, 0.2) !important;
+  border-color: rgba(215, 106, 40, 0.55) !important;
+  min-width: var(--admin-hall-btn-width-primary) !important;
+  min-height: var(--admin-hall-btn-height) !important;
+  font-size: 0.76rem !important;
+  justify-content: center !important;
+}
+
 .admin-hall-sort-control {
   min-width: var(--admin-hall-btn-width-secondary);
   max-width: var(--admin-hall-btn-width-secondary);

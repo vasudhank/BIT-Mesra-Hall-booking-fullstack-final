@@ -20,6 +20,17 @@ const SORT_OPTIONS = [
   { value: 'RATING_ASC', label: 'Rating: Low-High' }
 ];
 
+const SORT_DISPLAY_LABELS = {
+  DATE_DESC: 'Date ↓',
+  DATE_ASC: 'Date ↑',
+  TYPE_ASC: 'Type ↑',
+  TYPE_DESC: 'Type ↓',
+  STATUS_ASC: 'Status ↑',
+  STATUS_DESC: 'Status ↓',
+  RATING_DESC: 'Rating ↓',
+  RATING_ASC: 'Rating ↑'
+};
+
 const STATUS_OPTIONS = ['ALL', 'NEW', 'IN_REVIEW', 'DONE'];
 const TYPE_OPTIONS = ['BUG', 'SUGGESTION', 'PRAISE'];
 
@@ -172,6 +183,21 @@ export default function FeedbackPage({ mode = 'public' }) {
 
   const showMobileCompactControls = !isDeveloperView && isMobile;
   const isStripCollapsedOnMobile = showMobileCompactControls && isHeaderStripCollapsed;
+  const getSortDisplayLabel = (value) => SORT_DISPLAY_LABELS[value] || SORT_OPTIONS.find((opt) => opt.value === value)?.label || '';
+  const renderSortSelect = (className = '', labelText = 'SORT FEEDBACK') => (
+    <div className={`feedback-sort-wrap ${className}`.trim()}>
+      <label>{labelText}</label>
+      <div className="feedback-sort-select-shell" data-selected-label={getSortDisplayLabel(sort)}>
+        <select value={sort} onChange={(e) => setSort(e.target.value)}>
+          {SORT_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
 
   const topStrip = (
     <div className="feedback-top-strip-shell">
@@ -206,22 +232,16 @@ export default function FeedbackPage({ mode = 'public' }) {
                   <h1>FEEDBACK</h1>
                   {showMobileCompactControls && (
                     <div className="feedback-title-mobile-tools">
-                      <div className="feedback-sort-wrap inline feedback-mobile-title-sort">
-                        <label>SORT FEEDBACK</label>
-                        <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                          {SORT_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      {renderSortSelect('inline feedback-mobile-title-sort')}
                       <QuickPageMenu
                         iconOnly
                         buttonClassName="feedback-header-home-btn feedback-header-menu-btn"
                         panelClassName="feedback-menu-panel"
                         itemClassName="feedback-menu-item"
                         align="right"
+                        topItems={[
+                          { key: 'mobile-collapse-strip', label: 'Collapse Strip', onClick: () => setIsHeaderStripCollapsed(true) }
+                        ]}
                         extraItems={[
                           { key: 'mobile-home', label: 'Home', path: '/' },
                           { key: 'mobile-compose-feedback', label: 'Share Feedback', onClick: () => setIsComposeModalOpen(true) }
@@ -257,16 +277,7 @@ export default function FeedbackPage({ mode = 'public' }) {
 
             <div className="feedback-filter-row">
               {!showMobileCompactControls && (
-                <div className="feedback-sort-wrap">
-                  <label>SORT FEEDBACK</label>
-                  <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                    {SORT_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                renderSortSelect()
               )}
 
               <div className="feedback-status-tabs">
@@ -287,25 +298,13 @@ export default function FeedbackPage({ mode = 'public' }) {
               </div>
             </div>
 
-            {showMobileCompactControls && (
-              <button
-                type="button"
-                className="feedback-strip-toggle feedback-strip-toggle--bottom"
-                onClick={() => setIsHeaderStripCollapsed(true)}
-                aria-label="Collapse feedback strip"
-              >
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="18 15 12 9 6 15"></polyline>
-                </svg>
-              </button>
-            )}
           </>
         )}
 
         {showMobileCompactControls && isStripCollapsedOnMobile && (
           <button
             type="button"
-            className="feedback-strip-toggle feedback-strip-toggle--floating"
+            className="feedback-strip-toggle feedback-strip-toggle--restore-corner"
             onClick={() => setIsHeaderStripCollapsed(false)}
             aria-label="Expand feedback strip"
           >

@@ -28,6 +28,19 @@ const SORT_OPTIONS = [
   { value: 'TRUSTED_ASC', label: 'Trusted: Low-High' }
 ];
 
+const SORT_DISPLAY_LABELS = {
+  DATE_DESC: 'Date ↓',
+  DATE_ASC: 'Date ↑',
+  TITLE_ASC: 'Title ↑',
+  TITLE_DESC: 'Title ↓',
+  EMAIL_ASC: 'Email ↑',
+  EMAIL_DESC: 'Email ↓',
+  SOLUTIONS_DESC: 'Solutions ↓',
+  SOLUTIONS_ASC: 'Solutions ↑',
+  TRUSTED_DESC: 'Trusted ↓',
+  TRUSTED_ASC: 'Trusted ↑'
+};
+
 const STATUS_STYLES = {
   IN_PROGRESS: 'support-status-in-progress',
   REOPENED: 'support-status-reopened',
@@ -214,6 +227,21 @@ export default function QueriesPage({ mode = 'public' }) {
 
   const showMobileCompactControls = !hideComposer && isMobile;
   const isStripCollapsedOnMobile = showMobileCompactControls && isHeaderStripCollapsed;
+  const getSortDisplayLabel = (value) => SORT_DISPLAY_LABELS[value] || SORT_OPTIONS.find((opt) => opt.value === value)?.label || '';
+  const renderSortSelect = (className = '', labelText = 'SORT QUERIES') => (
+    <div className={`support-sort-box ${className}`.trim()}>
+      <label>{labelText}</label>
+      <div className="support-sort-select-shell" data-selected-label={getSortDisplayLabel(sort)}>
+        <select value={sort} onChange={(e) => setSort(e.target.value)}>
+          {SORT_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
 
   const topStrip = (
     <div className="support-top-strip-shell">
@@ -246,22 +274,16 @@ export default function QueriesPage({ mode = 'public' }) {
                   <h1>Queries</h1>
                   {showMobileCompactControls && (
                     <div className="support-title-mobile-tools">
-                      <div className="support-sort-box inline support-mobile-title-sort">
-                        <label>SORT QUERIES</label>
-                        <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                          {SORT_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      {renderSortSelect('inline support-mobile-title-sort')}
                       <QuickPageMenu
                         iconOnly
                         buttonClassName="support-header-home-btn support-header-menu-btn"
                         panelClassName="support-menu-panel"
                         itemClassName="support-menu-item"
                         align="right"
+                        topItems={[
+                          { key: 'mobile-collapse-strip', label: 'Collapse Strip', onClick: () => setIsHeaderStripCollapsed(true) }
+                        ]}
                         extraItems={[
                           { key: 'mobile-home', label: 'Home', path: '/' },
                           { key: 'mobile-compose-query', label: 'Ask a Query', onClick: () => setIsComposeModalOpen(true) }
@@ -319,24 +341,12 @@ export default function QueriesPage({ mode = 'public' }) {
                 </div>
               </div>
             </div>
-            {showMobileCompactControls && (
-              <button
-                type="button"
-                className="support-strip-toggle support-strip-toggle--bottom"
-                onClick={() => setIsHeaderStripCollapsed(true)}
-                aria-label="Collapse header strip"
-              >
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="18 15 12 9 6 15"></polyline>
-                </svg>
-              </button>
-            )}
           </>
         )}
         {showMobileCompactControls && isStripCollapsedOnMobile && (
           <button
             type="button"
-            className="support-strip-toggle support-strip-toggle--floating"
+            className="support-strip-toggle support-strip-toggle--restore-corner"
             onClick={() => setIsHeaderStripCollapsed(false)}
             aria-label="Expand header strip"
           >
@@ -357,16 +367,7 @@ export default function QueriesPage({ mode = 'public' }) {
       <div className={`support-layout ${hideComposer ? 'support-layout--no-left' : ''}`}>
         {!hideComposer && !isMobile && (
           <aside className="support-left-panel">
-            <div className="support-sort-box">
-              <label>SORT QUERIES</label>
-              <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                {SORT_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {renderSortSelect()}
 
             {!fullscreenComposer && (
               <form className="support-raise-card" onSubmit={onSubmit} ref={composeCardRef}>
