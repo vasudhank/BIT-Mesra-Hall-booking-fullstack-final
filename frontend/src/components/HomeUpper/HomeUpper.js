@@ -538,7 +538,8 @@ export default function HomeUpper({
         html: built.html,
         title: built.title,
         orientation: built.orientation,
-        marginMm: built.marginMm
+        marginMm: built.marginMm,
+        keepTogetherSelector: 'tbody tr'
       });
       setSnackbarMessage('Contacts PDF downloaded.');
       setSnackbarOpen(true);

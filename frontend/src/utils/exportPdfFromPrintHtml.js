@@ -39,12 +39,72 @@ const waitForImages = async (root) => {
   );
 };
 
+const getSafePageSlices = ({
+  renderRoot,
+  rootHeight,
+  contentPageHeightPx,
+  keepTogetherSelector
+}) => {
+  const normalizedSelector = String(keepTogetherSelector || '').trim();
+  const rootRect = renderRoot.getBoundingClientRect();
+  const keepTogetherItems = normalizedSelector
+    ? Array.from(renderRoot.querySelectorAll(normalizedSelector))
+        .map((node) => {
+          const rect = node.getBoundingClientRect();
+          const top = Math.max(0, Math.round(rect.top - rootRect.top));
+          const bottom = Math.min(rootHeight, Math.round(rect.bottom - rootRect.top));
+          return {
+            top,
+            bottom,
+            height: Math.max(0, bottom - top)
+          };
+        })
+        .filter((item) => item.height > 0)
+        .sort((a, b) => a.top - b.top)
+    : [];
+
+  const pages = [];
+  const minimumPageFill = Math.max(120, Math.round(contentPageHeightPx * 0.52));
+  let cursor = 0;
+
+  while (cursor < rootHeight) {
+    const proposedEnd = Math.min(rootHeight, cursor + contentPageHeightPx);
+    let safeEnd = proposedEnd;
+
+    if (keepTogetherItems.length && proposedEnd < rootHeight) {
+      const overlappingItem = keepTogetherItems.find(
+        (item) => item.top < proposedEnd && item.bottom > proposedEnd
+      );
+
+      if (overlappingItem) {
+        const breakBefore = overlappingItem.top;
+        if (breakBefore - cursor >= minimumPageFill) {
+          safeEnd = breakBefore;
+        }
+      }
+    }
+
+    if (safeEnd <= cursor) {
+      safeEnd = proposedEnd;
+    }
+
+    pages.push({
+      startPx: cursor,
+      endPx: safeEnd
+    });
+    cursor = safeEnd;
+  }
+
+  return pages;
+};
+
 export const exportPdfFromPrintHtml = async ({
   html = '',
   title = 'Document',
   orientation = 'portrait',
   marginMm = 14,
-  scale = 2.1
+  scale = 2.1,
+  keepTogetherSelector = ''
 } = {}) => {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     throw new Error('pdf-export-not-available');
@@ -153,31 +213,34 @@ export const exportPdfFromPrintHtml = async ({
 
     const marginPt = safeMarginMm * MM_TO_PT;
     const contentWidthPt = contentWidthPx * PX_TO_PT;
-    const canvasSliceHeightPx = Math.max(1, Math.round(contentPageHeightPx * (canvas.width / rootWidth)));
+    const canvasScaleRatio = canvas.width / rootWidth;
+    const safePages = getSafePageSlices({
+      renderRoot,
+      rootHeight,
+      contentPageHeightPx,
+      keepTogetherSelector
+    });
 
-    let cursorY = 0;
-    let pageIndex = 0;
-    while (cursorY < canvas.height) {
+    safePages.forEach((page, pageIndex) => {
       if (pageIndex > 0) {
         pdfDoc.addPage('a4', pdfOrientation);
       }
 
-      const sliceHeight = Math.min(canvasSliceHeightPx, canvas.height - cursorY);
+      const sliceStart = Math.max(0, Math.round(page.startPx * canvasScaleRatio));
+      const sliceEnd = Math.min(canvas.height, Math.round(page.endPx * canvasScaleRatio));
+      const sliceHeight = Math.max(1, sliceEnd - sliceStart);
       const sliceCanvas = document.createElement('canvas');
       sliceCanvas.width = canvas.width;
       sliceCanvas.height = sliceHeight;
 
       const sliceCtx = sliceCanvas.getContext('2d');
       if (!sliceCtx) throw new Error('pdf-export-context-missing');
-      sliceCtx.drawImage(canvas, 0, cursorY, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+      sliceCtx.drawImage(canvas, 0, sliceStart, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
 
       const imageData = sliceCanvas.toDataURL('image/png');
       const renderedSliceHeightPt = (sliceHeight / (canvas.width / rootWidth)) * PX_TO_PT;
       pdfDoc.addImage(imageData, 'PNG', marginPt, marginPt, contentWidthPt, renderedSliceHeightPt, undefined, 'FAST');
-
-      cursorY += sliceHeight;
-      pageIndex += 1;
-    }
+    });
 
     const safeName = sanitizeFilename(title, 'Document');
     pdfDoc.save(`${safeName}.pdf`);

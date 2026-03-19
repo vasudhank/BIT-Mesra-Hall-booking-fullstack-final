@@ -244,7 +244,8 @@ export default function WishYourDayOverlay() {
         html: built.html,
         title: built.title,
         orientation: built.orientation,
-        marginMm: built.marginMm
+        marginMm: built.marginMm,
+        keepTogetherSelector: 'tbody tr'
       });
     } finally {
       setMobilePrintPdfBusy(false);
