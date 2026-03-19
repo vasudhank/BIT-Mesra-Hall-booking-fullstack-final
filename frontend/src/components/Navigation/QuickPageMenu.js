@@ -48,9 +48,13 @@ const normalizePath = (pathname) => {
 
 const detectContext = (pathname) => {
   const p = normalizePath(pathname);
-  if (p.startsWith('/admin/') || p === '/admin_login') return 'admin';
-  if (p.startsWith('/department/') || p === '/department_login' || p === '/department_register') return 'department';
-  if (p.startsWith('/developer/') || p === '/developer/login') return 'developer';
+  const isAdminAuthSurface = p === '/admin_login' || p.startsWith('/admin/forgot');
+  const isDepartmentAuthSurface = p === '/department_login' || p === '/department_register' || p.startsWith('/department/forgot');
+  const isDeveloperAuthSurface = p === '/developer/login';
+
+  if (p.startsWith('/admin/') && !isAdminAuthSurface) return 'admin';
+  if (p.startsWith('/department/') && !isDepartmentAuthSurface) return 'department';
+  if (p.startsWith('/developer/') && !isDeveloperAuthSurface) return 'developer';
   return 'public';
 };
 

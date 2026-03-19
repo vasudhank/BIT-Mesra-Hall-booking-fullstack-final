@@ -311,7 +311,9 @@ export default function AdminHall() {
                   onChange={toggleSelectAllFilled}
                   sx={{ color: 'white', '&.Mui-checked': { color: '#00d4ff' } }}
                 />
-                Select All Filled ({allFilledHallIds.length})
+                <span className='admin-hall-select-inline-text'>
+                  Select All Filled ({allFilledHallIds.length})
+                </span>
               </label>
 
               <Button
@@ -339,7 +341,9 @@ export default function AdminHall() {
                   onChange={toggleSelectAllHalls}
                   sx={{ color: 'white', '&.Mui-checked': { color: '#00d4ff' } }}
                 />
-                Select All Halls ({allHallIds.length})
+                <span className='admin-hall-select-inline-text'>
+                  Select All Halls ({allHallIds.length})
+                </span>
               </label>
 
               <Button

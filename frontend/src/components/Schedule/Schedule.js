@@ -7,7 +7,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
 import KeyboardArrowUpRoundedIcon from '@mui/icons-material/KeyboardArrowUpRounded';
 import {
-  Container, Grid, Paper, Typography, TextField, Box, Chip, Button, Stack, IconButton, InputAdornment, useTheme, useMediaQuery, Modal
+  Container, Grid, Paper, Typography, TextField, Box, Chip, Button, Stack, IconButton, InputAdornment, useTheme, useMediaQuery, Modal, MenuItem
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import dayjs from 'dayjs';
@@ -17,6 +17,40 @@ import { fuzzyFilterHallLike } from '../../utils/fuzzySearch';
 import QuickPageMenu from '../Navigation/QuickPageMenu';
 
 dayjs.extend(isoWeek);
+
+const MOBILE_SORT_OPTIONS = [
+  { value: 'NONE', label: 'Sort' },
+  { value: 'NAME_ASC', label: 'Name (A-Z)' },
+  { value: 'NAME_DESC', label: 'Name (Z-A)' },
+  { value: 'CAPACITY_ASC', label: 'Capacity (Low-High)' },
+  { value: 'CAPACITY_DESC', label: 'Capacity (High-Low)' },
+  { value: 'STATUS_FILLED_FIRST', label: 'Filled First' },
+  { value: 'STATUS_UNFILLED_FIRST', label: 'Unfilled First' }
+];
+
+const getHallFilledScore = (hall) => {
+  const status = String(hall?.status || '').trim().toLowerCase();
+  if (status.includes('filled') && !status.includes('not')) return 1;
+  if (status.includes('booked')) return 1;
+  return 0;
+};
+
+const compareScheduleHalls = (a, b, mode) => {
+  const nameA = String(a?.name || '');
+  const nameB = String(b?.name || '');
+  const capA = Number(a?.capacity || 0);
+  const capB = Number(b?.capacity || 0);
+  const filledA = getHallFilledScore(a);
+  const filledB = getHallFilledScore(b);
+
+  if (mode === 'NAME_ASC') return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+  if (mode === 'NAME_DESC') return nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: 'base' });
+  if (mode === 'CAPACITY_ASC') return capA - capB || nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+  if (mode === 'CAPACITY_DESC') return capB - capA || nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+  if (mode === 'STATUS_FILLED_FIRST') return filledB - filledA || nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+  if (mode === 'STATUS_UNFILLED_FIRST') return filledA - filledB || nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+  return 0;
+};
 
 function formatTime(dt) {
   if (!dt) return '';
@@ -197,6 +231,9 @@ export default function Schedule() {
   const [viewMode, setViewMode] = useState(location.state?.mode || 'today'); 
   const [searchTerm, setSearchTerm] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [mobileSortMode, setMobileSortMode] = useState('NONE');
+  const [mobileSearchExpanded, setMobileSearchExpanded] = useState(false);
+  const [mobileTopStripCollapsed, setMobileTopStripCollapsed] = useState(false);
   const [listNoticeListExpanded, setListNoticeListExpanded] = useState(false);
   const [todayNoticeListExpanded, setTodayNoticeListExpanded] = useState(false);
   const [closureHallDropdownByKey, setClosureHallDropdownByKey] = useState({});
@@ -207,10 +244,41 @@ export default function Schedule() {
   const todayAlertContentRef = useRef(null);
   
   const topStripRef = useRef(null);
+  const mobileSearchAreaRef = useRef(null);
+  const mobileDateInputRef = useRef(null);
   const [topStripHeight, setTopStripHeight] = useState(0);
   const [dateTime, setDateTime] = useState("");
   const topOffsetPx = 20;
   const navbarHeightPx = 0;
+
+  const collapseTopStrip = () => {
+    setMobileTopStripCollapsed(true);
+    setMobileSearchExpanded(false);
+  };
+
+  const expandTopStrip = () => {
+    setMobileTopStripCollapsed(false);
+  };
+
+  const mobileScheduleMenuItems = useMemo(
+    () =>
+      isMobile
+        ? [
+            {
+              key: 'collapse-strip',
+              label: mobileTopStripCollapsed ? 'Expand Strip' : 'Collapse Strip',
+              onClick: () => {
+                if (mobileTopStripCollapsed) {
+                  expandTopStrip();
+                } else {
+                  collapseTopStrip();
+                }
+              }
+            }
+          ]
+        : [],
+    [isMobile, mobileTopStripCollapsed]
+  );
 
   useLayoutEffect(() => {
     const measure = () => {
@@ -226,6 +294,21 @@ export default function Schedule() {
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
   }, []);
+
+  useLayoutEffect(() => {
+    if (isMobile && mobileTopStripCollapsed) {
+      setTopStripHeight(0);
+      return;
+    }
+    const raf = window.requestAnimationFrame(() => {
+      const el = topStripRef.current;
+      if (el) {
+        const r = el.getBoundingClientRect();
+        setTopStripHeight(Math.ceil(r.height));
+      }
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [isMobile, mobileTopStripCollapsed, mobileSearchExpanded]);
 
   const weekDates = useMemo(() => {
     const dt = dayjs(selectedDate);
@@ -418,15 +501,18 @@ export default function Schedule() {
 
   const filteredScheduleHalls = useMemo(() => {
     const source = Array.isArray(halls) ? halls : [];
-    if (!searchQuery) return source;
-    return fuzzyFilterHallLike(
-      source,
-      searchQuery,
-      (hall) => hall?.name,
-      (hall) => [hall?.capacity, hall?.status],
-      { threshold: 0.48, nameThreshold: 0.4 }
-    );
-  }, [halls, searchQuery]);
+    const searched = !searchQuery
+      ? [...source]
+      : fuzzyFilterHallLike(
+          source,
+          searchQuery,
+          (hall) => hall?.name,
+          (hall) => [hall?.capacity, hall?.status],
+          { threshold: 0.48, nameThreshold: 0.4 }
+        );
+    if (!isMobile || mobileSortMode === 'NONE') return searched;
+    return [...searched].sort((a, b) => compareScheduleHalls(a, b, mobileSortMode));
+  }, [halls, searchQuery, isMobile, mobileSortMode]);
 
   // Process data for Grid/List views
   const gridData = useMemo(() => {
@@ -518,6 +604,32 @@ export default function Schedule() {
     setClosureHallDropdownByKey({});
   }, [selectedDate, viewMode]);
 
+  useEffect(() => {
+    if (!isMobile) {
+      setMobileSearchExpanded(false);
+      setMobileTopStripCollapsed(false);
+    }
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!isMobile || !mobileSearchExpanded) return undefined;
+
+    const handleOutsideSearch = (event) => {
+      if (!mobileSearchAreaRef.current) return;
+      if (!mobileSearchAreaRef.current.contains(event.target)) {
+        setMobileSearchExpanded(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideSearch);
+    document.addEventListener('touchstart', handleOutsideSearch, { passive: true });
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideSearch);
+      document.removeEventListener('touchstart', handleOutsideSearch);
+    };
+  }, [isMobile, mobileSearchExpanded]);
+
   const rowHeaderWidth = isMobile ? '120px' : '220px';
   const dayColWidth = isMobile ? 'minmax(140px, 1fr)' : 'minmax(180px, 1fr)';
 
@@ -568,20 +680,21 @@ export default function Schedule() {
       />
 
       {/* TOP CONTROL STRIP */}
-      <Box
-        ref={topStripRef}
-        sx={{
-          position: 'sticky',
-          top: `${topStripStickyTop}px`,
-          zIndex: 1600,
-          backgroundColor: 'var(--bg-paper)',
-          color: 'var(--text-primary)',
-          borderBottom: '1px solid var(--border-color)',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
-          px: { xs: 2, md: 3 },
-          py: 1
-        }}
-      >
+      {!(isMobile && mobileTopStripCollapsed) && (
+        <Box
+          ref={topStripRef}
+          sx={{
+            position: 'sticky',
+            top: `${topStripStickyTop}px`,
+            zIndex: 1600,
+            backgroundColor: 'var(--bg-paper)',
+            color: 'var(--text-primary)',
+            borderBottom: '1px solid var(--border-color)',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+            px: { xs: 2, md: 3 },
+            py: 1
+          }}
+        >
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
           <Typography variant="h4" sx={{ fontWeight: 600, fontFamily: 'RecklessNeue', fontSize: { xs: '1.5rem', md: '2.125rem' } }}>
             Hall Schedule
@@ -600,50 +713,196 @@ export default function Schedule() {
             >
               {dateTime}
             </Typography>
-            <TextField
-              placeholder="Type your room name here"
-              value={searchTerm}
-              onChange={onSearchChange}
-              onKeyDown={onSearchKeyDown}
-              size="small"
-              variant="outlined"
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '24px',
-                  paddingRight: 0,
-                },
-                minWidth: { xs: '100%', sm: 260 },
-                flexGrow: { xs: 1, sm: 0 },
-                '& .MuiOutlinedInput-notchedOutline': {
-                  borderColor: 'var(--border-color)',
-                },
-                '& input::placeholder': {
-                  fontSize: '12px',
-                  opacity: 1,
-                  color: 'var(--text-secondary)'
-                }
-              }}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end" sx={{ mr: 0 }}>
-                    <IconButton size="small" onClick={onSearchSubmit} aria-label="submit search">
-                      <SearchIcon sx={{ color: 'var(--text-secondary)' }} />
-                    </IconButton>
-                  </InputAdornment>
-                ),
-                sx: { paddingRight: '6px' }
-              }}
-            />
+            {!isMobile && (
+              <TextField
+                placeholder="Type your room name here"
+                value={searchTerm}
+                onChange={onSearchChange}
+                onKeyDown={onSearchKeyDown}
+                size="small"
+                variant="outlined"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '24px',
+                    paddingRight: 0,
+                  },
+                  minWidth: { xs: '100%', sm: 260 },
+                  flexGrow: { xs: 1, sm: 0 },
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'var(--border-color)',
+                  },
+                  '& input::placeholder': {
+                    fontSize: '12px',
+                    opacity: 1,
+                    color: 'var(--text-secondary)'
+                  }
+                }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end" sx={{ mr: 0 }}>
+                      <IconButton size="small" onClick={onSearchSubmit} aria-label="submit search">
+                        <SearchIcon sx={{ color: 'var(--text-secondary)' }} />
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                  sx: { paddingRight: '6px' }
+                }}
+              />
+            )}
 
-            <TextField
-              label="Select date"
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              size="small"
-              sx={{ flexGrow: { xs: 1, sm: 0 } }}
-            />
+            {isMobile && (
+              <Box
+                ref={mobileSearchAreaRef}
+                sx={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--schedule-mobile-control-row-gap)',
+                  flexWrap: 'nowrap'
+                }}
+              >
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    if (!mobileSearchExpanded) {
+                      setMobileSearchExpanded(true);
+                      return;
+                    }
+                    onSearchSubmit();
+                  }}
+                  aria-label="open hall search"
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '10px',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    backgroundColor: 'var(--bg-paper)'
+                  }}
+                >
+                  <SearchIcon sx={{ color: 'var(--text-secondary)' }} />
+                </IconButton>
+
+                {mobileSearchExpanded ? (
+                  <TextField
+                    placeholder="Type your room name here"
+                    value={searchTerm}
+                    onChange={onSearchChange}
+                    onKeyDown={onSearchKeyDown}
+                    size="small"
+                    variant="outlined"
+                    autoFocus
+                    sx={{
+                      flexGrow: 1,
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '20px',
+                        height: 36
+                      },
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'var(--border-color)',
+                      },
+                      '& input::placeholder': {
+                        fontSize: '12px',
+                        opacity: 1,
+                        color: 'var(--text-secondary)'
+                      }
+                    }}
+                  />
+                ) : (
+                  <>
+                    <TextField
+                      select
+                      size="small"
+                      value={mobileSortMode}
+                      onChange={(e) => setMobileSortMode(e.target.value)}
+                      SelectProps={{
+                        MenuProps: {
+                          anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
+                          transformOrigin: { vertical: 'top', horizontal: 'left' },
+                          sx: { zIndex: 2200 },
+                          PaperProps: {
+                            sx: {
+                              mt: 0.2,
+                              borderRadius: '10px',
+                              zIndex: 2200
+                            }
+                          }
+                        }
+                      }}
+                      sx={{
+                        minWidth: 'var(--schedule-mobile-sort-width)',
+                        maxWidth: 'var(--schedule-mobile-sort-width)',
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '12px',
+                          height: 36
+                        },
+                        '& .MuiSelect-select': {
+                          fontSize: '0.75rem',
+                          py: 0.6,
+                          pl: 'var(--schedule-mobile-sort-pad-left)',
+                          pr: 'var(--schedule-mobile-sort-pad-right) !important'
+                        },
+                        '& .MuiSelect-icon': {
+                          color: 'var(--schedule-mobile-select-icon-color) !important',
+                          right: 'var(--schedule-mobile-select-icon-right)'
+                        }
+                      }}
+                    >
+                      {MOBILE_SORT_OPTIONS.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+
+                    <TextField
+                      type="date"
+                      inputRef={mobileDateInputRef}
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      onClick={() => {
+                        const input = mobileDateInputRef.current;
+                        if (input && typeof input.showPicker === 'function') {
+                          try {
+                            input.showPicker();
+                          } catch (_) { }
+                        }
+                      }}
+                      size="small"
+                      sx={{
+                        flexGrow: 1,
+                        minWidth: 'var(--schedule-mobile-date-width)',
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '12px',
+                          height: 36
+                        },
+                        '& input': {
+                          fontSize: '0.8rem',
+                          py: 0.4,
+                          pl: 'var(--schedule-mobile-date-pad-left)',
+                          pr: 'var(--schedule-mobile-date-pad-right)'
+                        },
+                        '& input::-webkit-calendar-picker-indicator': {
+                          filter: 'var(--schedule-mobile-date-icon-filter)'
+                        }
+                      }}
+                    />
+                  </>
+                )}
+              </Box>
+            )}
+
+            {!isMobile && (
+              <TextField
+                label="Select date"
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                size="small"
+                sx={{ flexGrow: { xs: 1, sm: 0 } }}
+              />
+            )}
 
             <Chip
               label={loading ? "Loading..." : `${(gridData.rows || []).length} halls`}
@@ -688,6 +947,7 @@ export default function Schedule() {
               panelClassName="schedule-menu-panel"
               itemClassName="schedule-menu-item"
               align="right"
+              extraItems={mobileScheduleMenuItems}
             />
             <IconButton
               size="small"
@@ -701,6 +961,19 @@ export default function Schedule() {
           </Box>
         </Box>
       </Box>
+      )}
+
+      {isMobile && mobileTopStripCollapsed && (
+        <button
+          type="button"
+          className="schedule-strip-restore-btn"
+          onClick={expandTopStrip}
+          aria-label="Expand schedule strip"
+          style={{ top: `${Math.max(8, weekHeaderStickyTop - 14)}px` }}
+        >
+          <KeyboardArrowDownRoundedIcon fontSize="small" />
+        </button>
+      )}
 
       <Box sx={{ height: `0px` }} />
 

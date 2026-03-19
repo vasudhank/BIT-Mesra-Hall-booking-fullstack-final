@@ -46,6 +46,8 @@ export default function DepartmentAppBar({
   const [anchorElUser, setAnchorElUser] = React.useState(null);
   const [dateTime, setDateTime] = React.useState("");
   const isMobileMenu = useMediaQuery('(max-width:900px)');
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = React.useState(false);
+  const mobileSearchAreaRef = React.useRef(null);
   const [effectiveMode, setEffectiveMode] = React.useState(() =>
     resolveEffectiveThemeMode(location.pathname, readGlobalThemeMode())
   );
@@ -94,6 +96,39 @@ export default function DepartmentAppBar({
       window.removeEventListener(THEME_SYNC_EVENT, handleThemeSync);
     };
   }, [syncEffectiveMode]);
+
+  React.useEffect(() => {
+    if (!isMobileMenu) {
+      setIsMobileSearchOpen(false);
+    }
+  }, [isMobileMenu]);
+
+  React.useEffect(() => {
+    if (!isMobileMenu || !isMobileSearchOpen) return undefined;
+
+    const handleOutsideSearch = (event) => {
+      if (!mobileSearchAreaRef.current) return;
+      if (!mobileSearchAreaRef.current.contains(event.target)) {
+        setIsMobileSearchOpen(false);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setIsMobileSearchOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideSearch);
+    document.addEventListener('touchstart', handleOutsideSearch, { passive: true });
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideSearch);
+      document.removeEventListener('touchstart', handleOutsideSearch);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isMobileMenu, isMobileSearchOpen]);
 
   const togglePageTheme = () => {
     const nextMode = effectiveMode === 'dark' ? 'light' : 'dark';
@@ -215,7 +250,7 @@ export default function DepartmentAppBar({
 
             {/* ROW 2: SEARCH + USER ICON */}
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, width: '100%' }}>
-              {showSort && (
+              {showSort && !isMobileSearchOpen && (
                 <TextField
                   select
                   size="small"
@@ -243,34 +278,66 @@ export default function DepartmentAppBar({
                 </TextField>
               )}
               
-              {/* Search Box (Takes mostly all width) */}
               {showSearch ? (
-                <TextField
-                  value={searchValue}
-                  onChange={onSearchChange}
-                  onKeyDown={(e) => e.key === 'Enter' && onSearchSubmit()}
-                  placeholder="Search hall"
-                  size="small"
-                  fullWidth
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '24px',
-                      background: 'rgba(255,255,255,0.95)',
-                      fontSize: '0.9rem',
-                      height: '40px'
-                    }
-                  }}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton size="small" onClick={onSearchSubmit}>
-                          <SearchIcon fontSize="small"/>
-                        </IconButton>
-                      </InputAdornment>
-                    )
-                  }}
-                />
-              ) : <Box sx={{flexGrow: 1}} />}
+                isMobileSearchOpen ? (
+                  <Box ref={mobileSearchAreaRef} sx={{ flexGrow: 1 }}>
+                    <TextField
+                      value={searchValue}
+                      onChange={onSearchChange}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          onSearchSubmit && onSearchSubmit();
+                        }
+                      }}
+                      placeholder="Search hall"
+                      size="small"
+                      fullWidth
+                      autoFocus
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '24px',
+                          background: 'rgba(255,255,255,0.95)',
+                          fontSize: '0.9rem',
+                          height: '40px'
+                        }
+                      }}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              size="small"
+                              onClick={() => onSearchSubmit && onSearchSubmit()}
+                              aria-label="Search halls"
+                            >
+                              <SearchIcon fontSize="small" />
+                            </IconButton>
+                          </InputAdornment>
+                        )
+                      }}
+                    />
+                  </Box>
+                ) : (
+                  <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'flex-end' }}>
+                    <IconButton
+                      onClick={() => setIsMobileSearchOpen(true)}
+                      aria-label="Open hall search"
+                      sx={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: '50%',
+                        color: '#ffffff',
+                        background: 'rgba(255,255,255,0.12)',
+                        border: '1px solid rgba(255,255,255,0.28)',
+                        '&:hover': {
+                          background: 'rgba(255,255,255,0.2)'
+                        }
+                      }}
+                    >
+                      <SearchIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                )
+              ) : <Box sx={{ flexGrow: 1 }} />}
 
               {/* User Icon on Right */}
               <Tooltip title="Open settings">

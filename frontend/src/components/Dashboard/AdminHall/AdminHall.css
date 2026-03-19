@@ -16,6 +16,13 @@
   --admin-hall-btn-width-primary: 136px;   /* Hide Appbar + Delete Selected */
   --admin-hall-btn-width-secondary: 136px; /* Collapse Strip + Sort box */
   --admin-hall-btn-height: 34px;
+  --admin-hall-select-font-size: 0.72rem;
+  --admin-hall-select-font-size-mobile: 0.68rem;
+  --admin-hall-sort-font-size: 0.72rem;
+  --admin-hall-sort-text-offset-y: 1.5px; /* +ve = down, -ve = up */
+  --admin-hall-sort-text-pad-y: 5px;
+  --admin-hall-sort-text-pad-left: 10px;
+  --admin-hall-sort-text-pad-right: 30px;
 }
 
 .admin-hall-body {
@@ -129,13 +136,29 @@
 .admin-hall-select-inline {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   font-family: 'Inter', sans-serif;
-  font-size: 0.95rem;
+  font-size: var(--admin-hall-select-font-size) !important;
+  font-weight: 600;
+  line-height: 1.1;
   color: #f3f5ff;
   border-radius: 999px;
-  padding: 3px 10px 3px 4px;
+  padding: 3px 8px 3px 6px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.12);
+  min-width: var(--admin-hall-btn-width-primary);
+  min-height: var(--admin-hall-btn-height);
+  box-sizing: border-box;
+  text-align: center;
+  gap: 2px;
+}
+
+.admin-hall-select-inline-text {
+  display: inline-block;
+  font-size: inherit !important;
+  line-height: 1.1;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .admin-hall-bulk-btn {
@@ -182,11 +205,21 @@
 }
 
 .admin-hall-sort-control .MuiSelect-select {
-  font-size: 0.76rem;
+  font-size: var(--admin-hall-sort-font-size);
   font-weight: 600;
-  padding: 5px 28px 5px 12px !important;
+  padding:
+    var(--admin-hall-sort-text-pad-y)
+    var(--admin-hall-sort-text-pad-right)
+    var(--admin-hall-sort-text-pad-y)
+    var(--admin-hall-sort-text-pad-left) !important;
   line-height: 1.1;
   font-family: 'Inter', sans-serif;
+  text-align: center;
+  text-align-last: center;
+  transform: translateY(var(--admin-hall-sort-text-offset-y));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-hall-viewport-btn {
@@ -245,6 +278,24 @@
 .admin-hall-strip-toggle-btn:hover {
   background: rgba(26, 37, 63, 0.98);
   transform: translateY(-1px);
+}
+
+/* Desktop-only: keep Select All controls same height as other strip buttons */
+@media only screen and (min-width: 769px) {
+  .admin-hall-select-inline {
+    height: var(--admin-hall-btn-height);
+    min-height: var(--admin-hall-btn-height);
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .admin-hall-select-inline .MuiCheckbox-root {
+    padding: 2px;
+  }
+
+  .admin-hall-select-inline .MuiSvgIcon-root {
+    font-size: 1.02rem;
+  }
 }
 
 /* --- CARD BUTTON STYLES --- */
@@ -416,7 +467,7 @@
   }
 
   .admin-hall-select-inline {
-    font-size: 0.86rem;
+    font-size: var(--admin-hall-select-font-size-mobile, var(--admin-hall-select-font-size)) !important;
     padding: 1px 8px 1px 3px;
     min-height: 28px;
   }
@@ -453,7 +504,7 @@
   }
 
   .admin-hall-controls-left .admin-hall-select-inline {
-    justify-content: flex-start;
+    justify-content: center;
   }
 
   .admin-hall-controls-left .admin-hall-sort-control {

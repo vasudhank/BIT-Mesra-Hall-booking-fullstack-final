@@ -594,30 +594,34 @@ export default function AdminBooking() {
               <button className='viewport-tool-btn' onClick={() => setShowBulkStrip((v) => !v)}>
                 {showBulkStrip ? 'Hide Select Strip' : 'Show Select Strip'}
               </button>
-              <button className='viewport-tool-btn' onClick={() => setShowConflictStrip((v) => !v)}>
-                {showConflictStrip ? 'Hide Conflict Strip' : 'Show Conflict Strip'}
-              </button>
-              <button className='viewport-tool-btn' onClick={() => setShowHeaderTitle((v) => !v)}>
-                {showHeaderTitle ? 'Hide Title' : 'Show Title'}
-              </button>
               <button className='viewport-tool-btn viewport-collapse-btn' onClick={() => setShowViewportStrip(false)}>
                 Collapse Strip
               </button>
+              <div className='booking-conflict-title-sort-row'>
+                <button className='viewport-tool-btn' onClick={() => setShowConflictStrip((v) => !v)}>
+                  {showConflictStrip ? 'Hide Conflict Strip' : 'Show Conflict Strip'}
+                </button>
+                <div className='booking-title-sort-pair'>
+                  <button className='viewport-tool-btn' onClick={() => setShowHeaderTitle((v) => !v)}>
+                    {showHeaderTitle ? 'Hide Title' : 'Show Title'}
+                  </button>
 
-              <div className='booking-sort-wrap'>
-                <FormControl size='small' className='booking-sort-control'>
-                  <Select
-                    value={sortMode}
-                    onChange={(e) => setSortMode(e.target.value)}
-                    renderValue={(selected) => `Sort: ${SORT_MODE_INLINE_LABELS[selected] || 'Time ↑'}`}
-                  >
-                    <MenuItem value='TIME_ASC'>Time (Earlier-Later)</MenuItem>
-                    <MenuItem value='TIME_DESC'>Time (Later-Earlier)</MenuItem>
-                    <MenuItem value='HALL_ASC'>Hall (A-Z)</MenuItem>
-                    <MenuItem value='HALL_DESC'>Hall (Z-A)</MenuItem>
-                    <MenuItem value='FACULTY_ASC'>Faculty Grouped</MenuItem>
-                  </Select>
-                </FormControl>
+                  <div className='booking-sort-wrap'>
+                    <FormControl size='small' className='booking-sort-control'>
+                      <Select
+                        value={sortMode}
+                        onChange={(e) => setSortMode(e.target.value)}
+                        renderValue={(selected) => `Sort: ${SORT_MODE_INLINE_LABELS[selected] || 'Time ↑'}`}
+                      >
+                        <MenuItem value='TIME_ASC'>Time (Earlier-Later)</MenuItem>
+                        <MenuItem value='TIME_DESC'>Time (Later-Earlier)</MenuItem>
+                        <MenuItem value='HALL_ASC'>Hall (A-Z)</MenuItem>
+                        <MenuItem value='HALL_DESC'>Hall (Z-A)</MenuItem>
+                        <MenuItem value='FACULTY_ASC'>Faculty Grouped</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </div>
+                </div>
               </div>
             </div>
           ) : (
@@ -742,3 +746,4 @@ export default function AdminBooking() {
     </>
   );
 }
+
