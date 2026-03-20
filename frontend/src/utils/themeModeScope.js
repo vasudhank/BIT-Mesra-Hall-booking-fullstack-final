@@ -82,10 +82,30 @@ export const readPageThemeOverride = (pathname) => {
   return sanitizePageEntry(all[normalizedPath]);
 };
 
+const readNearestAncestorPageThemeOverride = (pathname) => {
+  const normalizedPath = normalizeThemePath(pathname);
+  const all = readPageThemeOverrides();
+
+  if (!normalizedPath) return null;
+
+  let currentPath = normalizedPath;
+  while (true) {
+    const match = sanitizePageEntry(all[currentPath]);
+    if (match) return match;
+    if (currentPath === '/') break;
+
+    const parentPath = currentPath.replace(/\/[^/]+$/, '') || '/';
+    if (parentPath === currentPath) break;
+    currentPath = parentPath;
+  }
+
+  return null;
+};
+
 export const resolveEffectiveThemeMode = (pathname, fallbackGlobalMode = 'light') => {
   const globalMode = normalizeThemeMode(fallbackGlobalMode || readGlobalThemeMode());
   const globalStamp = readGlobalThemeStamp();
-  const pageOverride = readPageThemeOverride(pathname);
+  const pageOverride = readNearestAncestorPageThemeOverride(pathname);
 
   if (pageOverride && pageOverride.changedAt > globalStamp) {
     return pageOverride.mode;
