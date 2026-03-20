@@ -140,12 +140,12 @@ export default function HallCard(props) {
           image="https://images.unsplash.com/photo-1594122230689-45899d9e6f69?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8Y29uZmVyZW5jZSUyMGhhbGx8ZW58MHx8MHx8fDA%3D&w=1000&q=80"
           title="seminar hall"
         />
-        <CardContent>
+        <CardContent className="hall-card-bottom">
           <Typography gutterBottom variant="h5" component="div" className='hall-card-text' fontFamily={'RecklessNeue'}>
             {props.data.name}
           </Typography>
           <Typography variant="body2" color="text.secondary" className='hall-card-text' >
-            <EventSeatIcon fontSize="large"  />
+            <EventSeatIcon className="hall-capacity-icon" fontSize="large"  />
             <span className='number-seat'>{props.data.capacity}</span>
           </Typography>
 
@@ -158,6 +158,7 @@ export default function HallCard(props) {
 
         {/* ACTIONS SECTION - Centered Buttons */}
         <Box 
+            className="hall-card-actions"
             sx={{ 
                 display: 'flex', 
                 justifyContent: 'center', 

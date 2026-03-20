@@ -68,22 +68,41 @@ export default function Appbar({
   const mobileSearchAreaRef = React.useRef(null);
   const mobileSearchInputRef = React.useRef(null);
   const isCollapsedMobileMode = collapsedMobile && isMobileMenu;
+  const isDarkMode = effectiveMode === 'dark';
+  const appbarTextColor = isDarkMode ? '#f8fafc' : '#0f172a';
+  const appbarTextSoft = isDarkMode ? 'rgba(226, 232, 240, 0.9)' : 'rgba(30, 41, 59, 0.9)';
+  const searchSurface = isDarkMode ? 'rgba(15, 23, 42, 0.88)' : 'rgba(255, 255, 255, 0.96)';
+  const searchBorder = isDarkMode ? 'rgba(148, 163, 184, 0.34)' : 'rgba(15, 23, 42, 0.16)';
+  const searchTextColor = isDarkMode ? '#f8fafc' : '#0f172a';
+  const searchPlaceholderColor = isDarkMode ? 'rgba(226, 232, 240, 0.72)' : 'rgba(30, 41, 59, 0.62)';
+  const searchIconColor = isDarkMode ? '#e2e8f0' : '#475569';
+  const menuSurface = isDarkMode ? '#0f1623' : '#ffffff';
+  const menuBorder = isDarkMode ? 'rgba(148, 163, 184, 0.32)' : 'rgba(15, 23, 42, 0.14)';
 
   const searchInputSx = {
     '& .MuiOutlinedInput-root': {
       borderRadius: '24px',
-      background: 'rgba(255,255,255,0.9)',
+      background: searchSurface,
+      '& fieldset': {
+        borderColor: searchBorder
+      },
+      '&:hover fieldset': {
+        borderColor: searchBorder
+      },
+      '&.Mui-focused fieldset': {
+        borderColor: searchIconColor
+      },
       '& input': {
-        color: '#1b2033',
+        color: searchTextColor,
         fontFamily: 'Inter',
         fontWeight: 500
       },
       '& input::placeholder': {
-        color: 'rgba(27, 32, 51, 0.75)',
+        color: searchPlaceholderColor,
         opacity: 1
       },
       '& .MuiSvgIcon-root': {
-        color: '#34456b'
+        color: searchIconColor
       }
     }
   };
@@ -185,17 +204,25 @@ export default function Appbar({
   };
   const themeActionLabel = effectiveMode === 'dark' ? 'LIGHT' : 'DARK';
   const themeShortcutLabel = effectiveMode === 'dark' ? 'Ctrl+L' : 'Ctrl+D';
-  const mobileMenuTextColor = effectiveMode === 'dark' ? '#F8FAFC' : '#25354F';
+  const mobileMenuTextColor = appbarTextColor;
   const mobileMenuDangerColor = effectiveMode === 'dark' ? '#FCA5A5' : '#D32F2F';
-  const mobileMenuDividerColor = effectiveMode === 'dark' ? 'rgba(248, 250, 252, 0.28)' : 'rgba(37, 53, 79, 0.2)';
+  const mobileMenuDividerColor = isDarkMode ? 'rgba(248, 250, 252, 0.26)' : 'rgba(37, 53, 79, 0.2)';
   const mobileMenuPaperSx = {
-    backgroundColor: effectiveMode === 'dark' ? 'rgba(8, 12, 22, 0.96)' : 'rgba(255, 255, 255, 0.96)',
+    backgroundColor: menuSurface,
     backdropFilter: 'blur(10px)',
     color: mobileMenuTextColor,
-    border: effectiveMode === 'dark' ? '1px solid rgba(248, 250, 252, 0.18)' : '1px solid rgba(37, 53, 79, 0.14)',
+    border: `1px solid ${menuBorder}`,
     borderRadius: isCollapsedMobileMode ? '0 16px 16px 16px' : '16px',
     minWidth: '200px',
     mt: isCollapsedMobileMode ? 0 : 1
+  };
+  const desktopMenuPaperSx = {
+    mt: '45px',
+    '& .MuiPaper-root': {
+      backgroundColor: menuSurface,
+      color: mobileMenuTextColor,
+      border: `1px solid ${menuBorder}`
+    }
   };
   const mobileMenuContent = (
     <>
@@ -252,7 +279,7 @@ export default function Appbar({
             {themeActionLabel}
           </Typography>
           {!isMobileMenu && (
-            <Typography sx={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.02em' }}>
+            <Typography sx={{ color: isDarkMode ? 'rgba(226, 232, 240, 0.82)' : '#64748b', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.02em' }}>
               {themeShortcutLabel}
             </Typography>
           )}
@@ -347,7 +374,7 @@ export default function Appbar({
                 }}
               />
             )}
-            <Typography sx={{ fontSize: '0.85rem', whiteSpace: 'nowrap', color: 'white', fontFamily: 'Inter' }}>
+            <Typography sx={{ fontSize: '0.85rem', whiteSpace: 'nowrap', color: appbarTextSoft, fontFamily: 'Inter' }}>
               {dateTime}
             </Typography>
             <Tooltip title="Open settings">
@@ -356,7 +383,7 @@ export default function Appbar({
               </IconButton>
             </Tooltip>
             <Menu
-              sx={{ mt: '45px', color: 'white' }}
+              sx={desktopMenuPaperSx}
               id="menu-appbar"
               anchorEl={anchorElUser}
               anchorOrigin={{ vertical: 'top', horizontal: 'right', }}
@@ -365,12 +392,20 @@ export default function Appbar({
               open={Boolean(anchorElUser)}
               onClose={handleCloseUserMenu}
             >
-              <MenuItem onClick={handleCloseUserMenu} sx={{ color: 'black' }}><Link to="/"><Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>HOME</Typography></Link></MenuItem>
-              <MenuItem onClick={() => { handleCloseUserMenu(); navigate('/admin/account'); }} sx={{ color: 'black' }}>
-                <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>ACCOUNTS</Typography>
+              <MenuItem onClick={handleCloseUserMenu} sx={{ color: mobileMenuTextColor }}><Link to="/" style={{ color: 'inherit', textDecoration: 'none' }}><Typography textAlign="center" className="dropdown-text" sx={{ color: 'inherit' }}>HOME</Typography></Link></MenuItem>
+              <MenuItem onClick={() => { handleCloseUserMenu(); navigate('/admin/account'); }} sx={{ color: mobileMenuTextColor }}>
+                <Typography textAlign="center" className="dropdown-text" sx={{ color: 'inherit' }}>ACCOUNTS</Typography>
               </MenuItem>
-              <MenuItem onClick={handleCloseUserMenu} sx={{ color: 'black' }}><Typography textAlign="center" className="dropdown-text" onClick={logout} 
-  style={{ color: "red", fontWeight: "bold" }} sx={{ color: 'black' }}>LOGOUT</Typography></MenuItem>
+              <MenuItem onClick={handleCloseUserMenu} sx={{ color: mobileMenuTextColor }}>
+                <Typography
+                  textAlign="center"
+                  className="dropdown-text"
+                  onClick={logout}
+                  sx={{ color: mobileMenuDangerColor, fontWeight: 700 }}
+                >
+                  LOGOUT
+                </Typography>
+              </MenuItem>
               <MenuItem disableRipple sx={{ px: 1.25, py: 0.8 }}>
                 <QuickPageMenu
                   buttonLabel="MENU"
@@ -386,12 +421,12 @@ export default function Appbar({
                 />
               </MenuItem>
               <Divider sx={{ my: 0.3 }} />
-              <MenuItem onClick={togglePageTheme} sx={{ color: 'black' }}>
+              <MenuItem onClick={togglePageTheme} sx={{ color: mobileMenuTextColor }}>
                 <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.2 }}>
-                  <Typography textAlign="center" className="dropdown-text" sx={{ color: 'black' }}>
+                  <Typography textAlign="center" className="dropdown-text" sx={{ color: 'inherit' }}>
                     {themeActionLabel}
                   </Typography>
-                  <Typography sx={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.02em' }}>
+                  <Typography sx={{ color: isDarkMode ? 'rgba(226, 232, 240, 0.82)' : '#64748b', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.02em' }}>
                     {themeShortcutLabel}
                   </Typography>
                 </Box>
@@ -406,7 +441,7 @@ export default function Appbar({
             {/* ROW 1: Date & Time (Stacked on top) */}
             <Typography sx={{ 
               fontSize: '0.75rem', 
-              color: 'rgba(255,255,255,0.9)', 
+              color: appbarTextSoft, 
               fontFamily: 'Inter',
               textAlign: 'center',
               width: '100%'
@@ -499,19 +534,19 @@ export default function Appbar({
                             flex: '0 0 auto',
                             '& .MuiOutlinedInput-root': {
                               borderRadius: '999px',
-                              background: 'rgba(255,255,255,0.18)',
+                              background: searchSurface,
                               '& fieldset': {
-                                borderColor: 'rgba(255,255,255,0.3)'
+                                borderColor: searchBorder
                               },
                               '&:hover fieldset': {
-                                borderColor: 'rgba(255,255,255,0.45)'
+                                borderColor: searchBorder
                               },
                               '&.Mui-focused fieldset': {
-                                borderColor: 'rgba(255,255,255,0.6)'
+                                borderColor: searchIconColor
                               }
                             },
                             '& .MuiSelect-select': {
-                              color: '#f8fafc',
+                              color: searchTextColor,
                               fontFamily: 'Inter',
                               fontSize: '0.74rem',
                               fontWeight: 700,
@@ -524,7 +559,7 @@ export default function Appbar({
                               textOverflow: 'ellipsis'
                             },
                             '& .MuiSelect-icon': {
-                              color: '#f8fafc',
+                              color: searchIconColor,
                               right: '8px',
                               fontSize: '1rem'
                             },

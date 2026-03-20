@@ -138,9 +138,18 @@ export default function DepartmentAppBar({
   };
   const themeActionLabel = effectiveMode === 'dark' ? 'LIGHT' : 'DARK';
   const themeShortcutLabel = effectiveMode === 'dark' ? 'Ctrl+L' : 'Ctrl+D';
-  const mobileMenuTextColor = effectiveMode === 'dark' ? '#F8FAFC' : '#25354F';
+  const isDarkMode = effectiveMode === 'dark';
+  const mobileMenuTextColor = isDarkMode ? '#F8FAFC' : '#0F172A';
+  const appbarTextSoft = isDarkMode ? 'rgba(226, 232, 240, 0.9)' : 'rgba(30, 41, 59, 0.9)';
   const mobileMenuDangerColor = effectiveMode === 'dark' ? '#FCA5A5' : '#D32F2F';
-  const mobileMenuDividerColor = effectiveMode === 'dark' ? 'rgba(248, 250, 252, 0.28)' : 'rgba(37, 53, 79, 0.2)';
+  const mobileMenuDividerColor = isDarkMode ? 'rgba(248, 250, 252, 0.28)' : 'rgba(37, 53, 79, 0.2)';
+  const searchSurface = isDarkMode ? 'rgba(15, 23, 42, 0.88)' : 'rgba(255, 255, 255, 0.96)';
+  const searchBorder = isDarkMode ? 'rgba(148, 163, 184, 0.34)' : 'rgba(15, 23, 42, 0.16)';
+  const searchTextColor = isDarkMode ? '#f8fafc' : '#0f172a';
+  const searchPlaceholderColor = isDarkMode ? 'rgba(226, 232, 240, 0.72)' : 'rgba(30, 41, 59, 0.62)';
+  const searchIconColor = isDarkMode ? '#e2e8f0' : '#475569';
+  const menuSurface = isDarkMode ? '#0f1623' : '#ffffff';
+  const menuBorder = isDarkMode ? 'rgba(148, 163, 184, 0.32)' : 'rgba(15, 23, 42, 0.14)';
   const mobileMenuItemSx = isMobileMenu ? { minHeight: 42, justifyContent: 'center', px: 1.5 } : undefined;
   const getCompactSortLabel = (selected) => {
     const option = sortOptions.find((item) => item.value === selected);
@@ -187,7 +196,22 @@ export default function DepartmentAppBar({
                     minWidth: 185,
                     '& .MuiOutlinedInput-root': {
                       borderRadius: '24px',
-                      background: 'rgba(255,255,255,0.9)'
+                      background: searchSurface,
+                      '& fieldset': {
+                        borderColor: searchBorder
+                      },
+                      '&:hover fieldset': {
+                        borderColor: searchBorder
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: searchIconColor
+                      }
+                    },
+                    '& .MuiSelect-select': {
+                      color: searchTextColor
+                    },
+                    '& .MuiSelect-icon': {
+                      color: searchIconColor
                     }
                   }}
                 >
@@ -211,7 +235,26 @@ export default function DepartmentAppBar({
                     minWidth: 220,
                     '& .MuiOutlinedInput-root': {
                       borderRadius: '24px',
-                      background: 'rgba(255,255,255,0.9)'
+                      background: searchSurface,
+                      '& fieldset': {
+                        borderColor: searchBorder
+                      },
+                      '&:hover fieldset': {
+                        borderColor: searchBorder
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: searchIconColor
+                      }
+                    },
+                    '& input': {
+                      color: searchTextColor
+                    },
+                    '& input::placeholder': {
+                      color: searchPlaceholderColor,
+                      opacity: 1
+                    },
+                    '& .MuiSvgIcon-root': {
+                      color: searchIconColor
                     }
                   }}
                   InputProps={{
@@ -226,7 +269,7 @@ export default function DepartmentAppBar({
                 />
               )}
 
-              <Typography sx={{ fontSize: '0.85rem', whiteSpace: 'nowrap', color: 'white', fontFamily: 'Inter' }}>
+              <Typography sx={{ fontSize: '0.85rem', whiteSpace: 'nowrap', color: appbarTextSoft, fontFamily: 'Inter' }}>
                 {dateTime}
               </Typography>
 
@@ -247,7 +290,7 @@ export default function DepartmentAppBar({
             <Typography sx={{ 
               fontSize: '0.75rem', 
               whiteSpace: 'nowrap', 
-              color: 'rgba(255,255,255,0.9)', 
+              color: appbarTextSoft, 
               fontFamily: 'Inter',
               textAlign: 'center',
               width: '100%'
@@ -271,12 +314,25 @@ export default function DepartmentAppBar({
                     maxWidth: 150,
                     '& .MuiOutlinedInput-root': {
                       borderRadius: '20px',
-                      background: 'rgba(255,255,255,0.95)',
+                      background: searchSurface,
+                      '& fieldset': {
+                        borderColor: searchBorder
+                      },
+                      '&:hover fieldset': {
+                        borderColor: searchBorder
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: searchIconColor
+                      },
                       height: '40px'
                     },
                     '& .MuiSelect-select': {
                       fontSize: '0.8rem',
+                      color: searchTextColor,
                       py: 1
+                    },
+                    '& .MuiSelect-icon': {
+                      color: searchIconColor
                     }
                   }}
                 >
@@ -306,9 +362,28 @@ export default function DepartmentAppBar({
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           borderRadius: '24px',
-                          background: 'rgba(255,255,255,0.95)',
+                          background: searchSurface,
+                          '& fieldset': {
+                            borderColor: searchBorder
+                          },
+                          '&:hover fieldset': {
+                            borderColor: searchBorder
+                          },
+                          '&.Mui-focused fieldset': {
+                            borderColor: searchIconColor
+                          },
                           fontSize: '0.9rem',
                           height: '40px'
+                        },
+                        '& input': {
+                          color: searchTextColor
+                        },
+                        '& input::placeholder': {
+                          color: searchPlaceholderColor,
+                          opacity: 1
+                        },
+                        '& .MuiSvgIcon-root': {
+                          color: searchIconColor
                         }
                       }}
                       InputProps={{
@@ -335,11 +410,11 @@ export default function DepartmentAppBar({
                         width: 40,
                         height: 40,
                         borderRadius: '50%',
-                        color: '#ffffff',
-                        background: 'rgba(255,255,255,0.12)',
-                        border: '1px solid rgba(255,255,255,0.28)',
+                        color: searchIconColor,
+                        background: searchSurface,
+                        border: `1px solid ${searchBorder}`,
                         '&:hover': {
-                          background: 'rgba(255,255,255,0.2)'
+                          background: isDarkMode ? 'rgba(30, 41, 59, 0.92)' : '#f1f5fb'
                         }
                       }}
                     >
@@ -363,18 +438,14 @@ export default function DepartmentAppBar({
           <Menu
             sx={{
               mt: '45px',
-              ...(isMobileMenu
-                ? {
-                    '& .MuiPaper-root': {
-                      backgroundColor: effectiveMode === 'dark' ? 'rgba(8, 12, 22, 0.96)' : 'rgba(255, 255, 255, 0.96)',
-                      backdropFilter: 'blur(10px)',
-                      color: mobileMenuTextColor,
-                      border: effectiveMode === 'dark' ? '1px solid rgba(248, 250, 252, 0.18)' : '1px solid rgba(37, 53, 79, 0.14)',
-                      borderRadius: '16px',
-                      minWidth: '200px'
-                    }
-                  }
-                : {})
+              '& .MuiPaper-root': {
+                backgroundColor: menuSurface,
+                backdropFilter: 'blur(10px)',
+                color: mobileMenuTextColor,
+                border: `1px solid ${menuBorder}`,
+                borderRadius: '16px',
+                minWidth: '200px'
+              }
             }}
             anchorEl={anchorElUser}
             anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
@@ -392,9 +463,9 @@ export default function DepartmentAppBar({
                 <Typography textAlign="center" className="dropdown-text" sx={{ width: '100%', color: isMobileMenu ? mobileMenuTextColor : 'inherit' }}>HOME</Typography>
               </Link>
             </MenuItem>
-            <MenuItem onClick={() => { setAnchorElUser(null); }} sx={{ color: isMobileMenu ? mobileMenuTextColor : 'black', ...mobileMenuItemSx }}>
+            <MenuItem onClick={() => { setAnchorElUser(null); }} sx={{ color: mobileMenuTextColor, ...mobileMenuItemSx }}>
                <Link to="/department/account" style={{ textDecoration: 'none', color: 'inherit', width: '100%', display: 'flex', justifyContent: 'center' }}>
-                 <Typography textAlign="center" className="dropdown-text" sx={{ color: isMobileMenu ? mobileMenuTextColor : 'black' }}> ACCOUNTS </Typography>
+                 <Typography textAlign="center" className="dropdown-text" sx={{ color: mobileMenuTextColor }}> ACCOUNTS </Typography>
                </Link>
             </MenuItem>
             <MenuItem
@@ -416,13 +487,13 @@ export default function DepartmentAppBar({
               />
             </MenuItem>
             <Divider sx={{ my: 0.3, borderColor: isMobileMenu ? mobileMenuDividerColor : undefined, borderBottomWidth: '1px', opacity: 1 }} />
-            <MenuItem onClick={togglePageTheme} sx={{ color: isMobileMenu ? mobileMenuTextColor : 'black', ...mobileMenuItemSx }}>
+            <MenuItem onClick={togglePageTheme} sx={{ color: mobileMenuTextColor, ...mobileMenuItemSx }}>
               <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: isMobileMenu ? 'center' : 'space-between', gap: 1.2 }}>
-                <Typography textAlign="center" className="dropdown-text" sx={{ width: isMobileMenu ? 'auto' : '100%', color: isMobileMenu ? mobileMenuTextColor : 'black' }}>
+                <Typography textAlign="center" className="dropdown-text" sx={{ width: isMobileMenu ? 'auto' : '100%', color: mobileMenuTextColor }}>
                   {themeActionLabel}
                 </Typography>
                 {!isMobileMenu && (
-                  <Typography sx={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.02em' }}>
+                  <Typography sx={{ color: isDarkMode ? 'rgba(226, 232, 240, 0.82)' : '#64748b', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.02em' }}>
                     {themeShortcutLabel}
                   </Typography>
                 )}
@@ -432,7 +503,7 @@ export default function DepartmentAppBar({
               <Typography
                 className="dropdown-text"
                 sx={{
-                  color: isMobileMenu ? mobileMenuDangerColor : 'red',
+                  color: mobileMenuDangerColor,
                   fontWeight: 'bold',
                   width: '100%',
                   textAlign: 'center'

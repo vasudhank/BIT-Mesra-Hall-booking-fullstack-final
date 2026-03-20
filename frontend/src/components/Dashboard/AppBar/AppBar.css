@@ -7,14 +7,48 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
 
+:root {
+    --dashboard-bg-page: #f4f7fb;
+    --dashboard-surface: #ffffff;
+    --dashboard-surface-soft: #eef3fb;
+    --dashboard-surface-soft-2: #f1f5fb;
+    --dashboard-border: rgba(15, 23, 42, 0.14);
+    --dashboard-border-strong: rgba(15, 23, 42, 0.2);
+    --dashboard-text: #0f172a;
+    --dashboard-text-soft: #475569;
+}
+
+body.dark-mode {
+    --dashboard-bg-page: #05070d;
+    --dashboard-surface: #0f1623;
+    --dashboard-surface-soft: #182235;
+    --dashboard-surface-soft-2: #121a2a;
+    --dashboard-border: rgba(148, 163, 184, 0.34);
+    --dashboard-border-strong: rgba(148, 163, 184, 0.46);
+    --dashboard-text: #f8fafc;
+    --dashboard-text-soft: #cbd5e1;
+}
+
+body.light-mode {
+    --dashboard-bg-page: #f4f7fb;
+    --dashboard-surface: #ffffff;
+    --dashboard-surface-soft: #eef3fb;
+    --dashboard-surface-soft-2: #f1f5fb;
+    --dashboard-border: rgba(15, 23, 42, 0.14);
+    --dashboard-border-strong: rgba(15, 23, 42, 0.2);
+    --dashboard-text: #0f172a;
+    --dashboard-text-soft: #475569;
+}
 
 .temp-back{
-    background: linear-gradient(243.81deg, #25354F 0.9%, #1B2033 100%);
+    background: var(--dashboard-bg-page);
     height: 100vh;
 }
 
 .appbar{
-    background: linear-gradient(270deg, #3B557F 0%, #34456B 100%);
+    background: var(--dashboard-surface-soft) !important;
+    border-bottom: 1px solid var(--dashboard-border);
+    color: var(--dashboard-text) !important;
     position:fixed;
     display: flex;
     /* color: white !important; */
@@ -24,7 +58,7 @@
 
 .text-appbar{
     /* color: #FFFFFF!important; */
-    color: white !important;
+    color: var(--dashboard-text) !important;
     font-family: 'RecklessNeue';
 }
 
@@ -36,11 +70,11 @@
 .appbar-mobile-strip-toggle {
     width: 34px !important;
     height: 34px !important;
-    border: 1px solid rgba(128, 196, 255, 0.45) !important;
+    border: 1px solid var(--dashboard-border-strong) !important;
     border-radius: 12px !important;
-    background: linear-gradient(160deg, rgba(14, 27, 48, 0.96), rgba(27, 45, 73, 0.94)) !important;
-    color: #e9f4ff !important;
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(120, 188, 255, 0.14) !important;
+    background: var(--dashboard-surface) !important;
+    color: var(--dashboard-text) !important;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16) !important;
 }
 
 .appbar-mobile-strip-toggle-icon {
@@ -58,14 +92,14 @@
 .appbar-mobile-search-toggle {
     width: 36px !important;
     height: 36px !important;
-    border: 1px solid rgba(255, 255, 255, 0.36) !important;
+    border: 1px solid var(--dashboard-border-strong) !important;
     border-radius: 12px !important;
-    background: rgba(255, 255, 255, 0.12) !important;
-    color: #f8fafc !important;
+    background: var(--dashboard-surface) !important;
+    color: var(--dashboard-text) !important;
 }
 
 .appbar-mobile-search-toggle:hover {
-    background: rgba(255, 255, 255, 0.2) !important;
+    background: var(--dashboard-surface-soft-2) !important;
 }
 
 .appbar-collapsed-launcher {
@@ -76,12 +110,12 @@
     top: 0;
     width: 20px;
     height: 20px;
-    border: 1.5px solid rgba(255, 255, 255, 0.34);
+    border: 1.5px solid var(--dashboard-border-strong);
     border-left: none;
     border-top: none;
     border-radius: 0 0 999px 0;
-    background: rgba(12, 20, 36, 0.95);
-    color: #e9f4ff;
+    background: var(--dashboard-surface);
+    color: var(--dashboard-text);
     z-index: 2205;
     display: inline-flex;
     align-items: center;
@@ -98,7 +132,7 @@
 }
 
 .appbar-collapsed-launcher:hover {
-    background: rgba(26, 37, 63, 0.98);
+    background: var(--dashboard-surface-soft-2);
 }
 
 .appbar-user-menu-btn {
@@ -106,7 +140,7 @@
     justify-content: flex-start;
     border: none !important;
     background: transparent !important;
-    color: #25354F !important;
+    color: var(--dashboard-text) !important;
     border-radius: 8px !important;
     min-height: 36px !important;
     font-family: 'RecklessNeue' !important;
@@ -115,13 +149,13 @@
 }
 
 .appbar-user-menu-btn:hover {
-    background: rgba(15, 23, 42, 0.06) !important;
+    background: color-mix(in srgb, var(--dashboard-text) 8%, transparent) !important;
 }
 
 .appbar-user-submenu-panel {
-    border: 1px solid rgba(148, 163, 184, 0.34) !important;
-    background: #ffffff !important;
-    color: #25354F !important;
+    border: 1px solid var(--dashboard-border-strong) !important;
+    background: var(--dashboard-surface) !important;
+    color: var(--dashboard-text) !important;
     border-radius: 12px !important;
     max-height: 220px !important;
     overflow-y: auto !important;
@@ -129,48 +163,48 @@
 }
 
 .appbar-user-submenu-item {
-    color: #25354F !important;
+    color: var(--dashboard-text) !important;
     font-family: 'RecklessNeue' !important;
     font-weight: 700 !important;
 }
 
 .appbar-user-submenu-item:hover {
-    background: rgba(15, 23, 42, 0.06) !important;
+    background: color-mix(in srgb, var(--dashboard-text) 8%, transparent) !important;
 }
 
 body.dark-mode .appbar-user-menu-btn {
-    color: #f8fafc !important;
+    color: var(--dashboard-text) !important;
 }
 
 body.dark-mode .appbar-user-menu-btn:hover {
-    background: rgba(148, 163, 184, 0.2) !important;
+    background: color-mix(in srgb, var(--dashboard-text) 12%, transparent) !important;
 }
 
 @media (max-width: 900px) {
   .appbar-mobile-sort-field .MuiSelect-icon {
-    color: #f8fafc !important;
+    color: var(--dashboard-text) !important;
   }
 
   body.dark-mode .appbar-user-submenu-panel {
-    border-color: rgba(148, 163, 184, 0.46) !important;
-    background: rgba(8, 12, 22, 0.96) !important;
-    color: #f8fafc !important;
+    border-color: var(--dashboard-border-strong) !important;
+    background: var(--dashboard-surface) !important;
+    color: var(--dashboard-text) !important;
   }
 
   body.dark-mode .appbar-user-submenu-panel .quick-page-menu-divider {
-    background: rgba(248, 250, 252, 0.26) !important;
+    background: var(--dashboard-border) !important;
   }
 
   body.dark-mode .appbar-user-submenu-panel .quick-page-menu-shortcut {
-    color: rgba(226, 232, 240, 0.86) !important;
+    color: color-mix(in srgb, var(--dashboard-text) 80%, transparent) !important;
   }
 
   body.dark-mode .appbar-user-submenu-item {
-    color: #f8fafc !important;
+    color: var(--dashboard-text) !important;
   }
 
   body.dark-mode .appbar-user-submenu-item:hover {
-    background: rgba(148, 163, 184, 0.18) !important;
+    background: color-mix(in srgb, var(--dashboard-text) 12%, transparent) !important;
   }
 
   .appbar-user-menu-root-mobile {

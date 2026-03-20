@@ -631,7 +631,7 @@ export default function DepartmentBookingCard(props) {
           title="seminar hall"
         />
 
-        <CardContent sx={{ padding: "8px", "&:last-child": { paddingBottom: "4px" } }}>
+        <CardContent className="hall-card-bottom" sx={{ padding: "8px", "&:last-child": { paddingBottom: "4px" } }}>
           <Typography
             gutterBottom
             variant="h6"
@@ -655,7 +655,7 @@ export default function DepartmentBookingCard(props) {
           </Typography>
         </CardContent>
 
-        <Grid container spacing={2} justifyContent={"center"} sx={{ pb: 1.5, pt: 0.5 }}>
+        <Grid className="hall-card-actions" container spacing={2} justifyContent={"center"} sx={{ pb: 1.5, pt: 0.5 }}>
           <Grid item xs={10} sm={6} md={5} lg={5} xl={5}>
             <Button
               size="small"

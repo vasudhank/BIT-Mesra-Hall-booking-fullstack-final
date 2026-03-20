@@ -2,10 +2,7 @@
 
 .complaint-detail-page {
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--support-accent) 16%, transparent) 0%, transparent 44%),
-    radial-gradient(circle at 92% 2%, color-mix(in srgb, var(--support-info) 12%, transparent) 0%, transparent 48%),
-    linear-gradient(180deg, var(--support-bg-elev) 0%, var(--support-bg) 100%);
+  background: var(--support-bg);
   color: var(--support-text);
   font-family: var(--support-font);
   padding: 24px;

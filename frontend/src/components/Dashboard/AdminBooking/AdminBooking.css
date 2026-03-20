@@ -720,3 +720,161 @@
 .admin-booking-body .admin-booking-select-checkbox .MuiSvgIcon-root {
   color: inherit !important;
 }
+
+/* ================= THEME UNIFICATION ================= */
+body.light-mode .admin-booking-body,
+body:not(.dark-mode):not(.light-mode) .admin-booking-body {
+  background: #f4f7fb !important;
+  --bg-paper: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border-color: rgba(15, 23, 42, 0.16);
+  --admin-booking-strip-bg: #eef3fb;
+  --admin-booking-control-surface: rgba(255, 255, 255, 0.88);
+}
+
+body.dark-mode .admin-booking-body {
+  background: #05070d !important;
+  --bg-paper: #0f1623;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --border-color: rgba(148, 163, 184, 0.34);
+  --admin-booking-strip-bg: #0f1623;
+  --admin-booking-control-surface: rgba(30, 41, 59, 0.72);
+}
+
+.admin-booking-title,
+.hall-card-title,
+.back-btn-icon,
+.no-data-text {
+  color: var(--text-primary) !important;
+}
+
+.admin-booking-title-div {
+  border-bottom-color: var(--border-color) !important;
+}
+
+.sub-hall-title {
+  color: color-mix(in srgb, var(--text-primary) 82%, #38bdf8) !important;
+}
+
+.filter-btn {
+  color: var(--text-secondary);
+  background: var(--admin-booking-control-surface);
+  border-color: var(--border-color);
+}
+
+.filter-btn.active {
+  background: var(--bg-paper);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.hall-group-card {
+  border-color: var(--border-color);
+}
+
+.hall-card-count,
+.admin-booking-event-name,
+.admin-booking-datetime-range p {
+  color: var(--text-secondary);
+}
+
+.bulk-actions-container,
+.booking-viewport-tools {
+  border-color: var(--border-color);
+  background: var(--admin-booking-strip-bg);
+}
+
+.bulk-btn,
+.viewport-tool-btn,
+.bulk-select-all-inline {
+  color: var(--text-primary);
+  border-color: var(--border-color);
+  background: var(--admin-booking-control-surface);
+}
+
+.request-div-admin {
+  background: var(--bg-paper);
+  border: 1px solid var(--border-color);
+}
+
+.admin-booking-dept-name,
+.admin-booking-request-meta-row {
+  color: var(--text-primary);
+}
+
+.admin-booking-request-meta-row .MuiSvgIcon-root {
+  color: color-mix(in srgb, var(--text-primary) 78%, #38bdf8) !important;
+}
+
+.admin-booking-datetime-range {
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+}
+
+.booking-sort-label {
+  color: var(--text-secondary);
+}
+
+.booking-sort-control .MuiOutlinedInput-root {
+  color: var(--text-primary) !important;
+  background: var(--admin-booking-control-surface) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.booking-sort-control .MuiOutlinedInput-notchedOutline {
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: rgba(148, 163, 184, 0.34) !important;
+}
+
+.booking-sort-control .MuiSelect-icon {
+  color: var(--text-secondary) !important;
+}
+
+body.light-mode .admin-booking-body .MuiInputBase-root,
+body:not(.dark-mode):not(.light-mode) .admin-booking-body .MuiInputBase-root {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  color: #0f172a !important;
+  border: none !important;
+}
+
+body.light-mode .admin-booking-body .MuiInputBase-root input::placeholder,
+body:not(.dark-mode):not(.light-mode) .admin-booking-body .MuiInputBase-root input::placeholder {
+  color: rgba(15, 23, 42, 0.58) !important;
+}
+
+body.light-mode .admin-booking-body .MuiSvgIcon-root,
+body:not(.dark-mode):not(.light-mode) .admin-booking-body .MuiSvgIcon-root {
+  color: #475569 !important;
+}
+
+body.dark-mode .admin-booking-body .MuiInputBase-root {
+  background-color: rgba(15, 23, 42, 0.9) !important;
+  color: #f8fafc !important;
+  border: none !important;
+}
+
+body.dark-mode .admin-booking-body .MuiInputBase-root input::placeholder {
+  color: rgba(226, 232, 240, 0.72) !important;
+}
+
+body.dark-mode .admin-booking-body .MuiSvgIcon-root {
+  color: #e2e8f0 !important;
+}
+
+body.light-mode .admin-booking-body .admin-booking-select-checkbox .MuiSvgIcon-root,
+body:not(.dark-mode):not(.light-mode) .admin-booking-body .admin-booking-select-checkbox .MuiSvgIcon-root,
+body.dark-mode .admin-booking-body .admin-booking-select-checkbox .MuiSvgIcon-root {
+  color: inherit !important;
+}
+
+body.light-mode .booking-sort-control .MuiOutlinedInput-notchedOutline,
+body:not(.dark-mode):not(.light-mode) .booking-sort-control .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(15, 23, 42, 0.16) !important;
+}
+
+body.dark-mode .booking-sort-control .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(148, 163, 184, 0.34) !important;
+}

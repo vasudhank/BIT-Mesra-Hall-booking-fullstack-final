@@ -10,12 +10,13 @@
   --content-gap: 4px;
   --section-top-gap: 8px;
   --admin-hall-strip-top: var(--appbar-height);
+  --admin-hall-strip-gap: 0px;
   --admin-hall-strip-bg: #21304a;
   --admin-hall-strip-space: 84px;
   /* Manual pair sizing controls for options strip */
   --admin-hall-btn-width-primary: 136px;   /* Hide Appbar + Delete Selected */
   --admin-hall-btn-width-secondary: 136px; /* Collapse Strip + Sort box */
-  --admin-hall-btn-height: 34px;
+  --admin-hall-btn-height: 40px;
   --admin-hall-select-font-size: 0.72rem;
   --admin-hall-select-font-size-mobile: 0.68rem;
   --admin-hall-sort-font-size: 0.72rem;
@@ -23,6 +24,11 @@
   --admin-hall-sort-text-pad-y: 5px;
   --admin-hall-sort-text-pad-left: 10px;
   --admin-hall-sort-text-pad-right: 30px;
+  --admin-hall-select-checkbox-color: rgba(255, 255, 255, 0.86);
+  --admin-hall-select-checkbox-checked-color: #38bdf8;
+  --admin-hall-delete-icon-color: rgba(240, 13, 13, 0.66);
+  --admin-hall-delete-icon-hover-color: #ff4444;
+  --admin-hall-capacity-icon-color: #f8fafc;
 }
 
 .admin-hall-body {
@@ -95,7 +101,7 @@
   position: fixed;
   left: 0px;
   right: 0px;
-  top: var(--admin-hall-strip-top);
+  top: calc(var(--admin-hall-strip-top) + var(--admin-hall-strip-gap));
   width: auto;
   z-index: 35;
   display: flex;
@@ -118,7 +124,7 @@
 }
 
 .admin-hall-controls-spacer {
-  height: var(--admin-hall-strip-space);
+  height: calc(var(--admin-hall-strip-space) + var(--admin-hall-strip-gap));
 }
 
 .admin-hall-controls-left,
@@ -148,6 +154,7 @@
   border: 1px solid rgba(255, 255, 255, 0.12);
   min-width: var(--admin-hall-btn-width-primary);
   min-height: var(--admin-hall-btn-height);
+  height: var(--admin-hall-btn-height);
   box-sizing: border-box;
   text-align: center;
   gap: 2px;
@@ -161,28 +168,46 @@
   white-space: nowrap;
 }
 
+.admin-hall-select-inline .MuiCheckbox-root {
+  color: var(--admin-hall-select-checkbox-color) !important;
+}
+
+.admin-hall-select-inline .MuiCheckbox-root.Mui-checked {
+  color: var(--admin-hall-select-checkbox-checked-color) !important;
+}
+
+.admin-hall-select-inline .MuiCheckbox-root .MuiSvgIcon-root {
+  color: inherit !important;
+}
+
 .admin-hall-bulk-btn {
   text-transform: none !important;
   border-radius: 999px !important;
   color: #fff !important;
   font-size: 0.78rem !important;
-  padding: 7px 14px !important;
+  padding: 0 14px !important;
+  height: var(--admin-hall-btn-height) !important;
+  min-height: var(--admin-hall-btn-height) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
   min-width: fit-content !important;
   border: 1px solid transparent !important;
 }
 
 .admin-hall-bulk-btn.bulk-vacate {
-  background: rgba(34, 197, 94, 0.18) !important;
+  background: rgb(17, 205, 86) !important;
   border-color: rgba(34, 197, 94, 0.45) !important;
 }
 
 .admin-hall-bulk-btn.bulk-vacate-all {
-  background: rgba(14, 165, 233, 0.18) !important;
+  background: rgb(12, 158, 226) !important;
   border-color: rgba(14, 165, 233, 0.45) !important;
 }
 
 .admin-hall-bulk-btn.bulk-delete {
-  background: rgba(239, 68, 68, 0.18) !important;
+  background: rgba(197, 28, 28, 0.956) !important;
   border-color: rgba(239, 68, 68, 0.45) !important;
   min-width: var(--admin-hall-btn-width-primary) !important;
   min-height: var(--admin-hall-btn-height) !important;
@@ -191,7 +216,7 @@
 }
 
 .admin-hall-bulk-btn.bulk-create {
-  background: rgba(215, 106, 40, 0.2) !important;
+  background: rgba(232, 96, 11, 0.815) !important;
   border-color: rgba(215, 106, 40, 0.55) !important;
   min-width: var(--admin-hall-btn-width-primary) !important;
   min-height: var(--admin-hall-btn-height) !important;
@@ -203,6 +228,8 @@
   min-width: var(--admin-hall-btn-width-secondary);
   max-width: var(--admin-hall-btn-width-secondary);
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: stretch;
 }
 
 .admin-hall-sort-control .MuiOutlinedInput-root {
@@ -211,6 +238,14 @@
   background: rgba(255, 255, 255, 0.12) !important;
   min-height: var(--admin-hall-btn-height) !important;
   height: var(--admin-hall-btn-height) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.admin-hall-sort-control .MuiOutlinedInput-notchedOutline {
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
 }
 
 .admin-hall-sort-control .MuiSelect-select {
@@ -236,19 +271,32 @@
   border-radius: 999px !important;
   color: #fff !important;
   font-size: 0.76rem !important;
-  padding: 7px 13px !important;
+  padding: 0 13px !important;
+  height: var(--admin-hall-btn-height) !important;
   min-width: fit-content !important;
   border: 1px solid rgba(255, 255, 255, 0.24) !important;
   background: rgba(255, 255, 255, 0.08) !important;
   min-width: var(--admin-hall-btn-width-primary) !important;
   min-height: var(--admin-hall-btn-height) !important;
+  display: inline-flex !important;
+  align-items: center !important;
   justify-content: center !important;
 }
 
 .admin-hall-viewport-btn.admin-hall-collapse-btn {
   border-color: rgba(147, 197, 253, 0.45) !important;
-  background: rgba(147, 197, 253, 0.15) !important;
+  background: rgba(17, 103, 201, 0.404) !important;
   min-width: var(--admin-hall-btn-width-secondary) !important;
+}
+
+.btn-admin-hall-create {
+  min-height: var(--admin-hall-btn-height) !important;
+  height: var(--admin-hall-btn-height) !important;
+  padding: 0 20px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
 }
 
 .admin-hall-strip-toggle-btn {
@@ -291,6 +339,10 @@
 
 /* Desktop-only: keep Select All controls same height as other strip buttons */
 @media only screen and (min-width: 769px) {
+  :root {
+    --admin-hall-strip-gap: 12px;
+  }
+
   .admin-hall-select-inline {
     height: var(--admin-hall-btn-height);
     min-height: var(--admin-hall-btn-height);
@@ -349,14 +401,14 @@
     position: absolute !important;
     top: 5px;
     right: 5px;
-    color: rgba(255, 255, 255, 0.6) !important;
+    color: var(--admin-hall-delete-icon-color) !important;
     z-index: 10;
     transition: all 0.2s ease-in-out !important;
 }
 
 .delete-icon-btn:hover {
     background-color: rgba(255, 0, 0, 0.1) !important;
-    color: #ff4444 !important;
+    color: var(--admin-hall-delete-icon-hover-color) !important;
     transform: scale(1.1);
 }
 
@@ -473,12 +525,15 @@
     align-items: stretch;
     gap: 10px;
     padding: 10px;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
   }
 
   .admin-hall-select-inline {
     font-size: var(--admin-hall-select-font-size-mobile, var(--admin-hall-select-font-size)) !important;
     padding: 1px 8px 1px 3px;
-    min-height: 28px;
+    min-height: var(--admin-hall-btn-height) !important;
+    height: var(--admin-hall-btn-height) !important;
   }
 
   .admin-hall-select-inline .MuiCheckbox-root {
@@ -537,7 +592,9 @@
     margin-left: 0 !important;
     justify-content: center !important;
     font-size: 0.85rem !important;
-    padding: 8px 14px !important;
+    min-height: var(--admin-hall-btn-height) !important;
+    height: var(--admin-hall-btn-height) !important;
+    padding: 0 14px !important;
   }
 
   .admin-hall-strip-toggle-btn {
@@ -572,4 +629,162 @@
 .admin-hall-body .hall-select-checkbox .MuiSvgIcon-root,
 .admin-hall-body .admin-hall-select-inline .MuiSvgIcon-root {
   color: inherit !important;
+}
+
+/* ================= THEME UNIFICATION ================= */
+body.light-mode .admin-hall-body,
+body:not(.dark-mode):not(.light-mode) .admin-hall-body {
+  background: #f4f7fb !important;
+  --bg-paper: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border-color: rgba(15, 23, 42, 0.16);
+  --admin-hall-strip-bg: #eef3fb;
+  --admin-hall-control-surface: rgba(255, 255, 255, 0.86);
+  --admin-hall-control-surface-strong: #ffffff;
+  --admin-hall-select-checkbox-color: #334155;
+  --admin-hall-select-checkbox-checked-color: #0369a1;
+  --admin-hall-delete-icon-color: #dc2626;
+  --admin-hall-delete-icon-hover-color: #dc2626;
+  --admin-hall-capacity-icon-color: #f8fafc;
+}
+
+body.dark-mode .admin-hall-body {
+  background: #05070d !important;
+  --bg-paper: #0f1623;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --border-color: rgba(148, 163, 184, 0.34);
+  --admin-hall-strip-bg: #0f1623;
+  --admin-hall-control-surface: rgba(30, 41, 59, 0.72);
+  --admin-hall-control-surface-strong: rgba(15, 23, 42, 0.92);
+  --admin-hall-select-checkbox-color: rgba(248, 250, 252, 0.86);
+  --admin-hall-select-checkbox-checked-color: #38bdf8;
+  --admin-hall-delete-icon-color: #dc2626;
+  --admin-hall-delete-icon-hover-color: #ff4444;
+  --admin-hall-capacity-icon-color: #f8fafc;
+}
+
+.admin-hall-controls-strip {
+  border: 1px solid var(--border-color);
+}
+
+.admin-hall-select-inline {
+  color: var(--text-primary);
+  background: var(--admin-hall-control-surface);
+  border-color: var(--border-color);
+}
+
+.admin-hall-sort-control .MuiOutlinedInput-root {
+  color: var(--text-primary) !important;
+  background: var(--admin-hall-control-surface) !important;
+}
+
+.admin-hall-sort-control .MuiSelect-icon {
+  color: var(--text-secondary) !important;
+}
+
+.admin-hall-viewport-btn {
+  color: var(--text-primary) !important;
+  background: var(--admin-hall-control-surface) !important;
+  border-color: var(--border-color) !important;
+}
+
+.hall-admin-card {
+  background: var(--bg-paper) !important;
+  border: 1px solid var(--border-color);
+}
+
+.hall-card-text {
+  color: var(--text-primary) !important;
+}
+
+.delete-icon-btn {
+  color: var(--admin-hall-delete-icon-color) !important;
+}
+
+body.light-mode .status-filled {
+  background-color: #dc2626 !important;
+}
+
+body.light-mode .status-free {
+  background-color: #15803d !important;
+}
+
+body.light-mode .admin-hall-body .MuiInputBase-root:not(.admin-input),
+body:not(.dark-mode):not(.light-mode) .admin-hall-body .MuiInputBase-root:not(.admin-input) {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  color: #0f172a !important;
+  border: none !important;
+}
+
+body.light-mode .admin-hall-body .MuiInputBase-root:not(.admin-input) input::placeholder,
+body:not(.dark-mode):not(.light-mode) .admin-hall-body .MuiInputBase-root:not(.admin-input) input::placeholder {
+  color: rgba(15, 23, 42, 0.58) !important;
+}
+
+body.light-mode .admin-hall-body .MuiSvgIcon-root,
+body:not(.dark-mode):not(.light-mode) .admin-hall-body .MuiSvgIcon-root {
+  color: #475569 !important;
+}
+
+body.dark-mode .admin-hall-body .MuiInputBase-root:not(.admin-input) {
+  background-color: rgba(15, 23, 42, 0.9) !important;
+  color: #f8fafc !important;
+  border: none !important;
+}
+
+body.dark-mode .admin-hall-body .MuiInputBase-root:not(.admin-input) input::placeholder {
+  color: rgba(226, 232, 240, 0.72) !important;
+}
+
+body.dark-mode .admin-hall-body .MuiSvgIcon-root {
+  color: #e2e8f0 !important;
+}
+
+body.light-mode .admin-hall-body .hall-select-checkbox .MuiSvgIcon-root,
+body.light-mode .admin-hall-body .admin-hall-select-inline .MuiSvgIcon-root,
+body:not(.dark-mode):not(.light-mode) .admin-hall-body .hall-select-checkbox .MuiSvgIcon-root,
+body:not(.dark-mode):not(.light-mode) .admin-hall-body .admin-hall-select-inline .MuiSvgIcon-root,
+body.dark-mode .admin-hall-body .hall-select-checkbox .MuiSvgIcon-root,
+body.dark-mode .admin-hall-body .admin-hall-select-inline .MuiSvgIcon-root {
+  color: inherit !important;
+}
+
+body.light-mode .admin-hall-sort-control .MuiOutlinedInput-notchedOutline,
+body:not(.dark-mode):not(.light-mode) .admin-hall-sort-control .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(15, 23, 42, 0.16) !important;
+}
+
+body.dark-mode .admin-hall-sort-control .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(148, 163, 184, 0.34) !important;
+}
+
+body.light-mode .hall-admin-card .hall-card-bottom,
+body.light-mode .hall-admin-card .hall-card-actions,
+body:not(.dark-mode):not(.light-mode) .hall-admin-card .hall-card-bottom,
+body:not(.dark-mode):not(.light-mode) .hall-admin-card .hall-card-actions {
+  background: #05070d !important;
+}
+
+body.light-mode .hall-admin-card .hall-card-bottom .hall-card-text,
+body.light-mode .hall-admin-card .hall-card-bottom .number-seat,
+body:not(.dark-mode):not(.light-mode) .hall-admin-card .hall-card-bottom .hall-card-text,
+body:not(.dark-mode):not(.light-mode) .hall-admin-card .hall-card-bottom .number-seat {
+  color: #f8fafc !important;
+}
+
+/* Icon-specific overrides:
+   Keep global Mui icon colors for the page, but allow independent control
+   for delete (dustbin) and capacity (chair) icons. */
+body .admin-hall-body .delete-icon-btn .MuiSvgIcon-root {
+  color: var(--admin-hall-delete-icon-color) !important;
+}
+
+body .admin-hall-body .delete-icon-btn:hover .MuiSvgIcon-root {
+  color: var(--admin-hall-delete-icon-hover-color) !important;
+}
+
+body .admin-hall-body .hall-capacity-icon.MuiSvgIcon-root {
+  color: var(--admin-hall-capacity-icon-color) !important;
 }

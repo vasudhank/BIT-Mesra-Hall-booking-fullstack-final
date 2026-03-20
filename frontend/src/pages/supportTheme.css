@@ -8,16 +8,16 @@
   --support-radius-md: 20px;
   --support-radius-pill: 999px;
 
-  --support-bg: #f4f6f8;
-  --support-bg-elev: #edf2f7;
-  --support-surface: rgba(244, 246, 248, 0.92);
-  --support-surface-strong: #f7fafc;
-  --support-surface-soft: #eef2f6;
-  --support-border: rgba(15, 23, 42, 0.08);
+  --support-bg: #f4f7fb;
+  --support-bg-elev: #edf2f9;
+  --support-surface: rgba(255, 255, 255, 0.94);
+  --support-surface-strong: #ffffff;
+  --support-surface-soft: #f1f5fb;
+  --support-border: rgba(15, 23, 42, 0.09);
   --support-border-strong: rgba(15, 23, 42, 0.16);
-  --support-text: #1e293b;
-  --support-text-muted: #64748b;
-  --support-text-soft: #475569;
+  --support-text: #0f172a;
+  --support-text-muted: #475569;
+  --support-text-soft: #64748b;
 
   --support-accent: #3b82f6;
   --support-accent-strong: #1d4ed8;
@@ -35,19 +35,19 @@
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --support-bg: #090e17;
-    --support-bg-elev: #0f172a;
-    --support-surface: rgba(15, 23, 42, 0.86);
-    --support-surface-strong: #111b2d;
-    --support-surface-soft: #16243a;
-    --support-border: rgba(255, 255, 255, 0.08);
-    --support-border-strong: rgba(255, 255, 255, 0.16);
-    --support-text: #e2e8f0;
-    --support-text-muted: #94a3b8;
-    --support-text-soft: #cbd5e1;
+    --support-bg: #05070d;
+    --support-bg-elev: #0a0f19;
+    --support-surface: rgba(14, 20, 32, 0.92);
+    --support-surface-strong: #0f1623;
+    --support-surface-soft: #182235;
+    --support-border: rgba(148, 163, 184, 0.2);
+    --support-border-strong: rgba(148, 163, 184, 0.34);
+    --support-text: #f8fafc;
+    --support-text-muted: #cbd5e1;
+    --support-text-soft: #94a3b8;
 
-    --support-accent: #38bdf8;
-    --support-accent-strong: #67d2ff;
+    --support-accent: #3ba4ff;
+    --support-accent-strong: #76beff;
     --support-accent-soft: rgba(56, 189, 248, 0.18);
     --support-success: #3dd29e;
     --support-warning: #f0b35d;
@@ -63,18 +63,18 @@
 :root[data-theme='dark'],
 [data-theme='dark'] {
   color-scheme: dark;
-  --support-bg: #090e17;
-  --support-bg-elev: #0f172a;
-  --support-surface: rgba(15, 23, 42, 0.86);
-  --support-surface-strong: #111b2d;
-  --support-surface-soft: #16243a;
-  --support-border: rgba(255, 255, 255, 0.08);
-  --support-border-strong: rgba(255, 255, 255, 0.16);
-  --support-text: #e2e8f0;
-  --support-text-muted: #94a3b8;
-  --support-text-soft: #cbd5e1;
-  --support-accent: #38bdf8;
-  --support-accent-strong: #67d2ff;
+  --support-bg: #05070d;
+  --support-bg-elev: #0a0f19;
+  --support-surface: rgba(14, 20, 32, 0.92);
+  --support-surface-strong: #0f1623;
+  --support-surface-soft: #182235;
+  --support-border: rgba(148, 163, 184, 0.2);
+  --support-border-strong: rgba(148, 163, 184, 0.34);
+  --support-text: #f8fafc;
+  --support-text-muted: #cbd5e1;
+  --support-text-soft: #94a3b8;
+  --support-accent: #3ba4ff;
+  --support-accent-strong: #76beff;
   --support-accent-soft: rgba(56, 189, 248, 0.18);
   --support-success: #3dd29e;
   --support-warning: #f0b35d;
@@ -83,6 +83,40 @@
   --support-shadow-sm: 0 2px 8px -2px rgba(0, 0, 0, 0.45);
   --support-shadow-md: 0 12px 32px -4px rgba(0, 0, 0, 0.6);
   --support-shadow-lg: 0 24px 64px -8px rgba(0, 0, 0, 0.78);
+}
+
+body.light-mode {
+  color-scheme: light;
+  --support-bg: #f4f7fb;
+  --support-bg-elev: #edf2f9;
+  --support-surface: rgba(255, 255, 255, 0.94);
+  --support-surface-strong: #ffffff;
+  --support-surface-soft: #f1f5fb;
+  --support-border: rgba(15, 23, 42, 0.09);
+  --support-border-strong: rgba(15, 23, 42, 0.16);
+  --support-text: #0f172a;
+  --support-text-muted: #475569;
+  --support-text-soft: #64748b;
+  --support-accent: #3b82f6;
+  --support-accent-strong: #1d4ed8;
+  --support-accent-soft: rgba(59, 130, 246, 0.14);
+}
+
+body.dark-mode {
+  color-scheme: dark;
+  --support-bg: #05070d;
+  --support-bg-elev: #0a0f19;
+  --support-surface: rgba(14, 20, 32, 0.92);
+  --support-surface-strong: #0f1623;
+  --support-surface-soft: #182235;
+  --support-border: rgba(148, 163, 184, 0.2);
+  --support-border-strong: rgba(148, 163, 184, 0.34);
+  --support-text: #f8fafc;
+  --support-text-muted: #cbd5e1;
+  --support-text-soft: #94a3b8;
+  --support-accent: #3ba4ff;
+  --support-accent-strong: #76beff;
+  --support-accent-soft: rgba(59, 164, 255, 0.2);
 }
 
 .support-visually-hidden {

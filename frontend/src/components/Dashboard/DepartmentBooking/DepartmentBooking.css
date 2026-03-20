@@ -79,3 +79,56 @@
 .department-booking-body .MuiSvgIcon-root {
   color: #ffffff !important;
 }
+
+/* ================= THEME UNIFICATION ================= */
+body.light-mode .department-booking-body,
+body:not(.dark-mode):not(.light-mode) .department-booking-body {
+  background: #f4f7fb !important;
+  --bg-paper: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border-color: rgba(15, 23, 42, 0.16);
+}
+
+body.dark-mode .department-booking-body {
+  background: #05070d !important;
+  --bg-paper: #0f1623;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --border-color: rgba(148, 163, 184, 0.34);
+}
+
+.department-booking-title {
+  color: var(--text-primary) !important;
+}
+
+body.light-mode .department-booking-body .MuiInputBase-root,
+body:not(.dark-mode):not(.light-mode) .department-booking-body .MuiInputBase-root {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  color: #0f172a !important;
+  border: none !important;
+}
+
+body.light-mode .department-booking-body .MuiInputBase-root input::placeholder,
+body:not(.dark-mode):not(.light-mode) .department-booking-body .MuiInputBase-root input::placeholder {
+  color: rgba(15, 23, 42, 0.58) !important;
+}
+
+body.light-mode .department-booking-body .MuiSvgIcon-root,
+body:not(.dark-mode):not(.light-mode) .department-booking-body .MuiSvgIcon-root {
+  color: #475569 !important;
+}
+
+body.dark-mode .department-booking-body .MuiInputBase-root {
+  background-color: rgba(15, 23, 42, 0.9) !important;
+  color: #f8fafc !important;
+  border: none !important;
+}
+
+body.dark-mode .department-booking-body .MuiInputBase-root input::placeholder {
+  color: rgba(226, 232, 240, 0.72) !important;
+}
+
+body.dark-mode .department-booking-body .MuiSvgIcon-root {
+  color: #e2e8f0 !important;
+}

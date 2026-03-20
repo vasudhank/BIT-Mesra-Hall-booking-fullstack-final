@@ -1,19 +1,5 @@
 @import './supportTheme.css';
 
-.queries-page {
-  --support-accent: #3b82f6;
-  --support-accent-strong: #1d4ed8;
-  --support-accent-soft: color-mix(in srgb, #3b82f6 18%, transparent);
-}
-
-@media (prefers-color-scheme: dark) {
-  .queries-page {
-    --support-accent: #8b83ff;
-    --support-accent-strong: #a59fff;
-    --support-accent-soft: color-mix(in srgb, #8b83ff 24%, transparent);
-  }
-}
-
 .queries-page .support-page,
 .queries-page.support-page {
   background: var(--support-bg);

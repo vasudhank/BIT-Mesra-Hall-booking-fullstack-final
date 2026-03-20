@@ -16,6 +16,7 @@
   --text-primary: #ffffff;
   --text-secondary: #e0e0e0;
   --border-color: rgba(255, 255, 255, 0.2);
+  --admin-department-strip-gap: 0px;
 
   background: linear-gradient(243.81deg, #25354F 0.9%, #1B2033 100%) !important;
   height: 100vh;
@@ -74,7 +75,7 @@
 
 .fixed-create-btn-container {
   position: sticky;
-  top: 0;
+  top: var(--admin-department-strip-gap);
   z-index: 12;
   background: #21304a;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -392,4 +393,113 @@
 /* 3. UNIVERSAL ICON */
 .admin-department-body .MuiSvgIcon-root {
   color: #ffffff !important;
+}
+
+/* ================= THEME UNIFICATION ================= */
+body.light-mode .admin-department-body,
+body:not(.dark-mode):not(.light-mode) .admin-department-body {
+  background: #f4f7fb !important;
+  --bg-paper: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border-color: rgba(15, 23, 42, 0.16);
+  --admin-department-strip-bg: #eef3fb;
+  --admin-department-control-surface: rgba(255, 255, 255, 0.88);
+}
+
+body.dark-mode .admin-department-body {
+  background: #05070d !important;
+  --bg-paper: #0f1623;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --border-color: rgba(148, 163, 184, 0.34);
+  --admin-department-strip-bg: #0f1623;
+  --admin-department-control-surface: rgba(30, 41, 59, 0.72);
+}
+
+.admin-department-title,
+.admin-department-text {
+  color: var(--text-primary) !important;
+}
+
+.admin-department-title-div {
+  border-bottom-color: var(--border-color);
+}
+
+.fixed-create-btn-container {
+  background: var(--admin-department-strip-bg);
+  border-color: var(--border-color);
+}
+
+.admin-department-select-all-label {
+  color: var(--text-primary);
+  background: var(--admin-department-control-surface);
+  border-color: var(--border-color);
+}
+
+.btn-admin-department-strip-collapse {
+  color: var(--text-primary) !important;
+  background: var(--admin-department-control-surface) !important;
+  border-color: var(--border-color) !important;
+}
+
+.admin-department-card {
+  background: var(--bg-paper) !important;
+  border: 1px solid var(--border-color);
+}
+
+.admin-department-delete-btn {
+  border-color: var(--border-color);
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent) !important;
+  color: var(--text-primary) !important;
+}
+
+body.light-mode .admin-department-body .MuiInputBase-root:not(.admin-input),
+body:not(.dark-mode):not(.light-mode) .admin-department-body .MuiInputBase-root:not(.admin-input) {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  color: #0f172a !important;
+  border: none !important;
+}
+
+body.light-mode .admin-department-body .MuiInputBase-root:not(.admin-input) input::placeholder,
+body:not(.dark-mode):not(.light-mode) .admin-department-body .MuiInputBase-root:not(.admin-input) input::placeholder {
+  color: rgba(15, 23, 42, 0.58) !important;
+}
+
+body.light-mode .admin-department-body .MuiSvgIcon-root,
+body:not(.dark-mode):not(.light-mode) .admin-department-body .MuiSvgIcon-root {
+  color: #475569 !important;
+}
+
+body.dark-mode .admin-department-body .MuiInputBase-root:not(.admin-input) {
+  background-color: rgba(15, 23, 42, 0.9) !important;
+  color: #f8fafc !important;
+  border: none !important;
+}
+
+body.dark-mode .admin-department-body .MuiInputBase-root:not(.admin-input) input::placeholder {
+  color: rgba(226, 232, 240, 0.72) !important;
+}
+
+body.dark-mode .admin-department-body .MuiSvgIcon-root {
+  color: #e2e8f0 !important;
+}
+
+body.light-mode .admin-department-body .admin-department-select-checkbox .MuiSvgIcon-root,
+body.dark-mode .admin-department-body .admin-department-select-checkbox .MuiSvgIcon-root,
+body:not(.dark-mode):not(.light-mode) .admin-department-body .admin-department-select-checkbox .MuiSvgIcon-root,
+body.light-mode .admin-department-body .admin-department-delete-btn .MuiSvgIcon-root,
+body.dark-mode .admin-department-body .admin-department-delete-btn .MuiSvgIcon-root,
+body:not(.dark-mode):not(.light-mode) .admin-department-body .admin-department-delete-btn .MuiSvgIcon-root {
+  color: inherit !important;
+}
+
+@media only screen and (min-width: 769px) {
+  .admin-department-body {
+    --admin-department-strip-gap: 12px;
+  }
+
+  .admin-department-body.admin-department-appbar-hidden {
+    --admin-department-strip-gap: 0px;
+  }
 }
