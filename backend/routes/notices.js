@@ -7,6 +7,11 @@ const {
   getNoticeById,
   getNoticeClosures
 } = require('../services/noticeService');
+const {
+  getNoticeTrashRetentionDays,
+  setNoticeTrashRetentionDays,
+  runNoticeTrashCleanup
+} = require('../services/noticeTrashCleanupService');
 const { runNoticeMailSyncNow } = require('../services/noticeMailSyncService');
 const Notice = require('../models/notice');
 const { syncNoticeToRegisteredCalendars } = require('../services/noticeCalendarSyncService');
@@ -72,6 +77,12 @@ const toDateOrNull = (value) => {
   return Number.isNaN(dt.getTime()) ? 'INVALID' : dt;
 };
 
+const parseRetentionDays = (value) => {
+  const days = Number(value);
+  if (!Number.isFinite(days)) return NaN;
+  return Math.max(1, Math.min(365, Math.floor(days)));
+};
+
 router.get('/', async (req, res) => {
   try {
     const includeDeleted = String(req.query.includeDeleted || '').trim() === '1';
@@ -125,9 +136,7 @@ router.get('/closures', async (req, res) => {
 
 router.get('/trash', async (req, res) => {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ error: 'Only admin can access notice trash' });
-    }
+    await runNoticeTrashCleanup();
 
     const notices = await listNotices({
       search: req.query.search,
@@ -140,6 +149,36 @@ router.get('/trash', async (req, res) => {
     return res.status(200).json({ notices });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Failed to fetch notice trash' });
+  }
+});
+
+router.get('/trash/retention', async (req, res) => {
+  try {
+    const retentionDays = await getNoticeTrashRetentionDays();
+    return res.status(200).json({ retentionDays, maxDays: 365, defaultDays: 30 });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to fetch notice trash retention' });
+  }
+});
+
+router.patch('/trash/retention', async (req, res) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: 'Only admin can update trash retention' });
+    }
+
+    const requestedDays = parseRetentionDays(req.body?.retentionDays);
+    if (!Number.isFinite(requestedDays)) {
+      return res.status(400).json({ error: 'retentionDays must be a number between 1 and 365' });
+    }
+
+    const updatedBy = req.user?.name || req.user?.email || 'Admin';
+    const retentionDays = await setNoticeTrashRetentionDays(requestedDays, updatedBy);
+    await runNoticeTrashCleanup({ force: true });
+
+    return res.status(200).json({ success: true, retentionDays, maxDays: 365 });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Failed to update notice trash retention' });
   }
 });
 

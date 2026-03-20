@@ -1,7 +1,13 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { getTrashedNoticesApi, permanentlyDeleteNoticeApi, restoreNoticeApi } from '../api/noticesApi';
+import {
+  getNoticeTrashRetentionApi,
+  getTrashedNoticesApi,
+  permanentlyDeleteNoticeApi,
+  restoreNoticeApi,
+  updateNoticeTrashRetentionApi
+} from '../api/noticesApi';
 import { getCalendarAppearanceApi } from '../api/calendarApi';
 import './TrashPage.css';
 
@@ -32,12 +38,12 @@ const Svgs = {
 const MOBILE_MEDIA_QUERY = '(max-width: 768px)';
 
 const TRASH_SORT_OPTIONS = [
-  { value: 'TRASH_LATEST', label: 'Deleted Date (Newest)', compact: 'Deleted ↓' },
-  { value: 'TRASH_OLDEST', label: 'Deleted Date (Oldest)', compact: 'Deleted ↑' },
-  { value: 'PUBLISHED_LATEST', label: 'Published Date (Newest)', compact: 'Published ↓' },
-  { value: 'PUBLISHED_OLDEST', label: 'Published Date (Oldest)', compact: 'Published ↑' },
-  { value: 'TITLE_ASC', label: 'Alphabet (A-Z)', compact: 'Title ↑' },
-  { value: 'TITLE_DESC', label: 'Alphabet (Z-A)', compact: 'Title ↓' }
+  { value: 'TRASH_LATEST', label: 'Deleted Date (Newest)', compact: 'Deleted v' },
+  { value: 'TRASH_OLDEST', label: 'Deleted Date (Oldest)', compact: 'Deleted ^' },
+  { value: 'PUBLISHED_LATEST', label: 'Published Date (Newest)', compact: 'Published v' },
+  { value: 'PUBLISHED_OLDEST', label: 'Published Date (Oldest)', compact: 'Published ^' },
+  { value: 'TITLE_ASC', label: 'Alphabet (A-Z)', compact: 'Title A-Z' },
+  { value: 'TITLE_DESC', label: 'Alphabet (Z-A)', compact: 'Title Z-A' }
 ];
 
 export default function TrashPage() {
@@ -55,6 +61,9 @@ export default function TrashPage() {
   const [searchInput, setSearchInput] = React.useState('');
   const [appliedSearch, setAppliedSearch] = React.useState('');
   const [sortKey, setSortKey] = React.useState('TRASH_LATEST');
+  const [retentionDays, setRetentionDays] = React.useState(30);
+  const [retentionDraft, setRetentionDraft] = React.useState('30');
+  const [retentionSaving, setRetentionSaving] = React.useState(false);
   const [themeMode, setThemeMode] = React.useState(() => normalizeThemeMode(readCookieValue(THEME_COOKIE_KEY) || 'Light'));
   const [isMobileView, setIsMobileView] = React.useState(() => (
     typeof window !== 'undefined' &&
@@ -74,13 +83,6 @@ export default function TrashPage() {
   }, []);
 
   const loadTrash = React.useCallback(async () => {
-    if (!isAdmin) {
-      setLoading(false);
-      setError('');
-      setTrashedNotices([]);
-      return;
-    }
-
     setLoading(true);
     setError('');
     setInfo('');
@@ -97,7 +99,20 @@ export default function TrashPage() {
     } finally {
       setLoading(false);
     }
-  }, [isAdmin, appliedSearch, sortKey]);
+  }, [appliedSearch, sortKey]);
+
+  const loadRetention = React.useCallback(async () => {
+    try {
+      const data = await getNoticeTrashRetentionApi();
+      const parsed = Number(data?.retentionDays);
+      if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 365) {
+        setRetentionDays(parsed);
+        setRetentionDraft(String(parsed));
+      }
+    } catch (_) {
+      // noop
+    }
+  }, []);
 
   const restoreNotice = React.useCallback(async (noticeId) => {
     if (!isAdmin || !noticeId) return;
@@ -137,9 +152,40 @@ export default function TrashPage() {
     }
   }, [isAdmin]);
 
+  const saveRetention = React.useCallback(async () => {
+    if (!isAdmin) return;
+    const parsed = Number(retentionDraft);
+    if (!Number.isFinite(parsed)) {
+      setError('Retention must be a number between 1 and 365 days.');
+      return;
+    }
+
+    const nextRetention = Math.max(1, Math.min(365, Math.floor(parsed)));
+    setRetentionSaving(true);
+    setError('');
+    setInfo('');
+    try {
+      const data = await updateNoticeTrashRetentionApi(nextRetention);
+      const saved = Number(data?.retentionDays);
+      const resolved = Number.isFinite(saved) ? saved : nextRetention;
+      setRetentionDays(resolved);
+      setRetentionDraft(String(resolved));
+      setInfo(`Trash auto-delete updated to ${resolved} day${resolved === 1 ? '' : 's'}.`);
+      await loadTrash();
+    } catch (err) {
+      setError(err?.response?.data?.error || 'Unable to update trash retention.');
+    } finally {
+      setRetentionSaving(false);
+    }
+  }, [isAdmin, loadTrash, retentionDraft]);
+
   React.useEffect(() => {
     loadTrash();
   }, [loadTrash]);
+
+  React.useEffect(() => {
+    loadRetention();
+  }, [loadRetention]);
 
   React.useEffect(() => {
     if (String(searchInput || '').trim() === '' && appliedSearch) {
@@ -240,7 +286,7 @@ export default function TrashPage() {
 
   const selectedSortLabel = React.useMemo(() => {
     const match = TRASH_SORT_OPTIONS.find((option) => option.value === sortKey);
-    return match?.compact || 'Sort ↓';
+    return match?.compact || 'Sort v';
   }, [sortKey]);
 
   const renderSortControl = React.useCallback((className = '') => (
@@ -334,16 +380,51 @@ export default function TrashPage() {
         )}
       </header>
 
+      {isAdmin && (
+        <section className="trash-retention-bar" aria-label="Trash retention">
+          <form
+            className="trash-retention-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveRetention();
+            }}
+          >
+            <span className="trash-retention-label">Auto-delete after</span>
+            <input
+              type="number"
+              min="1"
+              max="365"
+              step="1"
+              className="trash-retention-input"
+              value={retentionDraft}
+              onChange={(e) => setRetentionDraft(e.target.value)}
+              aria-label="Retention in days"
+            />
+            <span className="trash-retention-suffix">days</span>
+            <button type="submit" className="trash-retention-save" disabled={retentionSaving}>
+              {retentionSaving ? 'Saving...' : 'Save'}
+            </button>
+            <span className="trash-retention-meta">
+              Current: {retentionDays} day{retentionDays === 1 ? '' : 's'} (max 365)
+            </span>
+          </form>
+        </section>
+      )}
+
       <div className="trash-layout">
         <main className="trash-main">
-          {!isAdmin && <div className="empty-trash-message">Only admin can view deleted notices.</div>}
-          {isAdmin && loading && <div className="empty-trash-message">Loading trash...</div>}
-          {isAdmin && !loading && error && <div className="empty-trash-message trash-error">{error}</div>}
-          {isAdmin && !loading && !error && info && <div className="empty-trash-message trash-info">{info}</div>}
-          {isAdmin && !loading && !error && trashedNotices.length === 0 && (
+          {loading && <div className="empty-trash-message">Loading trash...</div>}
+          {!loading && error && <div className="empty-trash-message trash-error">{error}</div>}
+          {!loading && !error && info && <div className="empty-trash-message trash-info">{info}</div>}
+          {!isAdmin && !loading && !error && (
+            <div className="empty-trash-message trash-readonly-note">
+              Read-only mode: only admin can restore or permanently delete notices.
+            </div>
+          )}
+          {!loading && !error && trashedNotices.length === 0 && (
             <div className="empty-trash-message">There are no deleted notices.</div>
           )}
-          {isAdmin && !loading && !error && trashedNotices.length > 0 && (
+          {!loading && !error && trashedNotices.length > 0 && (
             <div className="trash-list">
               {trashedNotices.map((notice) => (
                 <article key={notice._id} className="trash-item">
@@ -377,8 +458,6 @@ export default function TrashPage() {
                     </div>
                   </div>
                   <p>{notice.summary || notice.content || notice.body || 'No preview available.'}</p>
-                  
-                  {/* Updated section for neatly stacking the dates  */}
                   <div className="trash-item-meta">
                     <div className="trash-meta-dates">
                       <span className="trash-date-published">Published: {formatDate(notice.createdAt)}</span>
@@ -388,7 +467,6 @@ export default function TrashPage() {
                       {notice.kind === 'HOLIDAY' ? 'Alert/Closure' : 'Notice'}
                     </span>
                   </div>
-
                 </article>
               ))}
             </div>

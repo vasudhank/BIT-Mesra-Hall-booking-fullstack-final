@@ -15,6 +15,7 @@ const Developer = require('./models/developer');
 const { startFaqAutoPromotion } = require('./services/faqAutoPromotionService');
 const { startBookingCleanupSchedule } = require('./services/bookingCleanupService');
 const { startNoticeMailSync } = require('./services/noticeMailSyncService');
+const { startNoticeTrashCleanupSchedule } = require('./services/noticeTrashCleanupService');
 
 const PORT = process.env.PORT || 8000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -97,6 +98,7 @@ const server = app.listen(PORT, () => {
   startFaqAutoPromotion();
   startBookingCleanupSchedule();
   startNoticeMailSync();
+  startNoticeTrashCleanupSchedule();
 });
 
 server.on('error', (err) => {

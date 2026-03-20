@@ -35,6 +35,20 @@ export const getTrashedNoticesApi = async (params = {}) => {
   return response.data;
 };
 
+export const getNoticeTrashRetentionApi = async () => {
+  const response = await api.get('/notices/trash/retention', { withCredentials: true });
+  return response.data;
+};
+
+export const updateNoticeTrashRetentionApi = async (retentionDays) => {
+  const response = await api.patch(
+    '/notices/trash/retention',
+    { retentionDays },
+    { withCredentials: true }
+  );
+  return response.data;
+};
+
 export const restoreNoticeApi = async (id) => {
   const response = await api.patch(`/notices/${id}/restore`, {}, { withCredentials: true });
   return response.data;
