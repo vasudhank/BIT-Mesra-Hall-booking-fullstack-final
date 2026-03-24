@@ -501,6 +501,20 @@
   background: #f1f3f4 !important;
 }
 
+.gcal-user-menu-divider {
+  margin: 6px 0;
+}
+
+.gcal-user-menu-section-label {
+  padding: 4px 12px 6px;
+  font-family: 'Google Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #70757a;
+}
+
 /* --- LAYOUT --- */
 .gcal-layout {
   display: flex;
@@ -4575,5 +4589,617 @@ al-search-result-date span,
   .gcal-cancel-btn,
   .gcal-save-btn {
     width: 100%;
+  }
+}
+
+@media (max-width: 900px) {
+  .gcal-page {
+    --gcal-mobile-clock-strip-height: 36px;
+    --gcal-mobile-topbar-height: 58px;
+    --gcal-mobile-top-stack-height: calc(var(--gcal-mobile-clock-strip-height) + var(--gcal-mobile-topbar-height));
+    --gcal-week-grid-start-offset: 56px;
+    --gcal-week-time-text-right-gap: 8px;
+    --gcal-week-hour-row-height: 46px;
+    --gcal-week-all-day-collapsed-max-height: 58px;
+    --gcal-week-all-day-expanded-max-height: 126px;
+    --gcal-day-all-day-collapsed-max-height: 58px;
+    --gcal-day-all-day-expanded-max-height: 126px;
+  }
+
+  .gcal-mobile-time-strip {
+    width: 100%;
+    height: var(--gcal-mobile-clock-strip-height);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 12px;
+    box-sizing: border-box;
+    border-bottom: 1px solid #dfe5ec;
+    background: #202124;
+    flex-shrink: 0;
+  }
+
+  .gcal-mobile-time-value {
+    font-family: 'Google Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: #1f2a37;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    user-select: none;
+  }
+
+  .gcal-topbar {
+    height: var(--gcal-mobile-topbar-height);
+    padding: 8px 10px;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .gcal-top-left {
+    min-width: 0;
+    flex: 0 0 auto;
+    gap: 4px;
+  }
+
+  .gcal-top-center-mobile {
+    min-width: 0;
+    flex: 1 1 auto;
+    gap: 4px;
+    justify-content: flex-start;
+    overflow: hidden;
+  }
+
+  .gcal-top-right-mobile {
+    flex: 0 0 auto;
+    gap: 4px;
+    padding-right: 0;
+    margin-left: auto;
+  }
+
+  .gcal-top-right-mobile .gcal-icon-btn,
+  .gcal-top-left .gcal-icon-btn,
+  .gcal-top-center-mobile .gcal-icon-btn.nav {
+    width: 34px;
+    height: 34px;
+  }
+
+  .gcal-top-right-mobile .gcal-icon-btn svg,
+  .gcal-top-left .gcal-icon-btn svg,
+  .gcal-top-center-mobile .gcal-icon-btn.nav svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .gcal-create-mini-btn {
+    border-radius: 12px;
+    border: 1px solid #dadce0;
+    background: #ffffff;
+    box-shadow: 0 1px 2px rgba(60, 64, 67, 0.14);
+  }
+
+  .gcal-nav-arrows {
+    margin-left: 0;
+  }
+
+  .gcal-top-center-mobile .gcal-nav-arrows {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin-right: 2px;
+    flex: 0 0 auto;
+  }
+
+  .gcal-top-center-mobile .gcal-icon-btn.nav {
+    width: 28px;
+    height: 16px;
+    border-radius: 8px;
+  }
+
+  .gcal-top-center-mobile .gcal-icon-btn.nav svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .gcal-view-title {
+    margin: 0;
+    min-width: 0;
+    max-width: clamp(112px, 38vw, 190px);
+    font-size: 15px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .gcal-btn-today-mobile {
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .gcal-user-container {
+    margin-left: 0;
+  }
+
+  .gcal-user-menu {
+    top: 38px;
+    right: 0;
+    min-width: 190px;
+    max-width: min(82vw, 240px);
+  }
+
+  .gcal-search-header {
+    min-width: 0;
+    gap: 6px;
+  }
+
+  .gcal-search-back {
+    min-width: 0;
+    gap: 4px;
+    flex: 0 0 auto;
+  }
+
+  .search-title {
+    margin-left: 0;
+    font-size: 15px;
+  }
+
+  .gcal-search-input-box {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+    height: 40px;
+    margin-right: 0;
+  }
+
+  .gcal-search-input-box input {
+    font-size: 14px;
+  }
+
+  .gcal-layout {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .gcal-sidebar-scrim {
+    position: fixed;
+    top: var(--gcal-mobile-top-stack-height);
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 95;
+    border: 0;
+    background: rgba(17, 24, 39, 0.24);
+  }
+
+  .gcal-sidebar {
+    position: fixed;
+    top: var(--gcal-mobile-top-stack-height);
+    left: 0;
+    bottom: 0;
+    width: min(280px, 78vw);
+    max-width: 78vw;
+    z-index: 110;
+    border-right: 1px solid #dadce0;
+    box-shadow: 14px 0 28px rgba(15, 23, 42, 0.18);
+    transition: transform 0.22s ease, opacity 0.22s ease;
+  }
+
+  .gcal-layout.sidebar-closed .gcal-sidebar {
+    width: min(280px, 78vw);
+    transform: translateX(-100%);
+    opacity: 0;
+    padding: 0 0 16px;
+    pointer-events: none;
+  }
+
+  .gcal-main {
+    width: 100%;
+  }
+
+  .gcal-collapsed-fab {
+    display: none !important;
+  }
+
+  .gcal-mobile-sidebar-section {
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .gcal-mobile-sidebar-title {
+    margin-bottom: 10px;
+    font-family: 'Google Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #6b7280;
+  }
+
+  .gcal-mobile-view-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .gcal-mobile-view-btn {
+    min-height: 36px;
+    border: 1px solid #dadce0;
+    border-radius: 12px;
+    background: #ffffff;
+    color: #3c4043;
+    font-family: 'Google Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+  }
+
+  .gcal-mobile-view-btn.is-active {
+    background: #e8f0fe;
+    border-color: #8ab4f8;
+    color: #1a73e8;
+  }
+
+  .gcal-mobile-view-toggles {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 10px;
+  }
+
+  .gcal-mobile-view-toggle {
+    padding: 6px 0 6px 4px;
+  }
+
+  .gcal-mini-month {
+    padding: 0 16px 14px;
+  }
+
+  .gcal-accordion {
+    margin-top: 12px;
+  }
+
+  .gcal-accordion-header {
+    padding: 8px 16px;
+  }
+
+  .gcal-checkbox-label {
+    padding: 6px 16px 6px 34px;
+  }
+
+  .gcal-sidebar-footer {
+    padding: 12px 16px 18px;
+  }
+
+  .gcal-custom-year-wrapper {
+    padding: 8px 10px 10px;
+  }
+
+  .gcal-layout.sidebar-closed .gcal-custom-year-wrapper,
+  .gcal-layout.sidebar-closed .fc-multiMonthYear-view {
+    padding-left: 10px !important;
+  }
+
+  .gcal-custom-year-wrapper .calendar-year {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-rows: 1fr;
+    gap: 8px 10px;
+    min-height: calc(100vh - var(--gcal-mobile-top-stack-height) - 18px);
+  }
+
+  .gcal-custom-year-wrapper .month-container {
+    min-height: 0;
+  }
+
+  .gcal-custom-year-wrapper .month-title {
+    margin-bottom: 4px;
+    font-size: 11px;
+  }
+
+  .gcal-custom-year-wrapper .days-header,
+  .gcal-custom-year-wrapper .days-grid {
+    row-gap: 2px;
+  }
+
+  .gcal-custom-year-wrapper .day-name {
+    margin-bottom: 2px;
+    font-size: 8px;
+  }
+
+  .gcal-custom-year-wrapper .day {
+    width: 14px;
+    height: 14px;
+    font-size: 8px;
+  }
+
+  .gcal-mobile .fc .fc-dayGridMonth-view .fc-col-header-cell-cushion {
+    padding: 6px 0 2px !important;
+    font-size: 10px;
+  }
+
+  .gcal-mobile .fc .fc-dayGridMonth-view .fc-scrollgrid,
+  .gcal-mobile .fc .fc-dayGridMonth-view table,
+  .gcal-mobile .fc .fc-dayGridMonth-view td,
+  .gcal-mobile .fc .fc-dayGridMonth-view th {
+    border: none !important;
+  }
+
+
+  .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-day-frame {
+    min-height: 52px;
+    padding-bottom: 2px;
+  }
+
+  .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-day-top {
+    padding-top: 2px !important;
+  }
+
+  .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-day-number {
+    width: 20px;
+    height: 20px;
+    font-size: 11px;
+  }
+
+  
+
+  .fc-event {
+    font-size: 10px !important;
+    padding: 1px 5px !important;
+  }
+
+  .fc-more-link {
+    font-size: 10px;
+    padding: 1px 5px;
+  }
+
+  .gcal-day-header-custom {
+    gap: 3px;
+    padding: 4px 0 6px;
+  }
+
+  .gcal-day-name {
+    font-size: 9px;
+  }
+
+  .gcal-day-number {
+    width: 30px;
+    height: 30px;
+    font-size: 15px;
+  }
+
+  .fc .fc-timeGridWeek-view .fc-timegrid-axis,
+  .fc .fc-timeGridDay-view .fc-timegrid-axis {
+    width: var(--gcal-week-axis-width) !important;
+  }
+
+  .fc .fc-timeGridWeek-view .fc-timegrid-slot,
+  .fc .fc-timeGridDay-view .fc-timegrid-slot {
+    height: var(--gcal-week-hour-row-height);
+  }
+
+  .fc .fc-timeGridWeek-view .fc-timegrid-axis-cushion,
+  .fc .fc-timeGridWeek-view .fc-timegrid-slot-label-cushion,
+  .fc .fc-timeGridDay-view .fc-timegrid-axis-cushion,
+  .fc .fc-timeGridDay-view .fc-timegrid-slot-label-cushion {
+    font-size: 10px;
+  }
+
+  .gcal-schedule-panel {
+    --schedule-events-shift: 10px;
+    --schedule-row-padding-inline: 12px;
+    padding: 12px 0;
+  }
+
+  .gcal-schedule-panel .schedule-wrapper {
+    max-width: 100%;
+  }
+
+  .gcal-schedule-panel .day-group {
+    padding: 10px var(--schedule-row-padding-inline);
+  }
+
+  .gcal-schedule-panel .date-col {
+    width: 82px;
+    gap: 8px;
+  }
+
+  .gcal-schedule-panel .date-number {
+    width: 28px;
+    height: 28px;
+    font-size: 16px;
+  }
+
+  .gcal-schedule-panel .date-label {
+    min-height: 28px;
+    font-size: 9px;
+    line-height: 1.15;
+  }
+
+  .gcal-schedule-panel .events-col,
+  .gcal-schedule-panel .event-item,
+  .gcal-schedule-panel .event-click-zone {
+    min-height: 32px;
+  }
+
+  .gcal-schedule-panel .event-dot {
+    width: 8px;
+    height: 8px;
+    margin-right: 10px;
+  }
+
+  .gcal-schedule-panel .event-time {
+    width: 72px;
+    font-size: 11px;
+  }
+
+  .gcal-schedule-panel .event-title {
+    font-size: 11px;
+    gap: 6px;
+  }
+
+  .gcal-schedule-panel .event-location {
+    margin-left: 4px;
+    font-size: 10px;
+  }
+
+  .gcal-popover-connector {
+    display: none !important;
+  }
+
+  .gcal-event-popover {
+    width: min(92vw, 420px);
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+    border-radius: 20px;
+  }
+
+  .gcal-event-popover-shell {
+    max-height: calc(100vh - 16px);
+  }
+
+  .popover-header {
+    padding: 8px 10px 0;
+  }
+
+  .popover-body {
+    padding: 16px 16px 18px;
+    gap: 14px;
+  }
+
+  .gcal-modal.premium-modal {
+    width: min(94vw, 480px);
+    max-height: 90vh;
+    border-radius: 16px;
+  }
+
+  .gcal-modal-body.premium-body {
+    padding: 0 12px 14px;
+    overflow-y: auto;
+  }
+
+  .gcal-task-modal-head {
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .gcal-task-modal-head-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+
+  .gcal-task-modal-head-icon svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .gcal-task-modal-head-copy h3 {
+    font-size: 17px;
+  }
+
+  .gcal-task-modal-head-copy p {
+    font-size: 12px;
+  }
+
+  .gcal-task-form {
+    gap: 12px;
+  }
+
+  .gcal-modal-title-input {
+    padding: 11px 13px;
+    font-size: 17px;
+  }
+
+  .gcal-modal-row.task-row,
+  .gcal-modal-row.checkbox-row {
+    padding: 10px;
+  }
+
+  .icon-wrapper {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+  }
+
+  .icon-wrapper svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .gcal-task-field-label,
+  .gcal-time-line-label {
+    font-size: 10px;
+  }
+
+  .datetime-inputs input,
+  .gcal-date-display-input {
+    font-size: 13px;
+  }
+
+  .gcal-date-display-wrap {
+    min-height: 38px;
+    width: 100%;
+  }
+
+  .gcal-time-line {
+    gap: 6px;
+  }
+}
+
+.theme-dark .gcal-user-menu-section-label {
+  color: #9aa0a6;
+}
+
+@media (max-width: 900px) {
+  .theme-dark .gcal-mobile-time-strip {
+    background: #202124;
+    border-bottom-color: #3c4043;
+  }
+
+  .theme-dark .gcal-mobile-time-value {
+    color: #e8eaed;
+  }
+
+  .theme-dark .gcal-create-mini-btn {
+    background: #202124;
+    border-color: #5f6368;
+  }
+
+  .theme-dark .gcal-sidebar-scrim {
+    background: rgba(0, 0, 0, 0.44);
+  }
+
+  .theme-dark .gcal-sidebar {
+    border-right-color: #5f6368;
+    box-shadow: 14px 0 28px rgba(0, 0, 0, 0.38);
+  }
+
+  .theme-dark .gcal-mobile-sidebar-section {
+    border-bottom-color: #3c4043;
+  }
+
+  .theme-dark .gcal-mobile-sidebar-title {
+    color: #9aa0a6;
+  }
+
+  .theme-dark .gcal-mobile-view-btn {
+    background: #2b2b2b;
+    border-color: #5f6368;
+    color: #e8eaed;
+  }
+
+  .theme-dark .gcal-mobile-view-btn.is-active {
+    background: #8ab4f8;
+    border-color: #8ab4f8;
+    color: #202124;
   }
 }

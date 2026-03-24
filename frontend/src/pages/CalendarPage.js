@@ -311,6 +311,20 @@ const formatScheduleDateString = (dateString) => {
   return { dayNum, label: `${month}, ${weekday}` };
 };
 
+const stripYearFromHeaderTitle = (title) => {
+  const raw = String(title || '').trim();
+  if (!raw) return '';
+
+  return raw
+    .replace(/,\s*\d{4}\b/g, '')
+    .replace(/\s+\d{4}\b/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s*([\u2013\u2014-])\s*/g, ' $1 ')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/[,\s]+$/g, '')
+    .trim();
+};
+
 const computeAllDaySpanDays = (startValue, endValue) => {
   const start = toDateOrNull(startValue);
   if (!start) return 1;
@@ -1038,6 +1052,9 @@ export default function CalendarPage() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const auth = useSelector((state) => state.user);
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 900px)').matches : false
+  );
 
   const calendarRef = useRef(null);
   const calendarCardRef = useRef(null);
@@ -1098,7 +1115,9 @@ export default function CalendarPage() {
   const [viewRange, setViewRange] = useState({ start: null, end: null });
   const [weekAllDayExpanded, setWeekAllDayExpanded] = useState(false);
   const [dayAllDayExpanded, setDayAllDayExpanded] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    typeof window !== 'undefined' ? !window.matchMedia('(max-width: 900px)').matches : true
+  );
   const [miniAnchorDate, setMiniAnchorDate] = useState(new Date());
   
   // Search state
@@ -1245,6 +1264,36 @@ export default function CalendarPage() {
     }, 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const mediaQuery = window.matchMedia('(max-width: 900px)');
+    const applyViewportMode = (matches) => {
+      setIsMobile(matches);
+      setSidebarOpen((prev) => (matches ? false : true));
+      if (matches) {
+        setViewDropdownOpen(false);
+        setSettingsDropdownOpen(false);
+      }
+    };
+
+    applyViewportMode(mediaQuery.matches);
+
+    const handleChange = (event) => applyViewportMode(event.matches);
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+
+    mediaQuery.addListener(handleChange);
+    return () => mediaQuery.removeListener(handleChange);
+  }, []);
+
+  useEffect(() => {
+    if (isMobile && searchOpen) {
+      setSidebarOpen(false);
+    }
+  }, [isMobile, searchOpen]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -6634,6 +6683,34 @@ export default function CalendarPage() {
   };
 
   const viewLabels = { timeGridDay: 'Day', timeGridWeek: 'Week', dayGridMonth: 'Month', multiMonthYear: 'Year', listYear: 'Schedule' };
+  const mobileTodayLabel = String(new Date(headerClockTick).getDate());
+  const displayViewTitle = useMemo(() => {
+    if (!isMobile) return viewTitle;
+    const withoutYear = stripYearFromHeaderTitle(viewTitle);
+    return withoutYear || viewLabels[viewType] || viewTitle;
+  }, [isMobile, viewTitle, viewType]);
+    const toggleSidebar = () => {
+    setSidebarOpen((prev) => !prev);
+    if (isMobile) {
+      setViewDropdownOpen(false);
+      setSettingsDropdownOpen(false);
+    }
+  };
+
+  const openSearchFromHeader = (e) => {
+    e.stopPropagation();
+    const api = calendarRef.current?.getApi();
+    const capturedView = String(api?.view?.type || viewType || 'dayGridMonth');
+    const apiDate = api?.getDate?.();
+    let capturedIso = '';
+    if (apiDate instanceof Date && !Number.isNaN(apiDate.getTime())) {
+      capturedIso = apiDate.toISOString();
+    } else if (viewRange?.start instanceof Date && !Number.isNaN(viewRange.start.getTime())) {
+      capturedIso = viewRange.start.toISOString();
+    }
+    searchReturnRef.current = { view: capturedView, dateIso: capturedIso };
+    setSearchOpen(true);
+  };
 
   const closeUserMenu = () => setUserMenuOpen(false);
 
@@ -6696,6 +6773,15 @@ export default function CalendarPage() {
                 align="left"
                 closeParentMenu={closeUserMenu}
               />
+              {isMobile && (
+                <>
+                  <div className="gcal-dropdown-divider gcal-user-menu-divider"></div>
+                  <div className="gcal-user-menu-section-label">SETTINGS</div>
+                  <button type="button" className="gcal-user-menu-item" onClick={() => { closeUserMenu(); openPrintDialog(); }}>PRINT</button>
+                  <button type="button" className="gcal-user-menu-item" onClick={() => { closeUserMenu(); navigate('/trash'); }}>TRASH</button>
+                  <button type="button" className="gcal-user-menu-item" onClick={() => { closeUserMenu(); openAppearanceModal(); }}>APPEARANCE</button>
+                </>
+              )}
             </>
           ) : (
             <>
@@ -6713,6 +6799,15 @@ export default function CalendarPage() {
                 excludeKeys={['admin', 'faculty']}
                 closeParentMenu={closeUserMenu}
               />
+              {isMobile && (
+                <>
+                  <div className="gcal-dropdown-divider gcal-user-menu-divider"></div>
+                  <div className="gcal-user-menu-section-label">SETTINGS</div>
+                  <button type="button" className="gcal-user-menu-item" onClick={() => { closeUserMenu(); openPrintDialog(); }}>PRINT</button>
+                  <button type="button" className="gcal-user-menu-item" onClick={() => { closeUserMenu(); navigate('/trash'); }}>TRASH</button>
+                  <button type="button" className="gcal-user-menu-item" onClick={() => { closeUserMenu(); openAppearanceModal(); }}>APPEARANCE</button>
+                </>
+              )}
             </>
           )}
         </div>
@@ -6891,65 +6986,91 @@ export default function CalendarPage() {
   }, [popover, popoverDetails?.badgeColor]);
 
   const calendarLogoSrc = `https://ssl.gstatic.com/calendar/images/dynamiclogo_2020q4/calendar_${logoDay}_2x.png`;
-  const headerClockText = `${new Intl.DateTimeFormat('en-IN', {
+  const clockTimeText = new Intl.DateTimeFormat('en-IN', {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
     hour12: false,
     timeZone: 'Asia/Kolkata'
-  }).format(new Date(headerClockTick))} IST`;
+  }).format(new Date(headerClockTick));
+  const headerClockText = `${clockTimeText} IST`;
 
   return (
     <div
-      className={`gcal-page theme-${themeMode.toLowerCase()}${searchOpen ? ' search-open' : ''}${viewType === 'timeGridWeek' ? (weekAllDayExpanded ? ' week-all-day-expanded' : ' week-all-day-collapsed') : ''}${viewType === 'timeGridDay' ? (dayAllDayExpanded ? ' day-all-day-expanded' : ' day-all-day-collapsed') : ''}`}
+      className={`gcal-page theme-${themeMode.toLowerCase()}${isMobile ? ' gcal-mobile' : ''}${searchOpen ? ' search-open' : ''}${viewType === 'timeGridWeek' ? (weekAllDayExpanded ? ' week-all-day-expanded' : ' week-all-day-collapsed') : ''}${viewType === 'timeGridDay' ? (dayAllDayExpanded ? ' day-all-day-expanded' : ' day-all-day-collapsed') : ''}`}
     >
+      {isMobile && (
+        <div className="gcal-mobile-time-strip" aria-label="Current time in IST">
+          <span className="gcal-mobile-time-value">{clockTimeText}</span>
+        </div>
+      )}
       
       {/* Top Navigation Bar - Switches Mode when Searching */}
       <header className="gcal-topbar">
         {!searchOpen ? (
           <>
             <div className="gcal-top-left">
-              <button type="button" className="gcal-icon-btn" onClick={() => setSidebarOpen(v => !v)} aria-label="Main menu"><Svgs.Menu /></button>
-              <div className="gcal-brand">
-                <img src={calendarLogoSrc} alt="Calendar" className="gcal-logo-img" />
-                <span>Calendar</span>
-              </div>
+              <button type="button" className="gcal-icon-btn" onClick={toggleSidebar} aria-label="Main menu"><Svgs.Menu /></button>
+              {isMobile ? (
+                <button
+                  type="button"
+                  className="gcal-icon-btn gcal-create-mini-btn"
+                  onClick={openTaskModalFromCreate}
+                  aria-label="Create public task"
+                >
+                  <Svgs.Plus />
+                </button>
+              ) : (
+                <div className="gcal-brand">
+                  <img src={calendarLogoSrc} alt="Calendar" className="gcal-logo-img" />
+                  <span>Calendar</span>
+                </div>
+              )}
             </div>
 
-            <div className="gcal-top-center">
-              <button type="button" className="gcal-btn-today" onClick={() => executeCalendarCommand('today')}>Today</button>
+            <div className={`gcal-top-center ${isMobile ? 'gcal-top-center-mobile' : ''}`}>
+              {!isMobile && (
+                <button type="button" className="gcal-btn-today" onClick={() => executeCalendarCommand('today')}>Today</button>
+              )}
               <div className="gcal-nav-arrows">
-                <button type="button" className="gcal-icon-btn nav" onClick={() => executeCalendarCommand('prev')} aria-label="Previous"><svg width="20" height="20" viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"></path></svg></button>
-                <button type="button" className="gcal-icon-btn nav" onClick={() => executeCalendarCommand('next')} aria-label="Next"><svg width="20" height="20" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"></path></svg></button>
+                <button type="button" className="gcal-icon-btn nav" onClick={() => executeCalendarCommand('prev')} aria-label="Previous">
+                  {isMobile ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24"><path d="M7 14l5-5 5 5z"></path></svg>
+                  ) : (
+                    <svg width="20" height="20" viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"></path></svg>
+                  )}
+                </button>
+                <button type="button" className="gcal-icon-btn nav" onClick={() => executeCalendarCommand('next')} aria-label="Next">
+                  {isMobile ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"></path></svg>
+                  ) : (
+                    <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"></path></svg>
+                  )}
+                </button>
               </div>
-              <h2 className="gcal-view-title">{viewTitle}</h2>
+              <h2 className="gcal-view-title">{displayViewTitle}</h2>
             </div>
 
-            <div className="gcal-top-right">
-              <div className="gcal-header-clock" aria-label="Current time in IST">
-                {headerClockText}
-              </div>
+            <div className={`gcal-top-right ${isMobile ? 'gcal-top-right-mobile' : ''}`}>
+              {!isMobile && (
+                <div className="gcal-header-clock" aria-label="Current time in IST">
+                  {headerClockText}
+                </div>
+              )}
+              {isMobile && (
+                <button type="button" className="gcal-btn-today gcal-btn-today-mobile" onClick={() => executeCalendarCommand('today')} aria-label="Go to today">
+                  {mobileTodayLabel}
+                </button>
+              )}
               <button
                 className="gcal-icon-btn gcal-search-icon-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const api = calendarRef.current?.getApi();
-                  const capturedView = String(api?.view?.type || viewType || 'dayGridMonth');
-                  const apiDate = api?.getDate?.();
-                  let capturedIso = '';
-                  if (apiDate instanceof Date && !Number.isNaN(apiDate.getTime())) {
-                    capturedIso = apiDate.toISOString();
-                  } else if (viewRange?.start instanceof Date && !Number.isNaN(viewRange.start.getTime())) {
-                    capturedIso = viewRange.start.toISOString();
-                  }
-                  searchReturnRef.current = { view: capturedView, dateIso: capturedIso };
-                  setSearchOpen(true);
-                }}
+                onClick={openSearchFromHeader}
               >
                 <Svgs.Search />
               </button>
               
               {/* Settings Dropdown */}
+              {!isMobile && (
               <div className="gcal-settings-container">
                 <button className="gcal-icon-btn" onClick={() => setSettingsDropdownOpen(!settingsDropdownOpen)}><Svgs.Settings /></button>
                 {settingsDropdownOpen && (
@@ -6973,8 +7094,10 @@ export default function CalendarPage() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* View Selector Dropdown */}
+              {!isMobile && (
               <div className="gcal-view-selector-container">
                 <button className="gcal-view-selector-btn" onClick={() => setViewDropdownOpen(!viewDropdownOpen)}>
                   {viewLabels[viewType]} <Svgs.CaretDown />
@@ -6996,6 +7119,7 @@ export default function CalendarPage() {
                   </div>
                 )}
               </div>
+              )}
               {renderUserMenu()}
             </div>
           </>
@@ -7047,14 +7171,63 @@ export default function CalendarPage() {
       </header>
 
       <div className={`gcal-layout ${!sidebarOpen ? 'sidebar-closed' : ''}`}>
+        {isMobile && sidebarOpen && !searchOpen && (
+          <button
+            type="button"
+            className="gcal-sidebar-scrim"
+            aria-label="Close sidebar"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
         
         {/* Sidebar */}
         <aside className="gcal-sidebar">
-          {!searchOpen && (
+          {!searchOpen && !isMobile && (
             <div className="gcal-create-wrapper">
               <button type="button" className="gcal-fab" onClick={openTaskModalFromCreate}>
                 <Svgs.Plus /> <span>Create</span>
               </button>
+            </div>
+          )}
+
+          {isMobile && !searchOpen && (
+            <div className="gcal-mobile-sidebar-section">
+              <div className="gcal-mobile-sidebar-title">Views</div>
+              <div className="gcal-mobile-view-grid">
+                {Object.entries(viewLabels).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={`gcal-mobile-view-btn ${viewType === value ? 'is-active' : ''}`}
+                    onClick={() => {
+                      handleViewChange(value);
+                      setSidebarOpen(false);
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="gcal-mobile-view-toggles">
+                <label className="gcal-checkbox-label gcal-mobile-view-toggle">
+                  <input
+                    type="checkbox"
+                    checked={viewOptions.weekends}
+                    onChange={() => setViewOptions({ ...viewOptions, weekends: !viewOptions.weekends })}
+                  />
+                  <div className="gcal-checkbox-custom cb-blue">{viewOptions.weekends && <Svgs.Check />}</div>
+                  <span className="gcal-checkbox-text">Show weekends</span>
+                </label>
+                <label className="gcal-checkbox-label gcal-mobile-view-toggle">
+                  <input
+                    type="checkbox"
+                    checked={viewOptions.declined}
+                    onChange={() => setViewOptions({ ...viewOptions, declined: !viewOptions.declined })}
+                  />
+                  <div className="gcal-checkbox-custom cb-purple">{viewOptions.declined && <Svgs.Check />}</div>
+                  <span className="gcal-checkbox-text">Show declined events</span>
+                </label>
+              </div>
             </div>
           )}
 
@@ -7144,7 +7317,7 @@ export default function CalendarPage() {
         {/* Main Calendar View */}
         <main className="gcal-main">
           {/* Floating Create FAB when sidebar is collapsed */}
-          {!sidebarOpen && !searchOpen && (
+          {!sidebarOpen && !searchOpen && !isMobile && (
             <button
               type="button"
               className="gcal-collapsed-fab"
@@ -7332,6 +7505,11 @@ export default function CalendarPage() {
                 dateClick={handleDateClick}
                 datesSet={handleDatesSet}
                 moreLinkClick={handleMoreLinkClick}
+                moreLinkContent={(arg) => (
+                  isMobile && viewType === 'dayGridMonth'
+                    ? `+${arg.num} more`
+                    : `+${arg.num}`
+                )}
                 dayMaxEvents={true} 
                 eventOrder={compareCalendarEventPriority}
                 eventOrderStrict={true}
@@ -7393,7 +7571,8 @@ export default function CalendarPage() {
                     )
                   },
                   dayGridMonth: {
-                    dayHeaderFormat: { weekday: 'short' }
+                    dayHeaderFormat: { weekday: 'short' },
+                    dayMaxEvents: isMobile ? 3 : true
                   },
                   multiMonthYear: {
                     multiMonthMaxColumns: 4,
@@ -7495,7 +7674,7 @@ export default function CalendarPage() {
       {popover.open && (
         <>
           <div className="gcal-popover-backdrop" onClick={closePopover}></div>
-          {popoverConnector && (
+          {!isMobile && popoverConnector && (
             <svg className="gcal-popover-connector" aria-hidden="true" viewBox={`0 0 ${window.innerWidth} ${window.innerHeight}`}>
               {popoverConnector.leadLine && (
                 <line
