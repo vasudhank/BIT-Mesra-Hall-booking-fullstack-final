@@ -1927,6 +1927,8 @@ export default function NoticeDetailPage() {
                         {notice.kind === 'HOLIDAY' ? 'Closure Notice' : 'General Notice'}
                       </span>
                       <span>Published: {formatDate(notice.createdAt)}</span>
+                      <span>Source: {notice.source === 'EMAIL' ? 'Email Notice' : 'Manual Notice'}</span>
+                      {notice.emailFrom && <span>From: {notice.emailFrom}</span>}
                       {notice.holidayName && <span>Event: {notice.holidayName}</span>}
                       {notice.startDateTime && <span>Start: {formatDate(notice.startDateTime)}</span>}
                       {notice.endDateTime && <span>End: {formatDate(notice.endDateTime)}</span>}

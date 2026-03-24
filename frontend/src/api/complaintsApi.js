@@ -25,6 +25,16 @@ export const postComplaintQuickSolution = async (id, payload) => {
   return data;
 };
 
+export const updateComplaintSolution = async (id, solutionId, payload) => {
+  const { data } = await api.patch(`/complaints/${id}/solutions/${solutionId}`, payload, { withCredentials: true });
+  return data;
+};
+
+export const deleteComplaintSolution = async (id, solutionId) => {
+  const { data } = await api.delete(`/complaints/${id}/solutions/${solutionId}`, { withCredentials: true });
+  return data;
+};
+
 export const reactComplaintSolution = async (id, solutionId, payload) => {
   const { data } = await api.post(`/complaints/${id}/solutions/${solutionId}/react`, payload, { withCredentials: true });
   return data;
@@ -42,6 +52,11 @@ export const reactComplaintReply = async (id, solutionId, replyId, payload) => {
 
 export const updateComplaintStatus = async (id, payload) => {
   const { data } = await api.patch(`/complaints/${id}/status`, payload, { withCredentials: true });
+  return data;
+};
+
+export const acceptComplaintSolution = async (id, solutionId) => {
+  const { data } = await api.patch(`/complaints/${id}/accept-solution/${solutionId}`, {}, { withCredentials: true });
   return data;
 };
 

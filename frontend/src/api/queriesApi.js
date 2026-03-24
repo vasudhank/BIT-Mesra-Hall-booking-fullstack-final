@@ -25,6 +25,16 @@ export const postQueryQuickSolution = async (id, payload) => {
   return data;
 };
 
+export const updateQuerySolution = async (id, solutionId, payload) => {
+  const { data } = await api.patch(`/queries/${id}/solutions/${solutionId}`, payload, { withCredentials: true });
+  return data;
+};
+
+export const deleteQuerySolution = async (id, solutionId) => {
+  const { data } = await api.delete(`/queries/${id}/solutions/${solutionId}`, { withCredentials: true });
+  return data;
+};
+
 export const reactQuerySolution = async (id, solutionId, payload) => {
   const { data } = await api.post(`/queries/${id}/solutions/${solutionId}/react`, payload, { withCredentials: true });
   return data;

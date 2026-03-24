@@ -7,13 +7,19 @@ import ThumbDownAltOutlinedIcon from '@mui/icons-material/ThumbDownAltOutlined';
 import ThumbDownAltIcon from '@mui/icons-material/ThumbDownAlt';
 import CommentOutlinedIcon from '@mui/icons-material/CommentOutlined';
 import ReplyOutlinedIcon from '@mui/icons-material/ReplyOutlined';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
+import CheckCircleOutlineRoundedIcon from '@mui/icons-material/CheckCircleOutlineRounded';
 import {
+  acceptComplaintSolution,
+  deleteComplaintSolution,
   getComplaint,
   postComplaintReply,
   postComplaintSolution,
   reactComplaintReply,
   reactComplaintSolution,
   requestComplaintReopenOtp,
+  updateComplaintSolution,
   updateComplaintStatus,
   verifyComplaintReopenOtp
 } from '../api/complaintsApi';
@@ -123,12 +129,16 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
   const [isQuestionPopupOpen, setIsQuestionPopupOpen] = useState(false);
   const [isDesktopThreadMenuOpen, setIsDesktopThreadMenuOpen] = useState(false);
   const [isDesktopSolutionPopupOpen, setIsDesktopSolutionPopupOpen] = useState(false);
+  const [editingSolutionId, setEditingSolutionId] = useState('');
+  const [editDraftBody, setEditDraftBody] = useState('');
+  const [busySolutionAction, setBusySolutionAction] = useState({ type: '', solutionId: '' });
 
   const viewerId = useMemo(() => getViewerId(), []);
   const [solutionReactionMap, setSolutionReactionMap] = useState(() => readReactionStore('complaintSolutionReactions'));
   const [replyReactionMap, setReplyReactionMap] = useState(() => readReactionStore('complaintReplyReactions'));
 
   const trusted = role === 'ADMIN' || role === 'DEVELOPER';
+  const isAdmin = role === 'ADMIN';
 
   const load = async () => {
     setLoading(true);
@@ -364,6 +374,72 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
       setReopenOtp((prev) => ({ ...prev, otp: '' }));
     } catch (err) {
       alert(err?.response?.data?.error || 'OTP verification failed');
+    }
+  };
+
+  const canManageSolutionCard = (solution) => {
+    const authorEmail = String(solution?.authorEmail || '').trim().toLowerCase();
+    const viewerEmail = String(sessionEmail || '').trim().toLowerCase();
+    return isAdmin || (Boolean(viewerEmail) && Boolean(authorEmail) && viewerEmail === authorEmail);
+  };
+
+  const isBusySolutionAction = (type, solutionId) =>
+    busySolutionAction.type === type && String(busySolutionAction.solutionId) === String(solutionId);
+
+  const startEditingSolution = (solution) => {
+    setEditingSolutionId(String(solution._id));
+    setEditDraftBody(pickFirstText(solution, ['body', 'message', 'content', 'solution']));
+  };
+
+  const cancelEditingSolution = () => {
+    setEditingSolutionId('');
+    setEditDraftBody('');
+  };
+
+  const saveEditedSolution = async (solutionId) => {
+    const nextBody = String(editDraftBody || '').trim();
+    if (!nextBody) {
+      alert('Solution text is required');
+      return;
+    }
+    try {
+      setBusySolutionAction({ type: 'save', solutionId });
+      await updateComplaintSolution(id, solutionId, { body: nextBody });
+      cancelEditingSolution();
+      await load();
+    } catch (err) {
+      alert(err?.response?.data?.error || 'Unable to update solution');
+    } finally {
+      setBusySolutionAction({ type: '', solutionId: '' });
+    }
+  };
+
+  const removeSolution = async (solutionId) => {
+    const confirmed = window.confirm('Delete this solution from the thread?');
+    if (!confirmed) return;
+    try {
+      setBusySolutionAction({ type: 'delete', solutionId });
+      await deleteComplaintSolution(id, solutionId);
+      if (String(editingSolutionId) === String(solutionId)) {
+        cancelEditingSolution();
+      }
+      await load();
+    } catch (err) {
+      alert(err?.response?.data?.error || 'Unable to delete solution');
+    } finally {
+      setBusySolutionAction({ type: '', solutionId: '' });
+    }
+  };
+
+  const acceptSolution = async (solutionId) => {
+    try {
+      setBusySolutionAction({ type: 'accept', solutionId });
+      await acceptComplaintSolution(id, solutionId);
+      await load();
+    } catch (err) {
+      alert(err?.response?.data?.error || 'Accept answer failed');
+    } finally {
+      setBusySolutionAction({ type: '', solutionId: '' });
     }
   };
 
@@ -656,11 +732,21 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
               const replyTree = buildReplyTree(solution.replies || []);
               const draft = replyDrafts[solution._id] || {};
               const activeParent = replyParent[solution._id];
+              const accepted = String(complaint.acceptedSolutionId || '') === String(solution._id);
+              const canManage = canManageSolutionCard(solution);
+              const editingThis = String(editingSolutionId) === String(solution._id);
+              const showAccept = isAdmin && !accepted && !solution.trusted;
               return (
                 <article className="thread-solution-item" key={solution._id}>
                   <div className="thread-solution-head">
                     <div className="head-author-area">
                       <h3>{formatAuthor(solution.authorName, solution.authorEmail)}</h3>
+                      {accepted && (
+                        <div className="thread-accepted-line">
+                          <CheckCircleOutlineRoundedIcon fontSize="inherit" />
+                          <span>Accepted Answer - Approved by Admin</span>
+                        </div>
+                      )}
                       <div className="chip-group">
                         {solution.trusted && (
                           <span className="trusted-chip">
@@ -676,7 +762,16 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
                   </div>
 
                   <div className="thread-solution-body">
-                    <p>{pickFirstText(solution, ['body', 'message', 'content', 'solution'])}</p>
+                    {editingThis ? (
+                      <textarea
+                        className="thread-solution-edit-textarea"
+                        value={editDraftBody}
+                        onChange={(e) => setEditDraftBody(e.target.value)}
+                        disabled={isBusySolutionAction('save', solution._id)}
+                      />
+                    ) : (
+                      <p>{pickFirstText(solution, ['body', 'message', 'content', 'solution'])}</p>
+                    )}
                   </div>
 
                   <div className="thread-solution-actions">
@@ -716,6 +811,63 @@ export default function ComplaintDetailPage({ mode = 'public' }) {
                       <ReplyOutlinedIcon fontSize="small"/>
                       <span>Reply</span>
                     </button>
+                    <div className="thread-solution-actions-right">
+                      <div className="thread-solution-manage">
+                        {editingThis ? (
+                          <>
+                            <button
+                              type="button"
+                              className="thread-manage-text-btn"
+                              onClick={() => saveEditedSolution(solution._id)}
+                              disabled={isBusySolutionAction('save', solution._id)}
+                            >
+                              {isBusySolutionAction('save', solution._id) ? 'Saving...' : 'Save'}
+                            </button>
+                            <button
+                              type="button"
+                              className="thread-manage-text-btn secondary"
+                              onClick={cancelEditingSolution}
+                              disabled={isBusySolutionAction('save', solution._id)}
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : canManage ? (
+                          <>
+                            <button
+                              type="button"
+                              className="thread-manage-icon-btn"
+                              onClick={() => startEditingSolution(solution)}
+                              title="Edit solution"
+                              aria-label="Edit solution"
+                            >
+                              <EditOutlinedIcon fontSize="small" />
+                            </button>
+                            <button
+                              type="button"
+                              className="thread-manage-icon-btn danger"
+                              onClick={() => removeSolution(solution._id)}
+                              title="Delete solution"
+                              aria-label="Delete solution"
+                              disabled={isBusySolutionAction('delete', solution._id)}
+                            >
+                              <DeleteOutlineOutlinedIcon fontSize="small" />
+                            </button>
+                          </>
+                        ) : null}
+                      </div>
+                      {showAccept && (
+                        <button
+                          type="button"
+                          className={`thread-accept-btn ${isBusySolutionAction('accept', solution._id) ? 'busy' : ''}`}
+                          onClick={() => acceptSolution(solution._id)}
+                          disabled={isBusySolutionAction('accept', solution._id)}
+                        >
+                          <CheckCircleOutlineRoundedIcon fontSize="small" />
+                          <span>{isBusySolutionAction('accept', solution._id) ? 'Accepting...' : 'ACCEPT ANSWER'}</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {composerOpen && (

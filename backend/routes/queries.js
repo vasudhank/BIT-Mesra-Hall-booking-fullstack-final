@@ -66,6 +66,15 @@ const getSessionRole = (req) => {
 };
 
 const isTrustedRole = (role) => role === 'ADMIN' || role === 'DEVELOPER';
+const isAdminRole = (role) => role === 'ADMIN';
+const getSessionEmail = (req) => sanitizeEmail(req?.user?.email);
+const canManageSolution = (req, solution) => {
+  const role = getSessionRole(req);
+  if (isAdminRole(role)) return true;
+  const sessionEmail = getSessionEmail(req);
+  const authorEmail = sanitizeEmail(solution?.authorEmail || solution?.email || '');
+  return Boolean(sessionEmail) && Boolean(authorEmail) && sessionEmail === authorEmail;
+};
 
 const getUserReaction = (reactions = [], voterId = '') => {
   const id = String(voterId || '').trim();
@@ -460,6 +469,70 @@ router.post('/:id/quick-solution', async (req, res) => {
   }
 });
 
+router.patch('/:id/solutions/:solutionId', async (req, res) => {
+  try {
+    const voterId = getReactionVoterId(req, req.body.viewerId || req.body.voterId);
+    const query = await Query.findById(req.params.id);
+    if (!query) return res.status(404).json({ error: 'Query not found' });
+    const solution = query.solutions.id(req.params.solutionId);
+    if (!solution) return res.status(404).json({ error: 'Solution not found' });
+    if (!canManageSolution(req, solution)) {
+      return res.status(403).json({ error: 'Only admin or the solution author can edit this solution.' });
+    }
+
+    const nextBody = sanitizeText(req.body.body, 12000);
+    if (!nextBody) return res.status(400).json({ error: 'Updated solution text is required' });
+
+    solution.body = nextBody;
+    solution.content = nextBody;
+    solution.message = nextBody;
+    solution.solution = nextBody;
+    query.lastActivityAt = new Date();
+    await query.save();
+
+    res.json({
+      query: toPublicQuery(query, voterId),
+      solution: toPublicSolution(solution, voterId)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/:id/solutions/:solutionId', async (req, res) => {
+  try {
+    const voterId = getReactionVoterId(req, req.body?.viewerId || req.query.viewerId);
+    const query = await Query.findById(req.params.id);
+    if (!query) return res.status(404).json({ error: 'Query not found' });
+    const solution = query.solutions.id(req.params.solutionId);
+    if (!solution) return res.status(404).json({ error: 'Solution not found' });
+    if (!canManageSolution(req, solution)) {
+      return res.status(403).json({ error: 'Only admin or the solution author can delete this solution.' });
+    }
+
+    const deletedId = String(solution._id);
+    const removedAccepted = String(query.acceptedSolutionId || '') === deletedId;
+    query.solutions.pull(solution._id);
+    if (removedAccepted) {
+      query.acceptedSolutionId = null;
+      if (query.status === 'RESOLVED' || query.status === 'CLOSED') {
+        query.status = 'REOPENED';
+        query.resolvedAt = null;
+      }
+    }
+    query.lastActivityAt = new Date();
+    await query.save();
+
+    res.json({
+      success: true,
+      deletedSolutionId: deletedId,
+      query: toPublicQuery(query, voterId)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/:id/solutions/:solutionId/react', async (req, res) => {
   try {
     const voterId = getReactionVoterId(req, req.body.voterId);
@@ -605,9 +678,8 @@ router.patch('/:id/accept-solution/:solutionId', async (req, res) => {
     if (!solution) return res.status(404).json({ error: 'Solution not found' });
 
     const role = getSessionRole(req);
-    const isReporter = sanitizeEmail(req.user?.email) === sanitizeEmail(queryDoc.email);
-    if (!isTrustedRole(role) && !isReporter) {
-      return res.status(403).json({ error: 'Only reporter/admin/developer can accept answer.' });
+    if (!isAdminRole(role)) {
+      return res.status(403).json({ error: 'Only admin can accept an answer.' });
     }
 
     queryDoc.acceptedSolutionId = solution._id;

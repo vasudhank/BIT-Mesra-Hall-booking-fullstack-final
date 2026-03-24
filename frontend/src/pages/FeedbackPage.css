@@ -16,7 +16,6 @@
   background: var(--support-surface-strong);
   border: 1px solid var(--support-border);
   border-radius: var(--support-radius-md);
-  box-shadow: var(--support-shadow-sm);
 }
 
 .feedback-layout {
@@ -56,7 +55,6 @@
   border: 1px solid var(--support-border);
   border-radius: 20px;
   background: var(--support-surface-strong);
-  box-shadow: var(--support-shadow-md);
   padding: 24px 16px 24px 24px;
   display: flex;
   flex-direction: column;

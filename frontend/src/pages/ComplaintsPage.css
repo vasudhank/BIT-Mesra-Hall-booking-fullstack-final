@@ -15,7 +15,7 @@
   background: var(--support-surface-strong);
   border: 1px solid var(--support-border);
   border-radius: var(--support-radius-md);
-  box-shadow: var(--support-shadow-sm);
+  
 }
 
 .support-layout {
@@ -136,7 +136,7 @@
   border-radius: 20px;
   border: 1px solid var(--support-border);
   background: var(--support-surface-strong);
-  box-shadow: var(--support-shadow-md);
+  
 }
 
 .support-compose-head {

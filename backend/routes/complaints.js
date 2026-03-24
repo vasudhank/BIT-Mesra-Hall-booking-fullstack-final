@@ -31,6 +31,15 @@ const getSessionRole = (req) => {
 };
 
 const isTrustedRole = (role) => role === 'ADMIN' || role === 'DEVELOPER';
+const isAdminRole = (role) => role === 'ADMIN';
+const getSessionEmail = (req) => sanitizeEmail(req?.user?.email);
+const canManageSolution = (req, solution) => {
+  const role = getSessionRole(req);
+  if (isAdminRole(role)) return true;
+  const sessionEmail = getSessionEmail(req);
+  const authorEmail = sanitizeEmail(solution?.authorEmail || solution?.email || '');
+  return Boolean(sessionEmail) && Boolean(authorEmail) && sessionEmail === authorEmail;
+};
 
 const safeMail = async (options) => {
   if (!mailTransporter) return;
@@ -144,6 +153,7 @@ const toPublicComplaint = (doc, voterId = '') => {
     status: doc.status,
     source: doc.source,
     createdByRole: doc.createdByRole || doc.createdByType || 'GUEST',
+    acceptedSolutionId: doc.acceptedSolutionId,
     resolvedAt: doc.resolvedAt,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
@@ -502,6 +512,70 @@ router.post('/:id/quick-solution', async (req, res) => {
   }
 });
 
+router.patch('/:id/solutions/:solutionId', async (req, res) => {
+  try {
+    const voterId = getReactionVoterId(req, req.body.viewerId || req.body.voterId);
+    const complaint = await Complaint.findById(req.params.id);
+    if (!complaint) return res.status(404).json({ error: 'Complaint not found' });
+    const solution = complaint.solutions.id(req.params.solutionId);
+    if (!solution) return res.status(404).json({ error: 'Solution not found' });
+    if (!canManageSolution(req, solution)) {
+      return res.status(403).json({ error: 'Only admin or the solution author can edit this solution.' });
+    }
+
+    const nextBody = sanitizeText(req.body.body, 12000);
+    if (!nextBody) return res.status(400).json({ error: 'Updated solution text is required' });
+
+    solution.body = nextBody;
+    solution.content = nextBody;
+    solution.message = nextBody;
+    solution.solution = nextBody;
+    complaint.lastActivityAt = new Date();
+    await complaint.save();
+
+    res.json({
+      complaint: toPublicComplaint(complaint, voterId),
+      solution: toPublicSolution(solution, voterId)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/:id/solutions/:solutionId', async (req, res) => {
+  try {
+    const voterId = getReactionVoterId(req, req.body?.viewerId || req.query.viewerId);
+    const complaint = await Complaint.findById(req.params.id);
+    if (!complaint) return res.status(404).json({ error: 'Complaint not found' });
+    const solution = complaint.solutions.id(req.params.solutionId);
+    if (!solution) return res.status(404).json({ error: 'Solution not found' });
+    if (!canManageSolution(req, solution)) {
+      return res.status(403).json({ error: 'Only admin or the solution author can delete this solution.' });
+    }
+
+    const deletedId = String(solution._id);
+    const removedAccepted = String(complaint.acceptedSolutionId || '') === deletedId;
+    complaint.solutions.pull(solution._id);
+    if (removedAccepted) {
+      complaint.acceptedSolutionId = null;
+      if (complaint.status === 'RESOLVED' || complaint.status === 'CLOSED') {
+        complaint.status = 'REOPENED';
+        complaint.resolvedAt = null;
+      }
+    }
+    complaint.lastActivityAt = new Date();
+    await complaint.save();
+
+    res.json({
+      success: true,
+      deletedSolutionId: deletedId,
+      complaint: toPublicComplaint(complaint, voterId)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/:id/solutions/:solutionId/react', async (req, res) => {
   try {
     const voterId = getReactionVoterId(req, req.body.voterId);
@@ -605,6 +679,31 @@ router.post('/:id/solutions/:solutionId/replies/:replyId/react', async (req, res
     await complaint.save();
 
     res.json({ upvotes: reply.upvotes, downvotes: reply.downvotes, userReaction: result.userReaction });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch('/:id/accept-solution/:solutionId', async (req, res) => {
+  try {
+    const voterId = getReactionVoterId(req, req.body.viewerId || req.body.voterId);
+    const complaint = await Complaint.findById(req.params.id);
+    if (!complaint) return res.status(404).json({ error: 'Complaint not found' });
+    const solution = complaint.solutions.id(req.params.solutionId);
+    if (!solution) return res.status(404).json({ error: 'Solution not found' });
+
+    const role = getSessionRole(req);
+    if (!isAdminRole(role)) {
+      return res.status(403).json({ error: 'Only admin can accept an answer.' });
+    }
+
+    complaint.acceptedSolutionId = solution._id;
+    complaint.status = 'RESOLVED';
+    complaint.resolvedAt = new Date();
+    complaint.lastActivityAt = new Date();
+    await complaint.save();
+
+    res.json({ complaint: toPublicComplaint(complaint, voterId) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

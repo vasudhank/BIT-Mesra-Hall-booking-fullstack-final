@@ -3,7 +3,6 @@ const { simpleParser } = require('mailparser');
 const { createNotice } = require('./noticeService');
 
 const DEFAULT_TARGET_RECIPIENT = 'bitmesraa@gmail.com';
-const DEFAULT_ALLOWED_SENDER = 'vasudhank440@gmail.com';
 const SENT_BOX_CANDIDATES = [
   '[Gmail]/Sent Mail',
   '[Google Mail]/Sent Mail',
@@ -43,9 +42,56 @@ const parseAddressList = (addressObj) =>
     .map((x) => String(x?.address || '').toLowerCase().trim())
     .filter(Boolean);
 
+const extractEmailsFromHeaderValue = (value) =>
+  uniqueStrings(
+    String(value || '')
+      .match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || []
+  )
+    .map((email) => email.toLowerCase());
+
+const uniqueStrings = (list) =>
+  Array.from(
+    new Set(
+      (Array.isArray(list) ? list : [])
+        .map((item) => String(item || '').trim())
+        .filter(Boolean)
+    )
+  );
+
+const collectRecipients = (parsed) => {
+  const headers = parsed?.headers;
+  return new Set(
+    uniqueStrings([
+      ...parseAddressList(parsed.to),
+      ...parseAddressList(parsed.cc),
+      ...parseAddressList(parsed.bcc),
+      ...parseAddressList(parsed.deliveredTo),
+      ...extractEmailsFromHeaderValue(headers?.get?.('delivered-to')),
+      ...extractEmailsFromHeaderValue(headers?.get?.('x-original-to')),
+      ...extractEmailsFromHeaderValue(headers?.get?.('envelope-to'))
+    ]).map((email) => email.toLowerCase())
+  );
+};
+
+const isAutomatedMailboxMessage = (parsed, fromEmail) => {
+  const subject = String(parsed?.subject || '').trim();
+  const autoSubmitted = String(parsed?.headers?.get?.('auto-submitted') || '').toLowerCase().trim();
+  const precedence = String(parsed?.headers?.get?.('precedence') || '').toLowerCase().trim();
+
+  return (
+    /\b(mailer-daemon|postmaster)\b/i.test(String(fromEmail || '')) ||
+    (autoSubmitted && autoSubmitted !== 'no') ||
+    ['bulk', 'junk', 'list', 'auto_reply'].includes(precedence) ||
+    /^(delivery status notification|undelivered mail returned to sender|automatic reply|auto reply|out of office)/i.test(subject)
+  );
+};
+
 const getMailboxConfig = () => {
-  const user = String(process.env.NOTICE_MAIL_USER || process.env.EMAIL || DEFAULT_ALLOWED_SENDER).trim();
+  const targetRecipient = String(process.env.NOTICE_TARGET_TO || DEFAULT_TARGET_RECIPIENT).toLowerCase().trim();
+  const user = String(process.env.NOTICE_MAIL_USER || targetRecipient || DEFAULT_TARGET_RECIPIENT).trim();
   const password = String(process.env.NOTICE_MAIL_APP_PASSWORD || process.env.EMAIL_APP_PASSWORD || '').trim();
+  const allowedSender = String(process.env.NOTICE_ALLOWED_FROM || '').toLowerCase().trim();
+  const includeSent = String(process.env.NOTICE_MAIL_SYNC_INCLUDE_SENT || 'false').toLowerCase() === 'true';
   const rejectUnauthorized =
     String(
       process.env.NOTICE_MAIL_SYNC_TLS_REJECT_UNAUTHORIZED ||
@@ -53,14 +99,12 @@ const getMailboxConfig = () => {
       'false'
     ).toLowerCase() !== 'false';
 
-  const targetRecipient = String(process.env.NOTICE_TARGET_TO || DEFAULT_TARGET_RECIPIENT).toLowerCase().trim();
-  const allowedSender = String(process.env.NOTICE_ALLOWED_FROM || DEFAULT_ALLOWED_SENDER).toLowerCase().trim();
-
   return {
     user,
     password,
     targetRecipient,
     allowedSender,
+    includeSent,
     imap: {
       user,
       password,
@@ -104,16 +148,12 @@ const processMessagesFromBox = async ({ conn, boxName, searchCriteria, cfg, mark
     if (!subject && !body) continue;
 
     const fromEmail = parseAddress(parsed.from);
-    const recipients = new Set([
-      ...parseAddressList(parsed.to),
-      ...parseAddressList(parsed.cc),
-      ...parseAddressList(parsed.bcc),
-      ...parseAddressList(parsed.deliveredTo)
-    ]);
+    const recipients = collectRecipients(parsed);
 
-    // Rule requested: only sender=vasudhank440@gmail.com and recipient includes bitmesraa@gmail.com
-    if (fromEmail !== cfg.allowedSender) continue;
+    if (!fromEmail) continue;
+    if (cfg.allowedSender && fromEmail !== cfg.allowedSender) continue;
     if (!recipients.has(cfg.targetRecipient)) continue;
+    if (isAutomatedMailboxMessage(parsed, fromEmail)) continue;
 
     const messageId = String(parsed.messageId || `${boxName}:${cfg.user}:${msg.attributes?.uid || Date.now()}`).trim();
 
@@ -125,7 +165,7 @@ const processMessagesFromBox = async ({ conn, boxName, searchCriteria, cfg, mark
       emailMessageId: messageId,
       postedBy: {
         id: null,
-        type: 'SYSTEM',
+        type: 'EMAIL',
         name: fromEmail || 'Mail Sync'
       }
     });
@@ -155,21 +195,23 @@ const syncMailbox = async () => {
       created += await processMessagesFromBox({
         conn,
         boxName: inboxOpened,
-        searchCriteria: ['UNSEEN', ['SINCE', sinceDate]],
+        searchCriteria: [['SINCE', sinceDate]],
         cfg,
         markSeen
       });
     }
 
-    const sentOpened = await openFirstAvailableBox(conn, SENT_BOX_CANDIDATES);
-    if (sentOpened) {
-      created += await processMessagesFromBox({
-        conn,
-        boxName: sentOpened,
-        searchCriteria: [['SINCE', sinceDate]],
-        cfg,
-        markSeen: false
-      });
+    if (cfg.includeSent) {
+      const sentOpened = await openFirstAvailableBox(conn, SENT_BOX_CANDIDATES);
+      if (sentOpened) {
+        created += await processMessagesFromBox({
+          conn,
+          boxName: sentOpened,
+          searchCriteria: [['SINCE', sinceDate]],
+          cfg,
+          markSeen: false
+        });
+      }
     }
 
     if (created > 0) {
@@ -207,7 +249,7 @@ const startNoticeMailSync = () => {
   syncTimer = setInterval(runSync, intervalMs);
   runSync().catch(() => {});
   console.log(
-    `[NoticeMailSync] started with interval ${intervalMs}ms (mailbox=${maskEmail(cfg.user)}, from=${maskEmail(cfg.allowedSender)}, to=${maskEmail(cfg.targetRecipient)})`
+    `[NoticeMailSync] started with interval ${intervalMs}ms (mailbox=${maskEmail(cfg.user)}, to=${maskEmail(cfg.targetRecipient)}, from=${cfg.allowedSender ? maskEmail(cfg.allowedSender) : 'any sender'}, includeSent=${cfg.includeSent})`
   );
 };
 

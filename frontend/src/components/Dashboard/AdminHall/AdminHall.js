@@ -19,6 +19,7 @@ import {
 
 import Appbar from '../AppBar/AppBar';
 import HallCard from './HallCard';
+import ConfirmDeleteDialog from '../../Common/ConfirmDeleteDialog';
 import { fuzzyFilterHallLike } from '../../../utils/fuzzySearch';
 
 import api from '../../../api/axiosInstance';
@@ -73,6 +74,8 @@ export default function AdminHall() {
   const [modal, setModal] = useState(false);
   const [name, setName] = useState('');
   const [capacity, setCapacity] = useState('');
+  const [deleteDialogHall, setDeleteDialogHall] = useState(null);
+  const [deleteDialogLoading, setDeleteDialogLoading] = useState(false);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -251,9 +254,28 @@ export default function AdminHall() {
   };
 
   const handleSingleDelete = async (hall) => {
-    if (!window.confirm(`Are you sure you want to delete ${hall.name}? This cannot be undone.`)) return;
-    await deleteOneHall(hall);
-    get_halls();
+    setDeleteDialogHall(hall);
+  };
+
+  const closeDeleteDialog = () => {
+    if (deleteDialogLoading) return;
+    setDeleteDialogHall(null);
+  };
+
+  const confirmSingleDelete = async () => {
+    if (!deleteDialogHall) return;
+
+    try {
+      setDeleteDialogLoading(true);
+      await deleteOneHall(deleteDialogHall);
+      setSelectedHallIds((prev) => prev.filter((id) => id !== deleteDialogHall._id));
+      setDeleteDialogHall(null);
+      await get_halls();
+    } catch (err) {
+      console.error('Delete hall failed:', err);
+    } finally {
+      setDeleteDialogLoading(false);
+    }
   };
 
   return (
@@ -500,6 +522,18 @@ export default function AdminHall() {
           ))}
         </Grid>
       </Container>
+
+      <ConfirmDeleteDialog
+        open={Boolean(deleteDialogHall)}
+        title="Delete this hall?"
+        highlight={deleteDialogHall?.name || 'Selected hall'}
+        description="This will permanently remove the hall from the dashboard and hall listings."
+        confirmLabel="Delete Hall"
+        loadingLabel="Deleting..."
+        loading={deleteDialogLoading}
+        onClose={closeDeleteDialog}
+        onConfirm={confirmSingleDelete}
+      />
     </div>
   );
 }

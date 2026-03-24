@@ -22,21 +22,6 @@ const parseAddressList = (addressObj) => {
   return values.map((x) => String(x.address || '').toLowerCase().trim()).filter(Boolean);
 };
 
-const normalizeSubject = (value) =>
-  String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/^((re|fw|fwd)\s*:\s*)+/i, '')
-    .trim();
-
-const normalizeTitle = (value) =>
-  String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .replace(/[^\w\s]/g, '')
-    .trim();
-
 const normalizeEmail = (value) => String(value || '').toLowerCase().trim();
 
 const getDeveloperSyncEmail = () =>
@@ -91,17 +76,8 @@ const isMetadataLine = (line) => {
   return false;
 };
 
-const sanitizeMailSyncedBody = (value) => {
-  const normalized = stripMailSyncTrackingHints(String(value || '').replace(/\r\n/g, '\n'));
-
-  // If the message includes an explicit "Solution:" section, keep content after it.
-  const solutionMarker = normalized.match(/(?:^|\n)\s*Solution:\s*/i);
-  const coreText = solutionMarker
-    ? normalized.slice(solutionMarker.index + solutionMarker[0].length)
-    : normalized;
-
-  const splitLines = coreText.split('\n');
-  const replyMarkerIndex = splitLines.findIndex((line) => {
+const findReplyMarkerIndex = (lines) =>
+  lines.findIndex((line) => {
     const trimmed = String(line || '').trim();
     return (
       /^On .+ wrote:$/i.test(trimmed) ||
@@ -109,7 +85,24 @@ const sanitizeMailSyncedBody = (value) => {
     );
   });
 
-  const lines = (replyMarkerIndex >= 0 ? splitLines.slice(0, replyMarkerIndex) : splitLines)
+const getPrimaryMailBody = (value) => {
+  const normalized = stripMailSyncTrackingHints(String(value || '').replace(/\r\n/g, '\n'));
+  const splitLines = normalized.split('\n');
+  const replyMarkerIndex = findReplyMarkerIndex(splitLines);
+  return (replyMarkerIndex >= 0 ? splitLines.slice(0, replyMarkerIndex) : splitLines).join('\n');
+};
+
+const sanitizeMailSyncedBody = (value) => {
+  const normalized = getPrimaryMailBody(value);
+
+  // If the message includes an explicit "Solution:" section, keep content after it.
+  const solutionMarker = normalized.match(/(?:^|\n)\s*Solution:\s*/i);
+  const coreText = solutionMarker
+    ? normalized.slice(solutionMarker.index + solutionMarker[0].length)
+    : normalized;
+
+  const lines = coreText
+    .split('\n')
     .map((line) => line.trimEnd())
     .filter(
       (line) =>
@@ -130,6 +123,46 @@ const toPlainBody = (parsed) => {
   return html.slice(0, 10000);
 };
 
+const COMPLAINT_REF_PATTERNS = [
+  /\[\s*Complaint\s*#\s*([a-f0-9]{24})\s*\]/gi,
+  /\bComplaint\s*Ref(?:erence)?(?:\s*No\.?)?\s*[:#-]?\s*\[\s*Complaint\s*#\s*([a-f0-9]{24})\s*\]/gi,
+  /\bComplaint\s*#\s*([a-f0-9]{24})\b/gi
+];
+
+const QUERY_REF_PATTERNS = [
+  /\[\s*Query\s*#\s*([a-f0-9]{24})\s*\]/gi,
+  /\bQuery\s*Ref(?:erence)?(?:\s*No\.?)?\s*[:#-]?\s*\[\s*Query\s*#\s*([a-f0-9]{24})\s*\]/gi,
+  /\bQuery\s*#\s*([a-f0-9]{24})\b/gi
+];
+
+const collectReferencedIds = (body, patterns) => {
+  const primaryBody = getPrimaryMailBody(body);
+  const ids = new Set();
+
+  for (const pattern of patterns) {
+    for (const match of primaryBody.matchAll(pattern)) {
+      const id = String(match?.[1] || '').toLowerCase().trim();
+      if (id) ids.add(id);
+    }
+  }
+
+  return Array.from(ids);
+};
+
+const extractThreadReferenceFromBody = (body) => {
+  const complaintIds = collectReferencedIds(body, COMPLAINT_REF_PATTERNS);
+  const queryIds = collectReferencedIds(body, QUERY_REF_PATTERNS);
+
+  if ((complaintIds.length + queryIds.length) !== 1) return null;
+  if (complaintIds.length === 1) {
+    return { kind: 'COMPLAINT', id: complaintIds[0] };
+  }
+  if (queryIds.length === 1) {
+    return { kind: 'QUERY', id: queryIds[0] };
+  }
+  return null;
+};
+
 const isSystemGeneratedNotifyBody = (body) => {
   const b = String(body || '').toLowerCase();
   if (!b) return false;
@@ -144,31 +177,6 @@ const isSystemGeneratedNotifyBody = (body) => {
     (b.includes('complaint ref: [complaint#') && b.includes('open thread')) ||
     (b.includes('query ref: [query#') && b.includes('open thread'))
   );
-};
-
-const extractComplaintId = (subject, body) => {
-  const combined = `${subject || ''}\n${body || ''}`;
-  const match = combined.match(/\[Complaint#([a-f0-9]{24})\]/i);
-  return match?.[1] || null;
-};
-
-const extractQueryId = (subject, body) => {
-  const combined = `${subject || ''}\n${body || ''}`;
-  const match = combined.match(/\[Query#([a-f0-9]{24})\]/i);
-  return match?.[1] || null;
-};
-
-const matchesStrictSubject = (kind, subject, title) => {
-  const normalized = normalizeSubject(subject);
-  const target = `regarding ${kind}: ${String(title || '').trim().toLowerCase()}`;
-  return normalized === target;
-};
-
-const matchesTitleSubject = (subject, title) => {
-  const normalizedSubject = normalizeTitle(normalizeSubject(subject));
-  const normalizedTitle = normalizeTitle(title);
-  if (!normalizedSubject || !normalizedTitle) return false;
-  return normalizedSubject === normalizedTitle;
 };
 
 const isTrustedSender = (email) => {
@@ -259,42 +267,6 @@ const openFirstAvailableBox = async (conn, names) => {
   return null;
 };
 
-const findComplaintByFallback = async ({ subject, recipients }) => {
-  const candidateComplaints = await Complaint.find({
-    status: { $in: ['IN_PROGRESS', 'REOPENED', 'RESOLVED', 'CLOSED'] }
-  })
-    .sort({ updatedAt: -1 })
-    .limit(500);
-
-  const recipientMatched = candidateComplaints.filter((c) =>
-    recipients.includes(String(c.email || '').toLowerCase().trim())
-  );
-
-  return (
-    recipientMatched.find((c) => matchesStrictSubject('complaint', subject, c.title)) ||
-    recipientMatched.find((c) => matchesTitleSubject(subject, c.title)) ||
-    null
-  );
-};
-
-const findQueryByFallback = async ({ subject, recipients }) => {
-  const candidateQueries = await Query.find({
-    status: { $in: ['IN_PROGRESS', 'REOPENED', 'RESOLVED', 'CLOSED'] }
-  })
-    .sort({ updatedAt: -1 })
-    .limit(500);
-
-  const recipientMatched = candidateQueries.filter((q) =>
-    recipients.includes(String(q.email || '').toLowerCase().trim())
-  );
-
-  return (
-    recipientMatched.find((q) => matchesStrictSubject('query', subject, q.title)) ||
-    recipientMatched.find((q) => matchesTitleSubject(subject, q.title)) ||
-    null
-  );
-};
-
 const processMailboxMessages = async ({ conn, searchCriteria }) => {
   const fetchOptions = { bodies: [''], markSeen: false, struct: true };
   const messages = await conn.search(searchCriteria, fetchOptions);
@@ -310,68 +282,18 @@ const processMailboxMessages = async ({ conn, searchCriteria }) => {
     const fromEmail = parseAddressList(parsed.from)[0] || '';
     if (!isTrustedSender(fromEmail)) continue;
 
-    const subject = String(parsed.subject || '').trim();
     const body = toPlainBody(parsed);
     if (isSystemGeneratedNotifyBody(body)) continue;
     const recipients = Array.from(
       new Set([...parseAddressList(parsed.to), ...parseAddressList(parsed.cc)])
     );
-    const complaintId = extractComplaintId(subject, body);
-    const queryId = extractQueryId(subject, body);
+    const threadRef = extractThreadReferenceFromBody(body);
+    if (!threadRef) continue;
     const messageId = String(parsed.messageId || '').trim();
 
-    let complaint = null;
-    let queryDoc = null;
-    let matchedByUniqueRecipient = false;
-
-    if (complaintId) {
-      complaint = await Complaint.findById(complaintId);
-    }
-    if (!complaint && queryId) {
-      queryDoc = await Query.findById(queryId);
-    }
-
-    if (!complaint && !queryDoc) {
-      complaint = await findComplaintByFallback({ subject, recipients });
-      if (!complaint) {
-        queryDoc = await findQueryByFallback({ subject, recipients });
-      }
-    }
-
-    // Fallback for "new compose" mails where sender did not keep subject/reference:
-    // if recipient maps to exactly one open support thread, attach to that one.
-    if (!complaint && !queryDoc && recipients.length > 0) {
-      const [recipientComplaints, recipientQueries] = await Promise.all([
-        Complaint.find({
-          email: { $in: recipients },
-          status: { $in: ['IN_PROGRESS', 'REOPENED', 'RESOLVED'] }
-        })
-          .sort({ updatedAt: -1 })
-          .limit(2),
-        Query.find({
-          email: { $in: recipients },
-          status: { $in: ['IN_PROGRESS', 'REOPENED', 'RESOLVED'] }
-        })
-          .sort({ updatedAt: -1 })
-          .limit(2)
-      ]);
-
-      if (recipientComplaints.length === 1 && recipientQueries.length === 0) {
-        complaint = recipientComplaints[0];
-        matchedByUniqueRecipient = true;
-      } else if (recipientQueries.length === 1 && recipientComplaints.length === 0) {
-        queryDoc = recipientQueries[0];
-        matchedByUniqueRecipient = true;
-      }
-    }
-
-    if (complaint) {
-      const isAccepted =
-        Boolean(complaintId) ||
-        matchesStrictSubject('complaint', subject, complaint.title) ||
-        matchesTitleSubject(subject, complaint.title) ||
-        matchedByUniqueRecipient;
-      if (!isAccepted) continue;
+    if (threadRef.kind === 'COMPLAINT') {
+      const complaint = await Complaint.findById(threadRef.id);
+      if (!complaint) continue;
       if (!recipients.includes(normalizeEmail(complaint.email))) continue;
 
       await addComplaintSolutionFromMail({
@@ -383,22 +305,18 @@ const processMailboxMessages = async ({ conn, searchCriteria }) => {
       continue;
     }
 
-    if (queryDoc) {
-      const isAccepted =
-        Boolean(queryId) ||
-        matchesStrictSubject('query', subject, queryDoc.title) ||
-        matchesTitleSubject(subject, queryDoc.title) ||
-        matchedByUniqueRecipient;
-      if (!isAccepted) continue;
-      if (!recipients.includes(normalizeEmail(queryDoc.email))) continue;
+    if (threadRef.kind !== 'QUERY') continue;
 
-      await addQuerySolutionFromMail({
-        queryDoc,
-        fromEmail,
-        body,
-        messageId
-      });
-    }
+    const queryDoc = await Query.findById(threadRef.id);
+    if (!queryDoc) continue;
+    if (!recipients.includes(normalizeEmail(queryDoc.email))) continue;
+
+    await addQuerySolutionFromMail({
+      queryDoc,
+      fromEmail,
+      body,
+      messageId
+    });
   }
 };
 

@@ -3,6 +3,44 @@ const chrono = require('chrono-node');
 const MAX_NOTICE_TEXT = 20000;
 const MAX_SUMMARY_LENGTH = 320;
 
+const STRUCTURED_FIELD_ALIASES = {
+  title: ['title', 'notice title', 'subject', 'notice subject', 'heading', 'notice heading'],
+  content: ['content', 'description', 'details', 'body', 'message', 'notice content', 'notice body', 'notice description'],
+  kind: ['kind', 'type', 'category', 'notice type'],
+  holidayName: ['holiday', 'holiday name', 'festival', 'festival name', 'event', 'event name'],
+  start: ['start', 'start date', 'start time', 'start datetime', 'start date time', 'starts'],
+  end: ['end', 'end date', 'end time', 'end datetime', 'end date time', 'ends'],
+  dateRange: ['date', 'date range', 'date time', 'date and time', 'date & time', 'schedule', 'when', 'timing'],
+  timeRange: ['time', 'time range', 'hours'],
+  rooms: [
+    'room',
+    'rooms',
+    'hall',
+    'halls',
+    'location',
+    'locations',
+    'venue',
+    'venues',
+    'closed hall',
+    'closed halls',
+    'affected hall',
+    'affected halls',
+    'halls closed',
+    'rooms closed'
+  ],
+  closureAllHalls: [
+    'all halls',
+    'all halls closed',
+    'closure all halls',
+    'campus wide',
+    'campus wide closure',
+    'closure scope',
+    'scope'
+  ]
+};
+
+const MULTILINE_STRUCTURED_FIELDS = new Set(['content', 'rooms']);
+
 const sanitizeText = (value) =>
   String(value || '')
     .replace(/\r\n/g, '\n')
@@ -39,9 +77,31 @@ const normalizeRoomKey = (value) =>
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
 
+const hasGlobalClosureLanguage = (value) =>
+  /\b(all halls?|all rooms?|all seminar halls?|campus wide|campus-wide|entire campus|whole campus|entire institute|entire university)\b/i.test(
+    String(value || '')
+  );
+
+const cleanRoomToken = (value) =>
+  String(value || '')
+    .replace(/[.,;:]+$/g, '')
+    .replace(/\s+(and|will|remain|closed|closure|from|on|during|for|to|at)$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const parseManualRooms = (roomsInput) => {
+  if (!roomsInput) return [];
+  if (Array.isArray(roomsInput)) return uniqueStrings(roomsInput.map(cleanRoomToken));
+  return uniqueStrings(
+    String(roomsInput)
+      .split(/[,\n;|]/)
+      .map((x) => cleanRoomToken(x))
+  );
+};
+
 const parseRoomsFromText = (text) => {
   const source = sanitizeText(text);
-  const explicitAllHalls = /\b(all halls?|all rooms?|entire campus|all seminar halls?)\b/i.test(source);
+  const explicitAllHalls = hasGlobalClosureLanguage(source);
   const inferredCampusClosure =
     /\b(institute|campus|university)\b/i.test(source) &&
     /\b(remain closed|will remain closed|closed for|closure)\b/i.test(source);
@@ -60,13 +120,6 @@ const parseRoomsFromText = (text) => {
   const seen = new Set();
   const rooms = [];
 
-  const cleanRoomToken = (value) =>
-    String(value || '')
-      .replace(/[.,;:]+$/g, '')
-      .replace(/\s+(and|will|remain|closed|closure|from|on|during|for|to|at)$/i, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-
   for (const room of merged) {
     const cleaned = cleanRoomToken(room);
     if (!/\b(?:hall|room)\b/i.test(cleaned)) continue;
@@ -79,33 +132,63 @@ const parseRoomsFromText = (text) => {
   return { rooms, closureAllHalls };
 };
 
-const isHolidayNotice = (subject, body) => {
-  const text = `${subject || ''}\n${body || ''}`;
-  return /\b(holiday|closed|closure|not bookable|no booking|suspended|restricted|maintenance shutdown|festival)\b/i.test(text);
+const normalizeStructuredFieldLabel = (value) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/[&_]/g, ' ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const resolveStructuredFieldKey = (label) => {
+  const normalized = normalizeStructuredFieldLabel(label);
+  if (!normalized) return '';
+  for (const [key, aliases] of Object.entries(STRUCTURED_FIELD_ALIASES)) {
+    if (aliases.includes(normalized)) return key;
+  }
+  return '';
 };
 
-const extractHolidayName = (subject, body) => {
-  const full = `${subject || ''}\n${body || ''}`.trim();
-  const patterns = [
-    /\bon account of\s+([a-z][a-z\s'-]{2,80}?)(?:\s+holiday|\s+festival|[.,\n]|$)/i,
-    /\bholiday\s*(?:for|:|-)\s*([a-z][a-z\s'-]{2,80}?)(?:[.,\n]|$)/i,
-    /\bholiday\b.*?\bfor\s+([a-z][a-z\s'-]{2,80}?)(?:[.,\n]|$)/i,
-    /\bfestival\s*(?:of|:|-)?\s*([a-z][a-z\s'-]{2,80}?)(?:[.,\n]|$)/i
-  ];
+const parseStructuredFieldLine = (line) => {
+  const trimmed = String(line || '').trim();
+  if (!trimmed) return null;
+  const match = trimmed.match(/^([A-Za-z][A-Za-z0-9 &/_()'-]{1,40}?)(?:\s*:\s*|\s*=\s*|\s+-\s+)(.*)$/);
+  if (!match) return null;
+  const rawLabel = String(match[1] || '').trim();
+  const key = resolveStructuredFieldKey(rawLabel);
+  if (!key) return null;
+  return {
+    key,
+    rawLabel,
+    initialValue: String(match[2] || '').trim()
+  };
+};
 
-  for (const re of patterns) {
-    const match = full.match(re);
-    if (match && match[1]) return match[1].trim();
+const pickLastNonEmpty = (list) => {
+  const items = Array.isArray(list) ? list : [];
+  for (let idx = items.length - 1; idx >= 0; idx -= 1) {
+    const value = sanitizeText(items[idx]);
+    if (value) return value;
   }
-
-  const subjectLine = String(subject || '').trim();
-  if (/holiday/i.test(subjectLine)) {
-    const fallback = subjectLine.replace(/\bholiday\b/gi, '').replace(/[-:]/g, ' ').trim();
-    if (/regarding|notice|closed|closure|institute|campus/i.test(fallback)) return '';
-    return fallback;
-  }
-
   return '';
+};
+
+const normalizeKindValue = (value) => {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (!normalized) return '';
+  if (normalized === 'GENERAL' || normalized === 'HOLIDAY') return normalized;
+  if (/\b(HOLIDAY|CLOSURE|CLOSED|FESTIVAL|ALERT)\b/i.test(normalized)) return 'HOLIDAY';
+  if (/\b(GENERAL|NOTICE|ANNOUNCEMENT|INFORMATION|INFO)\b/i.test(normalized)) return 'GENERAL';
+  return '';
+};
+
+const parseExplicitBoolean = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return null;
+  if (['true', '1', 'yes', 'y', 'closed', 'all'].includes(normalized)) return true;
+  if (['false', '0', 'no', 'n', 'open', 'partial', 'specific'].includes(normalized)) return false;
+  if (hasGlobalClosureLanguage(normalized)) return true;
+  return null;
 };
 
 const applyStartDefaults = (date, certainHour) => {
@@ -131,8 +214,8 @@ const applyEndDefaults = (date, certainHour, hasExplicitEnd) => {
   return next;
 };
 
-const parseDateWindow = (subject, body) => {
-  const text = sanitizeText(`${subject || ''}\n${body || ''}`);
+const parseDateWindowFromText = (value) => {
+  const text = sanitizeText(value);
   if (!text) return { startDateTime: null, endDateTime: null, parsedCandidates: [] };
 
   const parsed = chrono.parse(text, new Date(), { forwardDate: true }) || [];
@@ -144,7 +227,11 @@ const parseDateWindow = (subject, body) => {
   const rawStart = first.start?.date ? first.start.date() : null;
   const rawEnd = first.end?.date ? first.end.date() : null;
   if (!rawStart) {
-    return { startDateTime: null, endDateTime: null, parsedCandidates: parsed.slice(0, 3).map((x) => x.text) };
+    return {
+      startDateTime: null,
+      endDateTime: null,
+      parsedCandidates: parsed.slice(0, 3).map((x) => x.text)
+    };
   }
 
   const startCertainHour = first.start.isCertain('hour');
@@ -176,6 +263,163 @@ const parseDateWindow = (subject, body) => {
   };
 };
 
+const parseDateWindow = (subject, body) => parseDateWindowFromText(`${subject || ''}\n${body || ''}`);
+
+const extractStructuredNoticeFields = (body) => {
+  const sourceBody = stripMailQuotedContent(body);
+  const lines = sourceBody.split('\n');
+  const buckets = {
+    title: [],
+    content: [],
+    kind: [],
+    holidayName: [],
+    start: [],
+    end: [],
+    dateRange: [],
+    timeRange: [],
+    rooms: [],
+    closureAllHalls: []
+  };
+  const matchedFields = [];
+  const residualLines = [];
+
+  for (let idx = 0; idx < lines.length;) {
+    const rawLine = lines[idx];
+    const trimmed = String(rawLine || '').trim();
+    const field = parseStructuredFieldLine(trimmed);
+
+    if (!field) {
+      residualLines.push(rawLine);
+      idx += 1;
+      continue;
+    }
+
+    const values = [];
+    if (field.initialValue) values.push(field.initialValue);
+
+    const allowMultiline = MULTILINE_STRUCTURED_FIELDS.has(field.key);
+    let nextIndex = idx + 1;
+
+    while (nextIndex < lines.length) {
+      const nextRaw = lines[nextIndex];
+      const nextTrimmed = String(nextRaw || '').trim();
+      if (!nextTrimmed) {
+        if (allowMultiline && values.length > 0) {
+          values.push('');
+          nextIndex += 1;
+          continue;
+        }
+        break;
+      }
+      if (parseStructuredFieldLine(nextTrimmed)) break;
+      if (!allowMultiline && field.initialValue) break;
+      values.push(nextTrimmed.replace(/^[*-]\s*/, '').trim());
+      nextIndex += 1;
+      if (!allowMultiline) break;
+    }
+
+    const value = sanitizeText(
+      allowMultiline
+        ? values.join('\n')
+        : values.join(' ')
+    );
+
+    if (value) {
+      buckets[field.key].push(value);
+      matchedFields.push({ key: field.key, label: field.rawLabel, value });
+    }
+
+    idx = nextIndex;
+  }
+
+  const title = pickLastNonEmpty(buckets.title);
+  const content = pickLastNonEmpty(buckets.content);
+  const kind = normalizeKindValue(pickLastNonEmpty(buckets.kind));
+  const holidayName = pickLastNonEmpty(buckets.holidayName);
+  const roomsRaw = pickLastNonEmpty(buckets.rooms);
+  const structuredRooms = hasGlobalClosureLanguage(roomsRaw) ? [] : parseManualRooms(roomsRaw);
+  const explicitClosure = parseExplicitBoolean(pickLastNonEmpty(buckets.closureAllHalls));
+
+  const dateCandidates = uniqueStrings([
+    pickLastNonEmpty(buckets.dateRange) && `${pickLastNonEmpty(buckets.dateRange)} ${pickLastNonEmpty(buckets.timeRange)}`.trim(),
+    pickLastNonEmpty(buckets.dateRange),
+    pickLastNonEmpty(buckets.timeRange),
+    pickLastNonEmpty(buckets.start) && pickLastNonEmpty(buckets.end)
+      ? `${pickLastNonEmpty(buckets.start)} to ${pickLastNonEmpty(buckets.end)}`
+      : '',
+    pickLastNonEmpty(buckets.dateRange) && pickLastNonEmpty(buckets.start) && pickLastNonEmpty(buckets.end)
+      ? `${pickLastNonEmpty(buckets.dateRange)} ${pickLastNonEmpty(buckets.start)} to ${pickLastNonEmpty(buckets.end)}`
+      : '',
+    pickLastNonEmpty(buckets.dateRange) && pickLastNonEmpty(buckets.start)
+      ? `${pickLastNonEmpty(buckets.dateRange)} ${pickLastNonEmpty(buckets.start)}`
+      : '',
+    pickLastNonEmpty(buckets.start),
+    pickLastNonEmpty(buckets.end)
+  ]);
+
+  let structuredWindow = { startDateTime: null, endDateTime: null, parsedCandidates: [] };
+  let structuredDateSource = '';
+  for (const candidate of dateCandidates) {
+    const parsed = parseDateWindowFromText(candidate);
+    if (parsed.startDateTime) {
+      structuredWindow = parsed;
+      structuredDateSource = candidate;
+      break;
+    }
+    if (!structuredWindow.parsedCandidates.length && parsed.parsedCandidates.length) {
+      structuredWindow = parsed;
+      structuredDateSource = candidate;
+    }
+  }
+
+  return {
+    title,
+    content,
+    kind,
+    holidayName,
+    startDateTime: structuredWindow.startDateTime || null,
+    endDateTime: structuredWindow.endDateTime || null,
+    closureAllHalls:
+      explicitClosure !== null
+        ? explicitClosure
+        : (hasGlobalClosureLanguage(roomsRaw) ? true : null),
+    rooms: structuredRooms,
+    residualBody: sanitizeText(residualLines.join('\n')),
+    matchedFields,
+    parsedCandidates: structuredWindow.parsedCandidates,
+    structuredDateSource
+  };
+};
+
+const isHolidayNotice = (subject, body) => {
+  const text = `${subject || ''}\n${body || ''}`;
+  return /\b(holiday|closed|closure|not bookable|no booking|suspended|restricted|maintenance shutdown|festival)\b/i.test(text);
+};
+
+const extractHolidayName = (subject, body) => {
+  const full = `${subject || ''}\n${body || ''}`.trim();
+  const patterns = [
+    /\bon account of\s+([a-z][a-z\s'-]{2,80}?)(?:\s+holiday|\s+festival|[.,\n]|$)/i,
+    /\bholiday\s*(?:for|:|-)\s*([a-z][a-z\s'-]{2,80}?)(?:[.,\n]|$)/i,
+    /\bholiday\b.*?\bfor\s+([a-z][a-z\s'-]{2,80}?)(?:[.,\n]|$)/i,
+    /\bfestival\s*(?:of|:|-)?\s*([a-z][a-z\s'-]{2,80}?)(?:[.,\n]|$)/i
+  ];
+
+  for (const re of patterns) {
+    const match = full.match(re);
+    if (match && match[1]) return match[1].trim();
+  }
+
+  const subjectLine = String(subject || '').trim();
+  if (/holiday/i.test(subjectLine)) {
+    const fallback = subjectLine.replace(/\bholiday\b/gi, '').replace(/[-:]/g, ' ').trim();
+    if (/regarding|notice|closed|closure|institute|campus/i.test(fallback)) return '';
+    return fallback;
+  }
+
+  return '';
+};
+
 const coerceDateOrNull = (value) => {
   if (!value) return null;
   const dt = value instanceof Date ? value : new Date(value);
@@ -189,20 +433,11 @@ const buildSummary = (title, body) => {
   return `${source.slice(0, MAX_SUMMARY_LENGTH - 1).trim()}...`;
 };
 
-const parseManualRooms = (roomsInput) => {
-  if (!roomsInput) return [];
-  if (Array.isArray(roomsInput)) return uniqueStrings(roomsInput);
-  return uniqueStrings(
-    String(roomsInput)
-      .split(/[,\n;|]/)
-      .map((x) => x.trim())
-  );
-};
-
 const parseNoticeContent = ({ subject = '', body = '', manualOverrides = {} }) => {
   const cleanSubject = sanitizeText(subject);
   const cleanBody = stripMailQuotedContent(body);
-  const detectedHoliday = isHolidayNotice(cleanSubject, cleanBody);
+  const structuredFields = extractStructuredNoticeFields(cleanBody);
+  const detectedHoliday = structuredFields.kind === 'HOLIDAY' || isHolidayNotice(cleanSubject, cleanBody);
   const parsedWindow = parseDateWindow(cleanSubject, cleanBody);
   const parsedRooms = parseRoomsFromText(`${cleanSubject}\n${cleanBody}`);
 
@@ -210,32 +445,42 @@ const parseNoticeContent = ({ subject = '', body = '', manualOverrides = {} }) =
   const manualStart = coerceDateOrNull(manualOverrides.startDateTime);
   const manualEnd = coerceDateOrNull(manualOverrides.endDateTime);
   const manualHolidayName = sanitizeText(manualOverrides.holidayName || '');
-  const manualKind = String(manualOverrides.kind || '').toUpperCase();
+  const manualKind = normalizeKindValue(manualOverrides.kind);
   const resolvedKind =
-    manualKind === 'HOLIDAY' || manualKind === 'GENERAL'
-      ? manualKind
-      : detectedHoliday
-        ? 'HOLIDAY'
-        : 'GENERAL';
+    manualKind ||
+    structuredFields.kind ||
+    (detectedHoliday ? 'HOLIDAY' : 'GENERAL');
 
-  const mergedRooms = manualRooms.length > 0 ? manualRooms : parsedRooms.rooms;
+  const mergedRooms =
+    manualRooms.length > 0
+      ? manualRooms
+      : (structuredFields.rooms.length > 0 ? structuredFields.rooms : parsedRooms.rooms);
   const closureAllHallsExplicit =
     typeof manualOverrides.closureAllHalls === 'boolean'
       ? manualOverrides.closureAllHalls
-      : null;
+      : structuredFields.closureAllHalls;
 
-  const title = sanitizeText(manualOverrides.title || cleanSubject || 'Notice');
+  const title = sanitizeText(manualOverrides.title || structuredFields.title || cleanSubject || 'Notice');
   const holidayName =
     manualHolidayName ||
-    (resolvedKind === 'HOLIDAY' ? extractHolidayName(cleanSubject, cleanBody) : '');
+    structuredFields.holidayName ||
+    (resolvedKind === 'HOLIDAY' ? extractHolidayName(cleanSubject || title, cleanBody) : '');
 
-  const content = sanitizeText(manualOverrides.content || cleanBody || cleanSubject);
+  const content = sanitizeText(
+    manualOverrides.content ||
+    structuredFields.content ||
+    structuredFields.residualBody ||
+    cleanBody ||
+    cleanSubject
+  );
   const summary = buildSummary(title, content);
 
-  const startDateTime = manualStart || parsedWindow.startDateTime;
-  const endDateTime = manualEnd || parsedWindow.endDateTime;
+  const startDateTime = manualStart || structuredFields.startDateTime || parsedWindow.startDateTime;
+  const endDateTime = manualEnd || structuredFields.endDateTime || parsedWindow.endDateTime;
   const inferredHolidayGlobalClosure =
-    resolvedKind === 'HOLIDAY' && mergedRooms.length === 0 && /\b(closed|closure|not bookable|no booking|all day)\b/i.test(`${cleanSubject}\n${cleanBody}`);
+    resolvedKind === 'HOLIDAY' &&
+    mergedRooms.length === 0 &&
+    /\b(closed|closure|not bookable|no booking|all day)\b/i.test(`${cleanSubject}\n${cleanBody}`);
   const closureAllHalls =
     closureAllHallsExplicit !== null
       ? closureAllHallsExplicit
@@ -244,7 +489,7 @@ const parseNoticeContent = ({ subject = '', body = '', manualOverrides = {} }) =
   return {
     title,
     subject: cleanSubject || title,
-    body: cleanBody || content,
+    body: content || cleanBody || cleanSubject,
     content,
     summary,
     extracted: summary,
@@ -256,9 +501,14 @@ const parseNoticeContent = ({ subject = '', body = '', manualOverrides = {} }) =
     rooms: uniqueStrings(mergedRooms),
     halls: uniqueStrings(mergedRooms),
     parsedMeta: {
-      parsedCandidates: parsedWindow.parsedCandidates,
+      parsedCandidates: uniqueStrings([
+        ...structuredFields.parsedCandidates,
+        ...parsedWindow.parsedCandidates
+      ]).slice(0, 6),
       detectedHoliday,
-      closureAllHalls
+      closureAllHalls,
+      structuredDateSource: structuredFields.structuredDateSource,
+      structuredFields: structuredFields.matchedFields
     }
   };
 };

@@ -86,6 +86,7 @@ const complaintSchema = new mongoose.Schema(
       default: 'GUEST'
     },
     createdById: { type: String, default: null },
+    acceptedSolutionId: { type: String, default: null },
     resolvedAt: { type: Date, default: null },
     lastActivityAt: { type: Date, default: Date.now },
     autoCloseAfterDays: { type: Number, default: 7 },

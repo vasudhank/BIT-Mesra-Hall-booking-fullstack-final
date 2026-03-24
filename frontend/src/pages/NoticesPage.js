@@ -75,6 +75,9 @@ const filterNoticesByQuery = (sourceNotices, query) =>
       notice?.content,
       notice?.body,
       notice?.summary,
+      notice?.source,
+      notice?.emailFrom,
+      notice?.postedBy?.name,
       notice?.holidayName,
       notice?.kind,
       Array.isArray(notice?.rooms) ? notice.rooms.join(' ') : '',
@@ -806,6 +809,8 @@ export default function NoticesPage({ mode = 'public' }) {
                 <p className="notice-summary">{notice.summary || 'Click below to read the full details of this announcement.'}</p>
                 <div className="notice-meta">
                   <span>Published: {formatDate(notice.createdAt)}</span>
+                  <span>Source: {notice.source === 'EMAIL' ? 'Email Notice' : 'Manual Notice'}</span>
+                  {notice.emailFrom && <span>From: {notice.emailFrom}</span>}
                   {notice.startDateTime && <span>Starts: {formatDate(notice.startDateTime)}</span>}
                   {notice.endDateTime && <span>Ends: {formatDate(notice.endDateTime)}</span>}
                   {Array.isArray(notice.rooms) && notice.rooms.length > 0 && (

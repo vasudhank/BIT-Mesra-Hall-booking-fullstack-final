@@ -23,6 +23,7 @@ import FormControl from '@mui/material/FormControl';
 import Input from '@mui/material/Input';
 import { createDepartmentApi } from "../../../api/createdepartmentapi";
 import { deleteDepartmentApi } from "../../../api/deletedepartmentapi";
+import ConfirmDeleteDialog from '../../Common/ConfirmDeleteDialog';
 import { fuzzyFilterAndRank } from '../../../utils/fuzzySearch';
 
 export default function AdminDepartment() {
@@ -41,6 +42,7 @@ export default function AdminDepartment() {
   const [selectedDepartmentIds, setSelectedDepartmentIds] = useState([]);
   const [showControlStrip, setShowControlStrip] = useState(true);
   const [showAppbar, setShowAppbar] = useState(true);
+  const [deleteDialogDepartment, setDeleteDialogDepartment] = useState(null);
   
   // Search State
   const [search, setSearch] = useState("");
@@ -99,8 +101,17 @@ export default function AdminDepartment() {
 
   const handleDeleteDepartment = async (id, departmentName) => {
     if (!id) return;
-    const confirmed = window.confirm(`Are you sure you want to delete ${departmentName}? This cannot be undone.`);
-    if (!confirmed) return;
+    setDeleteDialogDepartment({ id, departmentName });
+  };
+
+  const closeDeleteDepartmentDialog = () => {
+    if (deleteDialogDepartment && deletingIds.includes(deleteDialogDepartment.id)) return;
+    setDeleteDialogDepartment(null);
+  };
+
+  const confirmDeleteDepartment = async () => {
+    const id = deleteDialogDepartment?.id;
+    if (!id) return;
 
     setDeletingIds((prev) => [...prev, id]);
     try {
@@ -108,6 +119,7 @@ export default function AdminDepartment() {
       setlist((prev) => prev.filter((dept) => dept._id !== id));
       setFilteredList((prev) => prev.filter((dept) => dept._id !== id));
       setSelectedDepartmentIds((prev) => prev.filter((deptId) => deptId !== id));
+      setDeleteDialogDepartment(null);
     } catch (err) {
       console.error("Failed to delete department:", err);
       window.alert("Failed to delete faculty. Please try again.");
@@ -453,6 +465,18 @@ export default function AdminDepartment() {
         </Container>
 
       </div>
+
+      <ConfirmDeleteDialog
+        open={Boolean(deleteDialogDepartment)}
+        title="Delete this faculty?"
+        highlight={deleteDialogDepartment?.departmentName || 'Selected faculty'}
+        description="This will permanently remove the selected faculty card from the department list."
+        confirmLabel="Delete Faculty"
+        loadingLabel="Deleting..."
+        loading={Boolean(deleteDialogDepartment && deletingIds.includes(deleteDialogDepartment.id))}
+        onClose={closeDeleteDepartmentDialog}
+        onConfirm={confirmDeleteDepartment}
+      />
     </>
   )
 }

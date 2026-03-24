@@ -752,6 +752,17 @@
   word-break: break-word;
 }
 
+.thread-accepted-line {
+  margin-top: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #059669;
+  font-size: 0.77rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
 .date-text {
   color: var(--support-text-soft);
   font-size: 0.75rem;
@@ -813,6 +824,25 @@
   word-break: break-word;
 }
 
+.thread-solution-edit-textarea {
+  width: 100%;
+  min-height: 140px;
+  border: 1px solid var(--support-border);
+  border-radius: 12px;
+  background: var(--support-surface-strong);
+  color: var(--support-text);
+  font: inherit;
+  line-height: 1.6;
+  padding: 12px 13px;
+  resize: vertical;
+  outline: none;
+}
+
+.thread-solution-edit-textarea:focus {
+  border-color: var(--support-accent);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
 .thread-solution-actions {
   display: flex;
   flex-wrap: wrap;
@@ -852,6 +882,100 @@
 
 .thread-icon-btn.active-text {
   color: var(--support-text);
+}
+
+.thread-accept-btn {
+  border: 1px solid rgba(16, 185, 129, 0.32);
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.14);
+  color: #059669;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.thread-accept-btn:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
+.thread-accept-btn:disabled {
+  opacity: 0.68;
+  cursor: not-allowed;
+}
+
+.thread-solution-actions-right {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.thread-solution-manage {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.thread-manage-icon-btn {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--support-border);
+  border-radius: 12px;
+  background: var(--support-surface-strong);
+  color: var(--support-text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.thread-manage-icon-btn:hover:not(:disabled) {
+  border-color: var(--support-accent);
+  color: var(--support-text);
+  transform: translateY(-1px);
+}
+
+.thread-manage-icon-btn.danger:hover:not(:disabled) {
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+.thread-manage-icon-btn:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.thread-manage-text-btn {
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.thread-manage-text-btn.secondary {
+  border-color: var(--support-border);
+  background: var(--support-surface-strong);
+  color: var(--support-text-soft);
+}
+
+.thread-manage-text-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .action-divider {
@@ -1033,6 +1157,21 @@
   .thread-icon-btn {
     font-size: 0.76rem;
     padding: 6px 9px;
+  }
+
+  .thread-accept-btn {
+    margin-left: 0;
+  }
+
+  .thread-solution-actions-right {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .thread-solution-manage {
+    margin-left: 0;
+    width: auto;
+    justify-content: flex-end;
   }
 }
 

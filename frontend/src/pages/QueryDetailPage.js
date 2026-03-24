@@ -7,16 +7,22 @@ import ThumbDownAltOutlinedIcon from '@mui/icons-material/ThumbDownAltOutlined';
 import ThumbDownAltIcon from '@mui/icons-material/ThumbDownAlt';
 import CommentOutlinedIcon from '@mui/icons-material/CommentOutlined';
 import ReplyOutlinedIcon from '@mui/icons-material/ReplyOutlined';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
+import CheckCircleOutlineRoundedIcon from '@mui/icons-material/CheckCircleOutlineRounded';
 import {
   acceptQuerySolution,
+  deleteQuerySolution,
   getQuery,
   postQueryReply,
   postQuerySolution,
   reactQueryReply,
   reactQuerySolution,
+  updateQuerySolution,
   updateQueryStatus
 } from '../api/queriesApi';
 import api from '../api/axiosInstance';
+import ConfirmDeleteDialog from '../components/Common/ConfirmDeleteDialog';
 import './ComplaintDetailPage.css';
 
 const STATUS_STYLES = {
@@ -38,6 +44,13 @@ const SORT_OPTIONS = [
 
 const formatDate = (value) =>
   new Date(value).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+
+const truncateText = (value, maxLength = 140) => {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+};
 
 const pickFirstText = (obj, keys = []) => {
   for (const key of keys) {
@@ -121,13 +134,17 @@ export default function QueryDetailPage({ mode = 'public' }) {
   const [isQuestionPopupOpen, setIsQuestionPopupOpen] = useState(false);
   const [isDesktopThreadMenuOpen, setIsDesktopThreadMenuOpen] = useState(false);
   const [isDesktopSolutionPopupOpen, setIsDesktopSolutionPopupOpen] = useState(false);
+  const [editingSolutionId, setEditingSolutionId] = useState('');
+  const [editDraftBody, setEditDraftBody] = useState('');
+  const [busySolutionAction, setBusySolutionAction] = useState({ type: '', solutionId: '' });
+  const [deleteDialogSolution, setDeleteDialogSolution] = useState(null);
 
   const viewerId = useMemo(() => getViewerId(), []);
   const [solutionReactionMap, setSolutionReactionMap] = useState(() => readReactionStore('querySolutionReactions'));
   const [replyReactionMap, setReplyReactionMap] = useState(() => readReactionStore('queryReplyReactions'));
 
   const trusted = role === 'ADMIN' || role === 'DEVELOPER';
-  const isReporter = String(sessionEmail || '').toLowerCase() === String(queryDoc?.email || '').toLowerCase();
+  const isAdmin = role === 'ADMIN';
 
   const load = async () => {
     setLoading(true);
@@ -348,10 +365,73 @@ export default function QueryDetailPage({ mode = 'public' }) {
 
   const acceptSolution = async (solutionId) => {
     try {
+      setBusySolutionAction({ type: 'accept', solutionId });
       await acceptQuerySolution(id, solutionId);
       await load();
     } catch (err) {
       alert(err?.response?.data?.error || 'Accept answer failed');
+    } finally {
+      setBusySolutionAction({ type: '', solutionId: '' });
+    }
+  };
+
+  const canManageSolutionCard = (solution) => {
+    const authorEmail = String(solution?.authorEmail || '').trim().toLowerCase();
+    const viewerEmail = String(sessionEmail || '').trim().toLowerCase();
+    return isAdmin || (Boolean(viewerEmail) && Boolean(authorEmail) && viewerEmail === authorEmail);
+  };
+
+  const isBusySolutionAction = (type, solutionId) =>
+    busySolutionAction.type === type && String(busySolutionAction.solutionId) === String(solutionId);
+
+  const startEditingSolution = (solution) => {
+    setEditingSolutionId(String(solution._id));
+    setEditDraftBody(pickFirstText(solution, ['body', 'message', 'content', 'solution']));
+  };
+
+  const cancelEditingSolution = () => {
+    setEditingSolutionId('');
+    setEditDraftBody('');
+  };
+
+  const saveEditedSolution = async (solutionId) => {
+    const nextBody = String(editDraftBody || '').trim();
+    if (!nextBody) {
+      alert('Solution text is required');
+      return;
+    }
+    try {
+      setBusySolutionAction({ type: 'save', solutionId });
+      await updateQuerySolution(id, solutionId, { body: nextBody });
+      cancelEditingSolution();
+      await load();
+    } catch (err) {
+      alert(err?.response?.data?.error || 'Unable to update solution');
+    } finally {
+      setBusySolutionAction({ type: '', solutionId: '' });
+    }
+  };
+
+  const closeDeleteSolutionDialog = () => {
+    if (deleteDialogSolution && isBusySolutionAction('delete', deleteDialogSolution._id)) return;
+    setDeleteDialogSolution(null);
+  };
+
+  const removeSolution = async () => {
+    if (!deleteDialogSolution?._id) return;
+    const solutionId = deleteDialogSolution._id;
+    try {
+      setBusySolutionAction({ type: 'delete', solutionId });
+      await deleteQuerySolution(id, solutionId);
+      if (String(editingSolutionId) === String(solutionId)) {
+        cancelEditingSolution();
+      }
+      setDeleteDialogSolution(null);
+      await load();
+    } catch (err) {
+      alert(err?.response?.data?.error || 'Unable to delete solution');
+    } finally {
+      setBusySolutionAction({ type: '', solutionId: '' });
     }
   };
 
@@ -637,14 +717,22 @@ export default function QueryDetailPage({ mode = 'public' }) {
               const draft = replyDrafts[solution._id] || {};
               const activeParent = replyParent[solution._id];
               const accepted = String(queryDoc.acceptedSolutionId || '') === String(solution._id);
+              const canManage = canManageSolutionCard(solution);
+              const editingThis = String(editingSolutionId) === String(solution._id);
+              const showAccept = isAdmin && !accepted && !solution.trusted;
               
               return (
                 <article className="thread-solution-item" key={solution._id}>
                   <div className="thread-solution-head">
                     <div className="head-author-area">
                       <h3>{formatAuthor(solution.authorName, solution.authorEmail)}</h3>
+                      {accepted && (
+                        <div className="thread-accepted-line">
+                          <CheckCircleOutlineRoundedIcon fontSize="inherit" />
+                          <span>Accepted Answer - Approved by Admin</span>
+                        </div>
+                      )}
                       <div className="chip-group">
-                        {accepted && <span className="trusted-chip" style={{ background: 'rgba(52, 211, 153, 0.2)', color: '#a7f3d0', borderColor: 'rgba(52, 211, 153, 0.4)' }}>★ Accepted Answer</span>}
                         {solution.trusted && <span className="trusted-chip">Trusted Solution</span>}
                         {solution.isAIGenerated && <span className="ai-chip">AI Generated</span>}
                         {solution.isAIPending && <span className="ai-thinking-chip">Thinking...</span>}
@@ -654,7 +742,16 @@ export default function QueryDetailPage({ mode = 'public' }) {
                   </div>
 
                   <div className="thread-solution-body">
-                    <p>{pickFirstText(solution, ['body', 'message', 'content', 'solution'])}</p>
+                    {editingThis ? (
+                      <textarea
+                        className="thread-solution-edit-textarea"
+                        value={editDraftBody}
+                        onChange={(e) => setEditDraftBody(e.target.value)}
+                        disabled={isBusySolutionAction('save', solution._id)}
+                      />
+                    ) : (
+                      <p>{pickFirstText(solution, ['body', 'message', 'content', 'solution'])}</p>
+                    )}
                   </div>
 
                   <div className="thread-solution-actions">
@@ -695,11 +792,63 @@ export default function QueryDetailPage({ mode = 'public' }) {
                       <span>Reply</span>
                     </button>
 
-                    {(trusted || isReporter) && !accepted && (
-                      <button className="thread-icon-btn" style={{ marginLeft: 'auto', color: '#10b981' }} type="button" onClick={() => acceptSolution(solution._id)}>
-                         Accept Answer
-                      </button>
-                    )}
+                    <div className="thread-solution-actions-right">
+                      <div className="thread-solution-manage">
+                        {editingThis ? (
+                          <>
+                            <button
+                              type="button"
+                              className="thread-manage-text-btn"
+                              onClick={() => saveEditedSolution(solution._id)}
+                              disabled={isBusySolutionAction('save', solution._id)}
+                            >
+                              {isBusySolutionAction('save', solution._id) ? 'Saving...' : 'Save'}
+                            </button>
+                            <button
+                              type="button"
+                              className="thread-manage-text-btn secondary"
+                              onClick={cancelEditingSolution}
+                              disabled={isBusySolutionAction('save', solution._id)}
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : canManage ? (
+                          <>
+                            <button
+                              type="button"
+                              className="thread-manage-icon-btn"
+                              onClick={() => startEditingSolution(solution)}
+                              title="Edit solution"
+                              aria-label="Edit solution"
+                            >
+                              <EditOutlinedIcon fontSize="small" />
+                            </button>
+                            <button
+                              type="button"
+                              className="thread-manage-icon-btn danger"
+                              onClick={() => setDeleteDialogSolution(solution)}
+                              title="Delete solution"
+                              aria-label="Delete solution"
+                              disabled={isBusySolutionAction('delete', solution._id)}
+                            >
+                              <DeleteOutlineOutlinedIcon fontSize="small" />
+                            </button>
+                          </>
+                        ) : null}
+                      </div>
+                      {showAccept && (
+                        <button
+                          className={`thread-accept-btn ${isBusySolutionAction('accept', solution._id) ? 'busy' : ''}`}
+                          type="button"
+                          onClick={() => acceptSolution(solution._id)}
+                          disabled={isBusySolutionAction('accept', solution._id)}
+                        >
+                          <CheckCircleOutlineRoundedIcon fontSize="small" />
+                          <span>{isBusySolutionAction('accept', solution._id) ? 'Accepting...' : 'ACCEPT ANSWER'}</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {composerOpen && (
@@ -828,6 +977,23 @@ export default function QueryDetailPage({ mode = 'public' }) {
           </div>
         </div>
       )}
+
+      <ConfirmDeleteDialog
+        open={Boolean(deleteDialogSolution)}
+        title="Delete this solution?"
+        highlight={
+          truncateText(
+            pickFirstText(deleteDialogSolution || {}, ['body', 'message', 'content', 'solution']),
+            150
+          ) || formatAuthor(deleteDialogSolution?.authorName, deleteDialogSolution?.authorEmail)
+        }
+        description="This will permanently remove the selected answer from the query thread for everyone."
+        confirmLabel="Delete Solution"
+        loadingLabel="Deleting..."
+        loading={Boolean(deleteDialogSolution && isBusySolutionAction('delete', deleteDialogSolution._id))}
+        onClose={closeDeleteSolutionDialog}
+        onConfirm={removeSolution}
+      />
     </div>
   );
 }
