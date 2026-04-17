@@ -1,0 +1,25 @@
+name: Render Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  deploy-backend:
+    name: Trigger Backend Deploy Hook
+    runs-on: ubuntu-latest
+    if: ${{ secrets.RENDER_DEPLOY_HOOK_URL_BACKEND != '' }}
+    steps:
+      - name: Trigger backend deploy
+        run: curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL_BACKEND }}"
+
+  deploy-frontend:
+    name: Trigger Frontend Deploy Hook
+    runs-on: ubuntu-latest
+    if: ${{ secrets.RENDER_DEPLOY_HOOK_URL_FRONTEND != '' }}
+    steps:
+      - name: Trigger frontend deploy
+        run: curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL_FRONTEND }}"

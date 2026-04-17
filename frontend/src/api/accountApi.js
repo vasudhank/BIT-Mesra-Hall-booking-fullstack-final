@@ -24,4 +24,3 @@ export const changeAccountPassword = async (role, payload) => {
   const { data } = await api.post(`/account/${role}/change_password`, payload, { withCredentials: true });
   return data;
 };
-

@@ -1,15 +1,14 @@
 const express = require('express');
-const fetch = require('node-fetch');
 const chrono = require('chrono-node');
 const pdfParse = require('pdf-parse');
 const router = express.Router();
 const Hall = require('../models/hall');
 const Fuse = require('fuse.js');
 const { getProjectSupportContext } = require('../services/projectSupportContextService');
-
-const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434/api/generate';
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'phi3';
-const OLLAMA_VISION_MODEL = process.env.OLLAMA_VISION_MODEL || process.env.OLLAMA_MODEL || 'phi3';
+const { generateText, cleanResponseText } = require('../services/llmGatewayService');
+const { getKnowledgeContextForPrompt } = require('../services/supportKnowledgeService');
+const { runSupportWorkflow } = require('../services/supportWorkflowService');
+const { beginAiTimer } = require('../services/metricsService');
 
 const MAX_ATTACHMENT_COUNT = 4;
 const MAX_ATTACHMENT_BYTES = 6 * 1024 * 1024;
@@ -339,17 +338,36 @@ const hasConstrainedFuzzyKeyword = (
   return false;
 };
 
-const chatReply = (message, intent = 'neutral') => ({
-  type: 'CHAT',
-  action: null,
-  message: maybeAddIntentEmoji(message, intent)
+const ACTION_TOOLCHAIN = {
+  BOOK_REQUEST: ['intent-parser', 'payload-normalizer', 'booking-request-executor'],
+  ADMIN_EXECUTE: ['intent-parser', 'role-policy-check', 'admin-booking-executor'],
+  SHOW_HALL_STATUS: ['intent-parser', 'availability-query-tool'],
+  LIST_BOOKING_REQUESTS: ['intent-parser', 'conflict-analyzer', 'pending-list-query-tool'],
+  EXPORT_SCHEDULE: ['intent-parser', 'schedule-query-tool', 'artifact-exporter']
+};
+
+const buildReplyMeta = (type, extra = {}) => ({
+  orchestrationMode: type === 'ACTION' ? 'AGENTIC' : 'CONVERSATIONAL',
+  orchestrationVersion: 'hybrid-router-v2',
+  ...extra
 });
 
-const actionReply = (action, payload, reply) => ({
+const chatReply = (message, intent = 'neutral', meta = {}) => ({
+  type: 'CHAT',
+  action: null,
+  message: maybeAddIntentEmoji(message, intent),
+  meta: buildReplyMeta('CHAT', meta)
+});
+
+const actionReply = (action, payload, reply, meta = {}) => ({
   type: 'ACTION',
   action,
   payload,
-  reply
+  reply,
+  meta: buildReplyMeta('ACTION', {
+    plannedTools: ACTION_TOOLCHAIN[action] || [],
+    ...meta
+  })
 });
 
 const to12HourTime = (inputTime) => {
@@ -580,6 +598,14 @@ const buildBookingRequestFromMessage = (message, allHalls) => {
   if (!timeRange.start) missing.push('start time');
   if (!timeRange.end) missing.push('end time');
 
+  if (timeRange.start && timeRange.end) {
+    const startMinutes = toMinutesFrom12Hour(timeRange.start);
+    const endMinutes = toMinutesFrom12Hour(timeRange.end);
+    if (startMinutes !== null && endMinutes !== null && endMinutes <= startMinutes) {
+      missing.push('valid time range (end time after start time)');
+    }
+  }
+
   if (missing.length > 0) {
     return { request: null, missing };
   }
@@ -726,6 +752,24 @@ const inferHallStatusIntent = (message, lower, tokens, allHalls) => {
   const targetHall = detectHallFromMessage(message, allHalls);
 
   return { mode, date, targetHall };
+};
+
+const toMinutesFrom12Hour = (inputTime) => {
+  const raw = String(inputTime || '').trim().toUpperCase();
+  const match = raw.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/);
+  if (!match) return null;
+
+  let hour = Number(match[1]);
+  const minute = Number(match[2] || '0');
+  const suffix = match[3];
+
+  if (Number.isNaN(hour) || Number.isNaN(minute) || hour < 1 || hour > 12 || minute < 0 || minute > 59) {
+    return null;
+  }
+
+  if (suffix === 'PM' && hour < 12) hour += 12;
+  if (suffix === 'AM' && hour === 12) hour = 0;
+  return hour * 60 + minute;
 };
 
 const inferScheduleExportIntent = (message, lower) => {
@@ -973,11 +1017,7 @@ const getChatLengthInstruction = (detailReq) => {
   return 'For CHAT responses, stay helpful and clear. Keep simple greetings concise.';
 };
 
-const cleanLLMText = (text) =>
-  String(text || '')
-    .replace(/```json/gi, '')
-    .replace(/```/g, '')
-    .trim();
+const cleanLLMText = (text) => cleanResponseText(text);
 
 const generateGeneralChatResponse = async ({
   message,
@@ -986,7 +1026,8 @@ const generateGeneralChatResponse = async ({
   preferredLanguage = 'auto',
   history = [],
   projectContext = '',
-  attachmentContext = null
+  attachmentContext = null,
+  knowledgeContext = ''
 }) => {
   const targetHint = detailReq.requestedWords
     ? `around ${detailReq.requestedWords} words`
@@ -1008,6 +1049,8 @@ You are a helpful conversational assistant for a hall booking application.
 
 User role: ${userRole}
 Project context: ${projectContext || 'Not available'}
+Retrieved FAQ/notice context:
+${knowledgeContext || 'No additional retrieval snippets.'}
 Task: Reply naturally to the user message.
 
 Guidelines:
@@ -1036,32 +1079,13 @@ Answer:
     ? Math.min(2400, Math.max(900, detailReq.requestedWords * 4))
     : (detailReq.needsDetailed ? 900 : 700);
 
-  const modelToUse = attachmentContext?.hasVisionInput ? OLLAMA_VISION_MODEL : OLLAMA_MODEL;
-  const requestBody = {
-    model: modelToUse,
+  const result = await generateText({
     prompt,
-    stream: false,
-    options: {
-      temperature: 0.5,
-      num_predict: numPredict
-    }
-  };
-  if (Array.isArray(attachmentContext?.images) && attachmentContext.images.length > 0) {
-    requestBody.images = attachmentContext.images;
-  }
-
-  const response = await fetch(OLLAMA_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody)
+    temperature: 0.5,
+    maxTokens: numPredict,
+    images: Array.isArray(attachmentContext?.images) ? attachmentContext.images : []
   });
-
-  if (!response.ok) {
-    throw new Error(`General chat generation failed: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return cleanLLMText(data.response);
+  return cleanLLMText(result.text);
 };
 
 const hasExtractableAttachmentText = (attachmentContext) => {
@@ -1079,7 +1103,9 @@ const generateAttachmentAnalysisResponse = async ({
   message,
   preferredLanguage = 'auto',
   history = [],
-  attachmentContext = null
+  attachmentContext = null,
+  projectContext = '',
+  knowledgeContext = ''
 }) => {
   const responseLanguage = detectResponseLanguage(message, preferredLanguage);
   const languageInstruction = responseLanguage === 'hi'
@@ -1103,6 +1129,12 @@ Task:
 - If the file appears unrelated to bookings, still explain it clearly.
 - If extracted text is missing/insufficient, say that clearly and ask for a clearer file scan or text-based file.
 
+Project context:
+${projectContext || 'Not available'}
+
+Retrieved FAQ/notice context:
+${knowledgeContext || 'No additional retrieval snippets.'}
+
 Output rules:
 - Plain text only (no JSON, no markdown fences).
 - Give a concise, structured response:
@@ -1124,33 +1156,13 @@ User message: "${message}"
 Answer:
 `.trim();
 
-  const modelToUse = attachmentContext?.hasVisionInput ? OLLAMA_VISION_MODEL : OLLAMA_MODEL;
-  const requestBody = {
-    model: modelToUse,
+  const result = await generateText({
     prompt,
-    stream: false,
-    options: {
-      temperature: 0.25,
-      num_predict: 1200
-    }
-  };
-
-  if (Array.isArray(attachmentContext?.images) && attachmentContext.images.length > 0) {
-    requestBody.images = attachmentContext.images;
-  }
-
-  const response = await fetch(OLLAMA_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody)
+    temperature: 0.25,
+    maxTokens: 1200,
+    images: Array.isArray(attachmentContext?.images) ? attachmentContext.images : []
   });
-
-  if (!response.ok) {
-    throw new Error(`Attachment analysis failed: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return cleanLLMText(data.response);
+  return cleanLLMText(result.text);
 };
 
 const expandChatResponse = async ({
@@ -1160,7 +1172,8 @@ const expandChatResponse = async ({
   userRole,
   preferredLanguage = 'auto',
   history = [],
-  projectContext = ''
+  projectContext = '',
+  knowledgeContext = ''
 }) => {
   const targetRange = detailReq.requestedWords
     ? `${detailReq.targetMinWords}-${detailReq.targetMaxWords} words`
@@ -1181,6 +1194,8 @@ Question: "${question}"
 Draft answer: "${draftAnswer}"
 User role: ${userRole}
 Project context: ${projectContext || 'Not available'}
+Retrieved FAQ/notice context:
+${knowledgeContext || 'No additional retrieval snippets.'}
 
 Requirements:
 - Return plain text only (no JSON, no markdown fences).
@@ -1197,26 +1212,12 @@ ${historyBlock}
     ? Math.min(2400, Math.max(700, detailReq.requestedWords * 4))
     : 900;
 
-  const response = await fetch(OLLAMA_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: OLLAMA_MODEL,
-      prompt: expandPrompt,
-      stream: false,
-      options: {
-        temperature: 0.35,
-        num_predict: numPredict
-      }
-    })
+  const result = await generateText({
+    prompt: expandPrompt,
+    temperature: 0.35,
+    maxTokens: numPredict
   });
-
-  if (!response.ok) {
-    throw new Error(`LLM expansion failed: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return cleanLLMText(data.response);
+  return cleanLLMText(result.text);
 };
 
 const extractFirstJSON = (txt) => {
@@ -1263,6 +1264,36 @@ const extractFirstJSON = (txt) => {
   return null;
 };
 
+const normalizeModelReply = (replyLike) => {
+  const raw = replyLike && typeof replyLike === 'object' ? replyLike : {};
+
+  const inferredType = (() => {
+    const typeRaw = String(raw.type || raw.mode || '').toUpperCase().trim();
+    if (typeRaw === 'ACTION') return 'ACTION';
+    if (typeRaw === 'CHAT') return 'CHAT';
+    return raw.action || raw.actionType || raw.tool ? 'ACTION' : 'CHAT';
+  })();
+
+  const actionRaw = String(raw.action || raw.actionType || raw.tool || '').toUpperCase().trim();
+  const payload =
+    raw.payload && typeof raw.payload === 'object'
+      ? raw.payload
+      : raw.params && typeof raw.params === 'object'
+        ? raw.params
+        : {};
+
+  const message = raw.message || raw.answer || raw.text || null;
+  const reply = raw.reply || raw.response || null;
+
+  return {
+    type: inferredType,
+    action: actionRaw || null,
+    payload,
+    message,
+    reply
+  };
+};
+
 const buildSystemPrompt = ({
   message,
   userRole,
@@ -1271,7 +1302,8 @@ const buildSystemPrompt = ({
   preferredLanguage = 'auto',
   history = [],
   projectContext = '',
-  attachmentContext = null
+  attachmentContext = null,
+  knowledgeContext = ''
 }) => {
   const ist = getISTDateMeta();
   const chatLengthInstruction = getChatLengthInstruction(detailReq);
@@ -1296,6 +1328,8 @@ Current context:
 - User Role: ${userRole}
 - Available Halls: [${hallNames}]
 - Project support context: ${projectContext || 'Not available'}
+- Retrieved FAQ/notice context:
+${knowledgeContext || 'No additional retrieval snippets.'}
 
 Core behavior:
 1) Support normal conversational chat and general knowledge.
@@ -1397,6 +1431,14 @@ const normalizeSingleBookingRequest = (requestLike, fallbackMessage, allHalls) =
   if (!start) missing.push('start time');
   if (!end) missing.push('end time');
 
+  if (start && end) {
+    const startMinutes = toMinutesFrom12Hour(start);
+    const endMinutes = toMinutesFrom12Hour(end);
+    if (startMinutes !== null && endMinutes !== null && endMinutes <= startMinutes) {
+      missing.push('valid time range (end time after start time)');
+    }
+  }
+
   if (missing.length > 0) {
     return { request: null, missing };
   }
@@ -1434,6 +1476,8 @@ const ensureBookingPayload = (payload, message, allHalls) => {
 };
 
 router.post('/chat', async (req, res) => {
+  const finalizeAi = beginAiTimer('http_chat');
+  let hadAiError = false;
   try {
     const message = String(req.body?.message || '').trim();
     if (!message) {
@@ -1442,14 +1486,28 @@ router.post('/chat', async (req, res) => {
 
     const history = sanitizeChatHistory(req.body?.history);
     const preferredLanguage = normalizeLanguagePreference(req.body?.language);
-    const attachmentContext = await buildAttachmentContext(req.body?.attachments || []);
-    const projectContext = await getProjectSupportContext();
+    const historyQueryText = history
+      .slice(-6)
+      .map((entry) => `${entry.role}: ${entry.text}`)
+      .join('\n');
+
+    const [attachmentContext, projectContext, halls, knowledgeBundle] = await Promise.all([
+      buildAttachmentContext(req.body?.attachments || []),
+      getProjectSupportContext(),
+      Hall.find({}, 'name'),
+      getKnowledgeContextForPrompt({
+        query: `${message}\n${historyQueryText}`,
+        maxFaq: 5,
+        maxNotices: 3
+      })
+    ]);
+
+    const knowledgeContext = String(knowledgeBundle?.block || 'No retrieval snippets available.').trim();
 
     const userRole = req.isAuthenticated && req.isAuthenticated()
       ? String(req.user?.type || '').toUpperCase()
       : 'GUEST';
 
-    const halls = await Hall.find({}, 'name');
     const hallNames = halls.map((h) => h.name);
 
     const lower = normalizeText(message);
@@ -1582,7 +1640,9 @@ router.post('/chat', async (req, res) => {
           message,
           preferredLanguage,
           history,
-          attachmentContext
+          attachmentContext,
+          projectContext,
+          knowledgeContext
         });
 
         if (attachmentReply) {
@@ -1621,49 +1681,34 @@ router.post('/chat', async (req, res) => {
         preferredLanguage,
         history,
         projectContext,
-        attachmentContext
+        attachmentContext,
+        knowledgeContext
       });
 
       const jsonNumPredict = detailReq.requestedWords
         ? Math.min(2400, Math.max(900, detailReq.requestedWords * 4))
         : (detailReq.needsDetailed ? 900 : 600);
 
-      const modelToUse = attachmentContext?.hasVisionInput ? OLLAMA_VISION_MODEL : OLLAMA_MODEL;
-      const requestBody = {
-        model: modelToUse,
+      const result = await generateText({
         prompt,
-        stream: false,
-        options: {
-          temperature: 0.2,
-          num_predict: jsonNumPredict,
-          stop: ['User input:', 'Output JSON:', '<|end|>']
-        }
-      };
-      if (Array.isArray(attachmentContext?.images) && attachmentContext.images.length > 0) {
-        requestBody.images = attachmentContext.images;
-      }
-
-      const response = await fetch(OLLAMA_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
+        temperature: 0.2,
+        maxTokens: jsonNumPredict,
+        stop: ['User input:', 'Output JSON:', '<|end|>'],
+        images: Array.isArray(attachmentContext?.images) ? attachmentContext.images : []
       });
 
-      if (!response.ok) {
-        throw new Error(`LLM request failed: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const rawText = String(data.response || '').trim();
+      const rawText = String(result.text || '').trim();
 
       parsed = extractFirstJSON(rawText);
       if (!parsed) {
-        const cleaned = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const cleaned = cleanLLMText(rawText);
         parsed = {
           type: 'CHAT',
           message: cleaned || 'I could not parse that request.'
         };
       }
+
+      parsed = normalizeModelReply(parsed);
     } catch (modelErr) {
       console.error('AI model error:', modelErr.message || modelErr);
 
@@ -1697,7 +1742,8 @@ router.post('/chat', async (req, res) => {
           preferredLanguage,
           history,
           projectContext,
-          attachmentContext
+          attachmentContext,
+          knowledgeContext
         });
 
         if (plainChat) {
@@ -1716,6 +1762,37 @@ router.post('/chat', async (req, res) => {
 
     if (type !== 'ACTION') {
       let messageText = cleanLLMText(parsed.message || parsed.reply || '').trim();
+      let chatMeta = {};
+
+      const asksForReasoning =
+        /\b(analyze|analysis|reason|reasoning|plan|planner|compare|deep dive|investigate|step by step|explain why)\b/i.test(lower)
+        || /(विश्लेषण|स्टेप बाय स्टेप|कारण|समझाओ)/.test(message);
+      const shouldUseAgentGraph =
+        detailReq.needsDetailed
+        || detailReq.requestedWords
+        || asksForReasoning
+        || !messageText;
+
+      if (shouldUseAgentGraph) {
+        try {
+          const workflow = await runSupportWorkflow({
+            message,
+            userRole,
+            preferredLanguage,
+            history,
+            projectContext
+          });
+
+          if (workflow?.answer) {
+            messageText = workflow.answer;
+          }
+          if (workflow?.meta) {
+            chatMeta = { ...chatMeta, agentGraph: workflow.meta };
+          }
+        } catch (graphErr) {
+          console.error('Agent graph fallback error:', graphErr.message || graphErr);
+        }
+      }
 
       if (detailReq.targetMinWords > 0 && getWordCount(messageText) < detailReq.targetMinWords) {
         const minAcceptWords = Math.max(20, Math.floor(detailReq.targetMinWords * 0.7));
@@ -1728,7 +1805,8 @@ router.post('/chat', async (req, res) => {
               userRole,
               preferredLanguage,
               history,
-              projectContext
+              projectContext,
+              knowledgeContext
             });
 
             const expandedWords = getWordCount(expanded);
@@ -1763,7 +1841,8 @@ router.post('/chat', async (req, res) => {
             preferredLanguage,
             history,
             projectContext,
-            attachmentContext
+            attachmentContext,
+            knowledgeContext
           });
           if (plainChat) messageText = plainChat;
         } catch (plainErr) {
@@ -1772,7 +1851,7 @@ router.post('/chat', async (req, res) => {
       }
 
       return res.json({
-        reply: chatReply(messageText || 'I can help with chat, booking requests, and admin booking workflows.')
+        reply: chatReply(messageText || 'I can help with chat, booking requests, and admin booking workflows.', 'neutral', chatMeta)
       });
     }
 
@@ -1945,7 +2024,8 @@ router.post('/chat', async (req, res) => {
         preferredLanguage,
         history,
         projectContext,
-        attachmentContext
+        attachmentContext,
+        knowledgeContext
       });
       if (plainChat) {
         return res.json({ reply: chatReply(plainChat) });
@@ -1958,8 +2038,11 @@ router.post('/chat', async (req, res) => {
       reply: chatReply('I understood the message but could not map it to a supported action.')
     });
   } catch (err) {
+    hadAiError = true;
     console.error('AI route error:', err);
     return res.status(500).json({ error: 'AI service failed' });
+  } finally {
+    finalizeAi({ error: hadAiError });
   }
 });
 

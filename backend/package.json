@@ -4,7 +4,9 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "ai:intent:test": "node scripts/aiIntentRegression.js"
+    "ai:intent:test": "node scripts/aiIntentRegression.js",
+    "vector:sync": "node scripts/syncVectorKnowledge.js",
+    "check": "node --check index.js && node --check routes/ai.js && node --check routes/aiExecute.js && node --check routes/integrationsWhatsApp.js && node --check routes/integrationsSlack.js && node --check routes/integrationsCrm.js && node --check services/langGraphRuntimeService.js && node --check services/supportWorkflowService.js && node --check services/whatsappIntegrationService.js && node --check services/slackIntegrationService.js && node --check services/crmIntegrationService.js"
   },
   "dependencies": {
     "axios": "^1.13.2",
@@ -21,9 +23,10 @@
     "mongoose": "^7.8.7",
     "node-fetch": "^2.7.0",
     "nodemailer": "^6.10.1",
+    "passport": "^0.6.0",
+    "passport-local": "^1.0.0",
     "pdf-parse": "^1.1.1",
     "pdfkit": "^0.17.2",
-    "passport": "^0.6.0",
-    "passport-local": "^1.0.0"
+    "ws": "^8.20.0"
   }
 }

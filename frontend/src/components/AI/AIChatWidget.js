@@ -233,6 +233,42 @@ const formatBytes = (bytes) => {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+const normalizeWsBase = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const withoutTrailingSlash = raw.replace(/\/+$/, "");
+  const noApiSuffix = withoutTrailingSlash.replace(/\/api$/i, "");
+  return noApiSuffix;
+};
+
+const resolveAiWebSocketUrl = () => {
+  const explicit = normalizeWsBase(process.env.REACT_APP_WS_URL);
+  if (explicit) {
+    const wsBase = explicit
+      .replace(/^https:\/\//i, "wss://")
+      .replace(/^http:\/\//i, "ws://");
+    return `${wsBase}/api/ai/ws`;
+  }
+
+  const apiBase = normalizeWsBase(process.env.REACT_APP_API_URL);
+  if (apiBase) {
+    const wsBase = apiBase
+      .replace(/^https:\/\//i, "wss://")
+      .replace(/^http:\/\//i, "ws://");
+    return `${wsBase}/api/ai/ws`;
+  }
+
+  if (typeof window !== "undefined") {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return `${protocol}//${window.location.host}/api/ai/ws`;
+  }
+
+  return "";
+};
+
+const isLikelyActionPrompt = (text) =>
+  /\b(book|booking|reserve|approve|reject|pending requests|hall status|show halls|export schedule|download schedule)\b/i.test(String(text || ""));
+
 const downloadBase64Artifact = (artifact) => {
   if (!artifact || !artifact.base64) return;
   try {
@@ -1114,6 +1150,120 @@ export default function AIChatWidget({
     };
   };
 
+  const streamConversationViaWebSocket = ({ message, history, language, userRole, abortSignal }) =>
+    new Promise((resolve) => {
+      const wsUrl = resolveAiWebSocketUrl();
+      if (!wsUrl || typeof window === "undefined" || typeof window.WebSocket === "undefined") {
+        resolve({ status: "unsupported", text: "" });
+        return;
+      }
+
+      const requestId = createId();
+      let completed = false;
+      let accumulated = "";
+      let socket;
+
+      const finish = (result) => {
+        if (completed) return;
+        completed = true;
+        try {
+          socket?.close();
+        } catch (err) {
+          // Ignore close errors.
+        }
+        resolve(result);
+      };
+
+      const onAbort = () => finish({ status: "aborted", text: "" });
+      if (abortSignal) {
+        if (abortSignal.aborted) {
+          onAbort();
+          return;
+        }
+        abortSignal.addEventListener("abort", onAbort, { once: true });
+      }
+
+      try {
+        socket = new window.WebSocket(wsUrl);
+      } catch (err) {
+        finish({ status: "unsupported", text: "" });
+        return;
+      }
+
+      const timeoutId = setTimeout(() => {
+        finish({ status: "timeout", text: "" });
+      }, 30000);
+
+      socket.onopen = () => {
+        socket.send(
+          JSON.stringify({
+            type: "chat.stream",
+            requestId,
+            payload: {
+              message,
+              history,
+              language,
+              userRole
+            }
+          })
+        );
+      };
+
+      socket.onmessage = (event) => {
+        let packet = null;
+        try {
+          packet = JSON.parse(String(event.data || "{}"));
+        } catch (err) {
+          return;
+        }
+
+        if (packet?.requestId && packet.requestId !== requestId) return;
+
+        if (packet?.type === "chat.stream.redirect_http") {
+          clearTimeout(timeoutId);
+          finish({ status: "redirect", text: "" });
+          return;
+        }
+
+        if (packet?.type === "chat.stream.delta") {
+          accumulated += String(packet.token || "");
+          return;
+        }
+
+        if (packet?.type === "chat.stream.end") {
+          clearTimeout(timeoutId);
+          const finalText = String(packet.text || accumulated || "").trim();
+          finish({
+            status: "ok",
+            text: finalText,
+            meta: packet.meta && typeof packet.meta === "object" ? packet.meta : null
+          });
+          return;
+        }
+
+        if (packet?.type === "chat.stream.error") {
+          clearTimeout(timeoutId);
+          finish({
+            status: "error",
+            text: "",
+            error: String(packet.error || "stream_error")
+          });
+        }
+      };
+
+      socket.onerror = () => {
+        clearTimeout(timeoutId);
+        finish({ status: "error", text: "" });
+      };
+
+      socket.onclose = () => {
+        if (!completed) {
+          clearTimeout(timeoutId);
+          finish({ status: accumulated ? "ok" : "error", text: accumulated.trim() });
+        }
+      };
+    });
+
   const sendMessage = async (textOverride = null, options = {}) => {
     const rawText = textOverride == null ? input : textOverride;
     const textToSend = String(rawText || "").trim();
@@ -1159,6 +1309,40 @@ export default function AIChatWidget({
     activeChatRequestRef.current = requestController;
 
     try {
+      const roleForStream = String(accountKey || "GUEST").split(":")[0] || "GUEST";
+      const shouldTryStream =
+        requestAttachments.length === 0
+        && !isLikelyActionPrompt(composedUserText)
+        && !options.forceHttp;
+
+      if (shouldTryStream) {
+        const streamResult = await streamConversationViaWebSocket({
+          message: composedUserText,
+          history: toServerHistory(historyMessages),
+          language: selectedLanguage,
+          userRole: roleForStream,
+          abortSignal: requestController.signal
+        });
+
+        if (requestController.signal.aborted) return;
+
+        if (streamResult.status === "ok" && streamResult.text) {
+          updateActiveThreadMessages((existingMessages) => [
+            ...existingMessages,
+            createMessage("ai", streamResult.text, {
+              data: streamResult.meta ? { streamMeta: streamResult.meta } : null
+            })
+          ]);
+
+          if (isLiveModeRef.current) {
+            speak(streamResult.text);
+          }
+          return;
+        }
+
+        if (streamResult.status === "aborted") return;
+      }
+
       const res = await api.post("/ai/chat", {
         message: composedUserText,
         history: toServerHistory(historyMessages),

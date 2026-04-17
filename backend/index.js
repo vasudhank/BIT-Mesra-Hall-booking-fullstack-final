@@ -16,16 +16,33 @@ const { startFaqAutoPromotion } = require('./services/faqAutoPromotionService');
 const { startBookingCleanupSchedule } = require('./services/bookingCleanupService');
 const { startNoticeMailSync } = require('./services/noticeMailSyncService');
 const { startNoticeTrashCleanupSchedule } = require('./services/noticeTrashCleanupService');
+const { startVectorKnowledgeSync } = require('./services/vectorKnowledgeSyncService');
+const { attachAiRealtimeSocketServer } = require('./services/aiRealtimeSocketService');
+const { beginHttpTimer } = require('./services/metricsService');
+const { logger } = require('./services/loggerService');
 
 const PORT = process.env.PORT || 8000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-console.log('ENV:', NODE_ENV);
-console.log('EMAIL:', process.env.EMAIL ? 'SET' : 'NOT SET');
-console.log('MONGO_URI:', process.env.MONGO_URI ? 'SET' : 'NOT SET');
+const captureRawBody = (req, res, buf) => {
+  if (!buf || !buf.length) return;
+  req.rawBody = buf.toString('utf8');
+};
 
-app.use(express.json({ limit: '15mb' }));
-app.use(express.urlencoded({ extended: true }));
+logger.info('Backend boot config', {
+  env: NODE_ENV,
+  emailConfigured: Boolean(process.env.EMAIL),
+  mongoConfigured: Boolean(process.env.MONGO_URI)
+});
+
+app.use(express.json({ limit: '15mb', verify: captureRawBody }));
+app.use(express.urlencoded({ extended: true, verify: captureRawBody }));
+
+app.use((req, res, next) => {
+  const done = beginHttpTimer(req);
+  res.on('finish', () => done(res.statusCode));
+  next();
+});
 
 app.use(
   cors({
@@ -59,6 +76,11 @@ app.use(passport.session());
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/ai', require('./routes/aiExecute'));
 app.use('/api/voice', require('./routes/voice'));
+app.use('/api/vector', require('./routes/vector'));
+app.use('/api/ops', require('./routes/ops'));
+app.use('/api/integrations/whatsapp', require('./routes/integrationsWhatsApp'));
+app.use('/api/integrations/slack', require('./routes/integrationsSlack'));
+app.use('/api/integrations/crm', require('./routes/integrationsCrm'));
 app.use('/api', require('./index1'));
 
 const ensureDefaultDeveloper = async () => {
@@ -76,37 +98,42 @@ const ensureDefaultDeveloper = async () => {
       password: hashSync(password, 10),
       type: 'Developer'
     });
-    console.log(`[Bootstrap] Default developer created: ${email}`);
+    logger.info('Default developer created', { email });
   } catch (err) {
-    console.error('[Bootstrap] Developer init failed:', err.message);
+    logger.error('Default developer bootstrap failed', { error: err.message || err });
   }
 };
 
 const server = app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  logger.info('Server started', { port: PORT });
   ensureDefaultDeveloper().catch(() => {});
   if (String(process.env.COMPLAINT_MAIL_SYNC_ENABLED || 'true').toLowerCase() !== 'false') {
     try {
       const { startComplaintMailSync } = require('./services/complaintMailSyncService');
       startComplaintMailSync();
     } catch (err) {
-      console.error('[Startup] Complaint mail sync failed to start:', err.message);
+      logger.error('Complaint mail sync failed to start', { error: err.message || err });
     }
   } else {
-    console.log('[Startup] Complaint mail sync disabled (COMPLAINT_MAIL_SYNC_ENABLED=false).');
+    logger.info('Complaint mail sync disabled', { reason: 'COMPLAINT_MAIL_SYNC_ENABLED=false' });
   }
   startFaqAutoPromotion();
   startBookingCleanupSchedule();
   startNoticeMailSync();
   startNoticeTrashCleanupSchedule();
+  startVectorKnowledgeSync();
 });
+
+attachAiRealtimeSocketServer(server);
 
 server.on('error', (err) => {
   if (err && err.code === 'EADDRINUSE') {
-    console.error(`[Startup] Port ${PORT} is already in use.`);
-    console.error('[Startup] Stop the old backend process or change PORT in backend/.env, then restart.');
+    logger.error('Port already in use', { port: PORT });
+    logger.error('Startup blocked by occupied port', {
+      hint: 'Stop old backend process or change PORT in backend/.env'
+    });
     process.exit(1);
   }
-  console.error('[Startup] Server failed to start:', err?.message || err);
+  logger.error('Server failed to start', { error: err?.message || err });
   process.exit(1);
 });

@@ -5,6 +5,7 @@ const Booking_Requests = require('../models/booking_requests');
 const PDFDocument = require('pdfkit');
 const { safeExecute } = require('../utils/safeNotify');
 const { generateApprovalToken, getTokenExpiry } = require('../utils/token');
+const { beginAiTimer } = require('../services/metricsService');
 
 const {
   sendBookingApprovalMail,
@@ -374,6 +375,8 @@ const rejectRequest = async (requestDoc) => {
 };
 
 router.post('/execute', async (req, res) => {
+  const finalizeAi = beginAiTimer('http_execute');
+  let hadAiError = false;
   try {
     const intent = req.body?.intent || {};
     const user = req.isAuthenticated && req.isAuthenticated()
@@ -854,8 +857,11 @@ router.post('/execute', async (req, res) => {
 
     return res.json({ status: 'ERROR', msg: 'Action not recognized.' });
   } catch (err) {
+    hadAiError = true;
     console.error('AI execute route error:', err);
     return res.status(500).json({ status: 'ERROR', msg: 'AI action execution failed.' });
+  } finally {
+    finalizeAi({ error: hadAiError });
   }
 });
 
