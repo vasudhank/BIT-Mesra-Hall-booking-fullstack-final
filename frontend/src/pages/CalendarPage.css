@@ -4971,8 +4971,8 @@ al-search-result-date span,
 
 
   .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-day-frame {
-    min-height: 52px;
-    padding-bottom: 2px;
+    min-height: 46px;
+    padding-bottom: 1px;
   }
 
   .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-day-top {

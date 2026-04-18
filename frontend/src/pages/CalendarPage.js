@@ -7706,7 +7706,7 @@ export default function CalendarPage() {
                   },
                   dayGridMonth: {
                     dayHeaderFormat: { weekday: 'short' },
-                    dayMaxEvents: isMobile ? 3 : true
+                    dayMaxEvents: isMobile ? 2 : true
                   },
                   multiMonthYear: {
                     multiMonthMaxColumns: 4,
