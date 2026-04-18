@@ -41,6 +41,9 @@ const VALID_THEME_MODES = ['Light', 'Dark', 'Auto'];
 const DAY_ALL_DAY_DEBUG_HOOK = true;
 const PX_TO_PT = 72 / 96;
 const MAX_PDF_PAGE_SIDE_PT = 14000;
+const MOBILE_SWIPE_ENABLED_VIEWS = new Set(['dayGridMonth', 'timeGridWeek', 'timeGridDay']);
+const MOBILE_SWIPE_MIN_DISTANCE_PX = 56;
+const MOBILE_SWIPE_AXIS_RATIO = 1.2;
 
 const defaultTaskForm = {
   title: '',
@@ -530,6 +533,31 @@ const isEditableDomTarget = (target) => {
   if (!(target instanceof Element)) return false;
   if (target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return true;
   return Boolean(target.closest('.gcal-modal, .gcal-print-modal, .gcal-appearance-modal'));
+};
+
+const isMobileSwipeBlockedTarget = (target) => {
+  if (!(target instanceof Element)) return false;
+  if (isEditableDomTarget(target)) return true;
+  return Boolean(
+    target.closest(
+      [
+        'button',
+        'a',
+        'label',
+        '[role="button"]',
+        '[role="menu"]',
+        '[role="menuitem"]',
+        '.fc-event',
+        '.gcal-event',
+        '.event-click-zone',
+        '.gcal-month-more-popup',
+        '.gcal-event-popover',
+        '.gcal-dropdown-menu',
+        '.gcal-user-menu',
+        '.quick-page-menu-panel'
+      ].join(', ')
+    )
+  );
 };
 
 const resolveCalendarPasteTarget = (target, point = null) => {
@@ -4174,10 +4202,99 @@ export default function CalendarPage() {
     };
   }, [stopScheduleAutoScroll]);
 
-  const executeCalendarCommand = (command) => {
+  const executeCalendarCommand = useCallback((command) => {
     const api = calendarRef.current?.getApi();
-    if (api) api[command]();
-  };
+    if (!api) return;
+    const commandFn = api?.[command];
+    if (typeof commandFn === 'function') {
+      commandFn.call(api);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile || searchOpen) return undefined;
+    if (!MOBILE_SWIPE_ENABLED_VIEWS.has(viewType)) return undefined;
+    const calendarCardEl = calendarCardRef.current;
+    if (!calendarCardEl) return undefined;
+
+    const swipeState = {
+      active: false,
+      blocked: false,
+      startX: 0,
+      startY: 0,
+      lastX: 0,
+      lastY: 0
+    };
+
+    const resetSwipeState = () => {
+      swipeState.active = false;
+      swipeState.blocked = false;
+      swipeState.startX = 0;
+      swipeState.startY = 0;
+      swipeState.lastX = 0;
+      swipeState.lastY = 0;
+    };
+
+    const handleTouchStart = (ev) => {
+      const touch = ev.touches?.[0];
+      if (!touch || ev.touches.length !== 1) {
+        resetSwipeState();
+        return;
+      }
+      swipeState.active = true;
+      swipeState.blocked = isMobileSwipeBlockedTarget(ev.target);
+      swipeState.startX = touch.clientX;
+      swipeState.startY = touch.clientY;
+      swipeState.lastX = touch.clientX;
+      swipeState.lastY = touch.clientY;
+    };
+
+    const handleTouchMove = (ev) => {
+      if (!swipeState.active) return;
+      const touch = ev.touches?.[0];
+      if (!touch) return;
+      swipeState.lastX = touch.clientX;
+      swipeState.lastY = touch.clientY;
+    };
+
+    const handleTouchEnd = (ev) => {
+      if (!swipeState.active) return;
+
+      const blocked = swipeState.blocked;
+      const touch = ev.changedTouches?.[0];
+      const endX = Number.isFinite(touch?.clientX) ? touch.clientX : swipeState.lastX;
+      const endY = Number.isFinite(touch?.clientY) ? touch.clientY : swipeState.lastY;
+      const deltaX = endX - swipeState.startX;
+      const deltaY = endY - swipeState.startY;
+      resetSwipeState();
+
+      if (blocked) return;
+
+      const absX = Math.abs(deltaX);
+      const absY = Math.abs(deltaY);
+      if (absX < MOBILE_SWIPE_MIN_DISTANCE_PX) return;
+      if (absX < (absY * MOBILE_SWIPE_AXIS_RATIO)) return;
+
+      executeCalendarCommand(deltaX < 0 ? 'next' : 'prev');
+    };
+
+    const handleTouchCancel = () => {
+      resetSwipeState();
+    };
+
+    const listenerOptions = { passive: true };
+    calendarCardEl.addEventListener('touchstart', handleTouchStart, listenerOptions);
+    calendarCardEl.addEventListener('touchmove', handleTouchMove, listenerOptions);
+    calendarCardEl.addEventListener('touchend', handleTouchEnd, listenerOptions);
+    calendarCardEl.addEventListener('touchcancel', handleTouchCancel, listenerOptions);
+
+    return () => {
+      calendarCardEl.removeEventListener('touchstart', handleTouchStart, listenerOptions);
+      calendarCardEl.removeEventListener('touchmove', handleTouchMove, listenerOptions);
+      calendarCardEl.removeEventListener('touchend', handleTouchEnd, listenerOptions);
+      calendarCardEl.removeEventListener('touchcancel', handleTouchCancel, listenerOptions);
+    };
+  }, [executeCalendarCommand, isMobile, searchOpen, viewType]);
 
   const closeAppearanceModal = () => {
     setAppearanceModalOpen(false);
@@ -7001,128 +7118,145 @@ export default function CalendarPage() {
     >
       {isMobile && (
         <div className="gcal-mobile-time-strip" aria-label="Current time in IST">
+          {!searchOpen && (
+            <div className="gcal-mobile-time-strip-left">
+              <button type="button" className="gcal-icon-btn" onClick={toggleSidebar} aria-label="Main menu">
+                <Svgs.Menu />
+              </button>
+              <button
+                type="button"
+                className="gcal-icon-btn gcal-create-mini-btn"
+                onClick={openTaskModalFromCreate}
+                aria-label="Create public task"
+              >
+                <Svgs.Plus />
+              </button>
+            </div>
+          )}
           <span className="gcal-mobile-time-value">{clockTimeText}</span>
+          {!searchOpen && (
+            <div className="gcal-mobile-time-strip-right">
+              <button
+                className="gcal-icon-btn gcal-search-icon-btn"
+                onClick={openSearchFromHeader}
+                aria-label="Open search"
+              >
+                <Svgs.Search />
+              </button>
+              <button
+                type="button"
+                className="gcal-btn-today gcal-btn-today-mobile"
+                onClick={() => executeCalendarCommand('today')}
+                aria-label="Go to today"
+              >
+                {mobileTodayLabel}
+              </button>
+              {renderUserMenu()}
+            </div>
+          )}
         </div>
       )}
       
       {/* Top Navigation Bar - Switches Mode when Searching */}
       <header className="gcal-topbar">
         {!searchOpen ? (
-          <>
-            <div className="gcal-top-left">
-              <button type="button" className="gcal-icon-btn" onClick={toggleSidebar} aria-label="Main menu"><Svgs.Menu /></button>
-              {isMobile ? (
-                <button
-                  type="button"
-                  className="gcal-icon-btn gcal-create-mini-btn"
-                  onClick={openTaskModalFromCreate}
-                  aria-label="Create public task"
-                >
-                  <Svgs.Plus />
-                </button>
-              ) : (
-                <div className="gcal-brand">
-                  <img src={calendarLogoSrc} alt="Calendar" className="gcal-logo-img" />
-                  <span>Calendar</span>
-                </div>
-              )}
-            </div>
-
-            <div className={`gcal-top-center ${isMobile ? 'gcal-top-center-mobile' : ''}`}>
-              {!isMobile && (
-                <button type="button" className="gcal-btn-today" onClick={() => executeCalendarCommand('today')}>Today</button>
-              )}
+          isMobile ? (
+            <div className="gcal-mobile-nav-row">
               <div className="gcal-nav-arrows">
                 <button type="button" className="gcal-icon-btn nav" onClick={() => executeCalendarCommand('prev')} aria-label="Previous">
-                  {isMobile ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24"><path d="M7 14l5-5 5 5z"></path></svg>
-                  ) : (
-                    <svg width="20" height="20" viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"></path></svg>
-                  )}
+                  <svg width="20" height="20" viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"></path></svg>
                 </button>
                 <button type="button" className="gcal-icon-btn nav" onClick={() => executeCalendarCommand('next')} aria-label="Next">
-                  {isMobile ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"></path></svg>
-                  ) : (
-                    <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"></path></svg>
-                  )}
+                  <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"></path></svg>
                 </button>
               </div>
               <h2 className="gcal-view-title">{displayViewTitle}</h2>
             </div>
+          ) : (
+            <>
+              <div className="gcal-top-left">
+                <button type="button" className="gcal-icon-btn" onClick={toggleSidebar} aria-label="Main menu"><Svgs.Menu /></button>
+                <div className="gcal-brand">
+                  <img src={calendarLogoSrc} alt="Calendar" className="gcal-logo-img" />
+                  <span>Calendar</span>
+                </div>
+              </div>
 
-            <div className={`gcal-top-right ${isMobile ? 'gcal-top-right-mobile' : ''}`}>
-              {!isMobile && (
+              <div className="gcal-top-center">
+                <button type="button" className="gcal-btn-today" onClick={() => executeCalendarCommand('today')}>Today</button>
+                <div className="gcal-nav-arrows">
+                  <button type="button" className="gcal-icon-btn nav" onClick={() => executeCalendarCommand('prev')} aria-label="Previous">
+                    <svg width="20" height="20" viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"></path></svg>
+                  </button>
+                  <button type="button" className="gcal-icon-btn nav" onClick={() => executeCalendarCommand('next')} aria-label="Next">
+                    <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"></path></svg>
+                  </button>
+                </div>
+                <h2 className="gcal-view-title">{displayViewTitle}</h2>
+              </div>
+
+              <div className="gcal-top-right">
                 <div className="gcal-header-clock" aria-label="Current time in IST">
                   {headerClockText}
                 </div>
-              )}
-              {isMobile && (
-                <button type="button" className="gcal-btn-today gcal-btn-today-mobile" onClick={() => executeCalendarCommand('today')} aria-label="Go to today">
-                  {mobileTodayLabel}
+                <button
+                  className="gcal-icon-btn gcal-search-icon-btn"
+                  onClick={openSearchFromHeader}
+                >
+                  <Svgs.Search />
                 </button>
-              )}
-              <button
-                className="gcal-icon-btn gcal-search-icon-btn"
-                onClick={openSearchFromHeader}
-              >
-                <Svgs.Search />
-              </button>
               
-              {/* Settings Dropdown */}
-              {!isMobile && (
-              <div className="gcal-settings-container">
-                <button className="gcal-icon-btn" onClick={() => setSettingsDropdownOpen(!settingsDropdownOpen)}><Svgs.Settings /></button>
-                {settingsDropdownOpen && (
-                  <div className="gcal-dropdown-menu settings-menu">
-                    <div className="gcal-dropdown-item" onClick={openPrintDialog}>
-                      Print
-                      <span className="hotkey">{printShortcutHint}</span>
+                {/* Settings Dropdown */}
+                <div className="gcal-settings-container">
+                  <button className="gcal-icon-btn" onClick={() => setSettingsDropdownOpen(!settingsDropdownOpen)}><Svgs.Settings /></button>
+                  {settingsDropdownOpen && (
+                    <div className="gcal-dropdown-menu settings-menu">
+                      <div className="gcal-dropdown-item" onClick={openPrintDialog}>
+                        Print
+                        <span className="hotkey">{printShortcutHint}</span>
+                      </div>
+                      <div className="gcal-dropdown-item" onClick={() => {
+                        setSettingsDropdownOpen(false);
+                        navigate('/trash');
+                      }}>
+                        Trash
+                        <span className="hotkey">{trashShortcutHint}</span>
+                      </div>
+                      <div className="gcal-dropdown-divider"></div>
+                      <div className="gcal-dropdown-item" onClick={openAppearanceModal}>
+                        Appearance
+                        <span className="hotkey">{appearanceShortcutHint}</span>
+                      </div>
                     </div>
-                    <div className="gcal-dropdown-item" onClick={() => {
-                      setSettingsDropdownOpen(false);
-                      navigate('/trash');
-                    }}>
-                      Trash
-                      <span className="hotkey">{trashShortcutHint}</span>
-                    </div>
-                    <div className="gcal-dropdown-divider"></div>
-                    <div className="gcal-dropdown-item" onClick={openAppearanceModal}>
-                      Appearance
-                      <span className="hotkey">{appearanceShortcutHint}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-              )}
+                  )}
+                </div>
 
-              {/* View Selector Dropdown */}
-              {!isMobile && (
-              <div className="gcal-view-selector-container">
-                <button className="gcal-view-selector-btn" onClick={() => setViewDropdownOpen(!viewDropdownOpen)}>
-                  {viewLabels[viewType]} <Svgs.CaretDown />
-                </button>
-                {viewDropdownOpen && (
-                  <div className="gcal-dropdown-menu view-menu">
-                    <div className="gcal-dropdown-item" onClick={() => handleViewChange('timeGridDay')}>Day <span className="hotkey">D</span></div>
-                    <div className="gcal-dropdown-item" onClick={() => handleViewChange('timeGridWeek')}>Week <span className="hotkey">W</span></div>
-                    <div className="gcal-dropdown-item" onClick={() => handleViewChange('dayGridMonth')}>Month <span className="hotkey">M</span></div>
-                    <div className="gcal-dropdown-item" onClick={() => handleViewChange('multiMonthYear')}>Year <span className="hotkey">Y</span></div>
-                    <div className="gcal-dropdown-item" onClick={() => handleViewChange('listYear')}>Schedule <span className="hotkey">S</span></div>
-                    <div className="gcal-dropdown-divider"></div>
-                    <div className="gcal-dropdown-item checkbox-item" onClick={(e) => { e.stopPropagation(); setViewOptions({...viewOptions, weekends: !viewOptions.weekends}); }}>
-                      <span className="check-area">{viewOptions.weekends && <Svgs.Check />}</span> Show weekends
+                {/* View Selector Dropdown */}
+                <div className="gcal-view-selector-container">
+                  <button className="gcal-view-selector-btn" onClick={() => setViewDropdownOpen(!viewDropdownOpen)}>
+                    {viewLabels[viewType]} <Svgs.CaretDown />
+                  </button>
+                  {viewDropdownOpen && (
+                    <div className="gcal-dropdown-menu view-menu">
+                      <div className="gcal-dropdown-item" onClick={() => handleViewChange('timeGridDay')}>Day <span className="hotkey">D</span></div>
+                      <div className="gcal-dropdown-item" onClick={() => handleViewChange('timeGridWeek')}>Week <span className="hotkey">W</span></div>
+                      <div className="gcal-dropdown-item" onClick={() => handleViewChange('dayGridMonth')}>Month <span className="hotkey">M</span></div>
+                      <div className="gcal-dropdown-item" onClick={() => handleViewChange('multiMonthYear')}>Year <span className="hotkey">Y</span></div>
+                      <div className="gcal-dropdown-item" onClick={() => handleViewChange('listYear')}>Schedule <span className="hotkey">S</span></div>
+                      <div className="gcal-dropdown-divider"></div>
+                      <div className="gcal-dropdown-item checkbox-item" onClick={(e) => { e.stopPropagation(); setViewOptions({...viewOptions, weekends: !viewOptions.weekends}); }}>
+                        <span className="check-area">{viewOptions.weekends && <Svgs.Check />}</span> Show weekends
+                      </div>
+                      <div className="gcal-dropdown-item checkbox-item" onClick={(e) => { e.stopPropagation(); setViewOptions({...viewOptions, declined: !viewOptions.declined}); }}>
+                        <span className="check-area">{viewOptions.declined && <Svgs.Check />}</span> Show declined events
+                      </div>
                     </div>
-                    <div className="gcal-dropdown-item checkbox-item" onClick={(e) => { e.stopPropagation(); setViewOptions({...viewOptions, declined: !viewOptions.declined}); }}>
-                      <span className="check-area">{viewOptions.declined && <Svgs.Check />}</span> Show declined events
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
+                {renderUserMenu()}
               </div>
-              )}
-              {renderUserMenu()}
-            </div>
-          </>
+            </>
+          )
         ) : (
           <div className="gcal-search-header">
             <div className="gcal-search-back">
@@ -7405,7 +7539,7 @@ export default function CalendarPage() {
           ) : (
             <div
               ref={calendarCardRef}
-              className={`gcal-calendar-card ${viewType === 'multiMonthYear' ? 'year-view-mode' : ''}${viewType === 'listYear' ? ' schedule-view-mode' : ''}`}
+              className={`gcal-calendar-card ${viewType === 'multiMonthYear' ? 'year-view-mode' : ''}${viewType === 'listYear' ? ' schedule-view-mode' : ''}${isMobile && MOBILE_SWIPE_ENABLED_VIEWS.has(viewType) ? ' mobile-swipe-enabled' : ''}`}
             >
               {viewType === 'multiMonthYear' && (
                 <section className="gcal-custom-year-wrapper" aria-label={`Year view ${activeYearForCustomView}`}>

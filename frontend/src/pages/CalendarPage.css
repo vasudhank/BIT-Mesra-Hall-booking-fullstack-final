@@ -688,6 +688,10 @@
   width: 100%;
 }
 
+.gcal-calendar-card.mobile-swipe-enabled {
+  touch-action: pan-y;
+}
+
 .gcal-calendar-card.year-view-mode .fc {
   display: none !important;
 }
@@ -4612,11 +4616,42 @@ al-search-result-date span,
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0 12px;
+    position: relative;
+    padding: 0 8px;
     box-sizing: border-box;
     border-bottom: 1px solid #dfe5ec;
     background: #ffffff;
     flex-shrink: 0;
+  }
+
+  .gcal-mobile-time-strip-left,
+  .gcal-mobile-time-strip-right {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .gcal-mobile-time-strip-left {
+    left: 8px;
+  }
+
+  .gcal-mobile-time-strip-right {
+    right: 8px;
+  }
+
+  .gcal-mobile-time-strip-left .gcal-icon-btn,
+  .gcal-mobile-time-strip-right .gcal-icon-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .gcal-mobile-time-strip-left .gcal-icon-btn svg,
+  .gcal-mobile-time-strip-right .gcal-icon-btn svg {
+    width: 18px;
+    height: 18px;
   }
 
   .gcal-mobile-time-value {
@@ -4631,45 +4666,12 @@ al-search-result-date span,
   }
 
   .gcal-topbar {
+    position: relative;
     height: var(--gcal-mobile-topbar-height);
-    padding: 8px 10px;
-    gap: 8px;
+    padding: 4px 10px 8px;
+    gap: 0;
     align-items: center;
-  }
-
-  .gcal-top-left {
-    min-width: 0;
-    flex: 0 0 auto;
-    gap: 4px;
-  }
-
-  .gcal-top-center-mobile {
-    min-width: 0;
-    flex: 1 1 auto;
-    gap: 4px;
-    justify-content: flex-start;
-    overflow: hidden;
-  }
-
-  .gcal-top-right-mobile {
-    flex: 0 0 auto;
-    gap: 4px;
-    padding-right: 0;
-    margin-left: auto;
-  }
-
-  .gcal-top-right-mobile .gcal-icon-btn,
-  .gcal-top-left .gcal-icon-btn,
-  .gcal-top-center-mobile .gcal-icon-btn.nav {
-    width: 34px;
-    height: 34px;
-  }
-
-  .gcal-top-right-mobile .gcal-icon-btn svg,
-  .gcal-top-left .gcal-icon-btn svg,
-  .gcal-top-center-mobile .gcal-icon-btn.nav svg {
-    width: 20px;
-    height: 20px;
+    justify-content: center;
   }
 
   .gcal-create-mini-btn {
@@ -4679,35 +4681,45 @@ al-search-result-date span,
     box-shadow: 0 1px 2px rgba(60, 64, 67, 0.14);
   }
 
+  .gcal-mobile-nav-row {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
   .gcal-nav-arrows {
     margin-left: 0;
   }
 
-  .gcal-top-center-mobile .gcal-nav-arrows {
+  .gcal-mobile-nav-row .gcal-nav-arrows {
+    position: absolute;
+    left: 4px;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0;
-    margin-right: 2px;
+    gap: 2px;
     flex: 0 0 auto;
   }
 
-  .gcal-top-center-mobile .gcal-icon-btn.nav {
-    width: 28px;
-    height: 16px;
-    border-radius: 8px;
+  .gcal-mobile-nav-row .gcal-icon-btn.nav {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
   }
 
-  .gcal-top-center-mobile .gcal-icon-btn.nav svg {
-    width: 16px;
-    height: 16px;
+  .gcal-mobile-nav-row .gcal-icon-btn.nav svg {
+    width: 18px;
+    height: 18px;
   }
 
   .gcal-view-title {
     margin: 0;
     min-width: 0;
-    max-width: clamp(112px, 38vw, 190px);
+    max-width: clamp(132px, 56vw, 260px);
+    text-align: center;
     font-size: 15px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -4715,12 +4727,12 @@ al-search-result-date span,
   }
 
   .gcal-btn-today-mobile {
-    width: 34px;
-    min-width: 34px;
-    height: 34px;
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
     padding: 0;
     border-radius: 50%;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
     line-height: 1;
   }
@@ -4730,7 +4742,7 @@ al-search-result-date span,
   }
 
   .gcal-user-menu {
-    top: 38px;
+    top: 34px;
     right: 0;
     min-width: 190px;
     max-width: min(82vw, 240px);
@@ -4771,7 +4783,7 @@ al-search-result-date span,
 
   .gcal-sidebar-scrim {
     position: fixed;
-    top: var(--gcal-mobile-top-stack-height);
+    top: var(--gcal-mobile-clock-strip-height);
     right: 0;
     bottom: 0;
     left: 0;
@@ -4782,7 +4794,7 @@ al-search-result-date span,
 
   .gcal-sidebar {
     position: fixed;
-    top: var(--gcal-mobile-top-stack-height);
+    top: var(--gcal-mobile-clock-strip-height);
     left: 0;
     bottom: 0;
     width: min(280px, 78vw);
