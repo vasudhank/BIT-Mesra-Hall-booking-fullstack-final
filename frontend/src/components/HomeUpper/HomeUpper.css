@@ -825,7 +825,17 @@ body.dark-mode .upper-toggle-thumb {
   line-height: 1;
   color: #ffffff !important; 
 }
-.hero-content h1 span {
+.hero-content h1 .hero-title-primary,
+.hero-content h1 .hero-title-secondary {
+  display: block;
+}
+.hero-content h1 .hero-title-word {
+  display: inline;
+}
+.hero-content h1 .hero-title-word + .hero-title-word {
+  margin-left: 0.28em;
+}
+.hero-content h1 .hero-title-secondary {
   font-style: italic;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.55), 0 0 14px rgba(255, 255, 255, 0.25);
   color: #ffffff !important;
@@ -1399,7 +1409,7 @@ body.dark-mode .mobile-floating-hide-btn {
   .logo-container2 { right: 14px; }
   .hero-content-mobile { padding: 1rem; justify-content: flex-start; background: transparent; }
   .hero-content h1 { padding-top: 20vh; text-align:left; font-size: 4.8rem; margin-bottom: 10px; text-shadow: 0 4px 10px rgba(0,0,0,0.6); }
-  .hero-content h1 span { font-size:3.8rem; text-shadow: 0 4px 10px rgba(0,0,0,0.6); padding-top: 30vh; text-align:center; }
+  .hero-content h1 .hero-title-secondary { font-size:3.8rem; text-shadow: 0 4px 10px rgba(0,0,0,0.6); }
   .hero-content p { font-size: 13px; max-width: 90%; text-shadow: 0 2px 5px rgba(0,0,0,0.8); font-weight: 500; color: #e2e8f0; }
   .scroll-down-hero { bottom: 4rem; left: 50%; }
   .contact-header-wrap { display: none; }
@@ -1427,12 +1437,21 @@ body.dark-mode .mobile-floating-hide-btn {
 }
 
 @media (min-width: 401px) and (max-width: 1364px) {
-  .hero-content h1 span { font-size: 3.1rem; }
+  .hero-content h1 .hero-title-secondary { font-size: 3.1rem; }
 }
 
 @media (max-width: 400px) {
   .hero-content h1 { font-size: 2.8rem; }
-  .hero-content h1 span { font-size: 2rem; }
+  .hero-content h1 .hero-title-word + .hero-title-word {
+    margin-left: 0;
+  }
+  .hero-content h1 .hero-title-primary .hero-title-word,
+  .hero-content h1 .hero-title-secondary .hero-title-word {
+    display: block;
+  }
+  .hero-content h1 .hero-title-secondary {
+    font-size: 2rem;
+  }
   .mobile-wish-btn { top: 80px; font-size: 0.8rem; padding: 8px 14px; }
   .mobile-floating-action.menu-action { top: 80px; }
   .mobile-menu-toggle { width: 40px; height: 40px; }

@@ -1871,8 +1871,14 @@ export default function HomeUpper({
         {/* Hero Text Content */}
         <div className={`hero-content ${!isMobile ? 'hero-content-lowered' : 'hero-content-mobile'}`}>
           <h1>
-            Book your hall <br />
-            <span>before your coffee gets cold</span>
+            <span className="hero-title-primary">
+              <span className="hero-title-word">Book your</span>
+              <span className="hero-title-word">hall</span>
+            </span>
+            <span className="hero-title-secondary">
+              <span className="hero-title-word">before your coffee</span>
+              <span className="hero-title-word">gets cold</span>
+            </span>
           </h1>
           <p>
             Our <span className="highlight">Hall Booking System</span> is the home
