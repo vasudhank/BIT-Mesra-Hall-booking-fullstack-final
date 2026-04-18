@@ -7123,37 +7123,9 @@ export default function CalendarPage() {
               <button type="button" className="gcal-icon-btn" onClick={toggleSidebar} aria-label="Main menu">
                 <Svgs.Menu />
               </button>
-              <button
-                type="button"
-                className="gcal-icon-btn gcal-create-mini-btn"
-                onClick={openTaskModalFromCreate}
-                aria-label="Create public task"
-              >
-                <Svgs.Plus />
-              </button>
             </div>
           )}
           <span className="gcal-mobile-time-value">{clockTimeText}</span>
-          {!searchOpen && (
-            <div className="gcal-mobile-time-strip-right">
-              <button
-                className="gcal-icon-btn gcal-search-icon-btn"
-                onClick={openSearchFromHeader}
-                aria-label="Open search"
-              >
-                <Svgs.Search />
-              </button>
-              <button
-                type="button"
-                className="gcal-btn-today gcal-btn-today-mobile"
-                onClick={() => executeCalendarCommand('today')}
-                aria-label="Go to today"
-              >
-                {mobileTodayLabel}
-              </button>
-              {renderUserMenu()}
-            </div>
-          )}
         </div>
       )}
       
@@ -7162,15 +7134,43 @@ export default function CalendarPage() {
         {!searchOpen ? (
           isMobile ? (
             <div className="gcal-mobile-nav-row">
-              <div className="gcal-nav-arrows">
+              <div className="gcal-mobile-nav-left">
+                <button
+                  type="button"
+                  className="gcal-icon-btn gcal-create-mini-btn"
+                  onClick={openTaskModalFromCreate}
+                  aria-label="Create public task"
+                >
+                  <Svgs.Plus />
+                </button>
+              </div>
+              <div className="gcal-mobile-nav-center">
                 <button type="button" className="gcal-icon-btn nav" onClick={() => executeCalendarCommand('prev')} aria-label="Previous">
                   <svg width="20" height="20" viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"></path></svg>
                 </button>
+                <h2 className="gcal-view-title">{displayViewTitle}</h2>
                 <button type="button" className="gcal-icon-btn nav" onClick={() => executeCalendarCommand('next')} aria-label="Next">
                   <svg width="20" height="20" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"></path></svg>
                 </button>
               </div>
-              <h2 className="gcal-view-title">{displayViewTitle}</h2>
+              <div className="gcal-mobile-nav-right">
+                <button
+                  className="gcal-icon-btn gcal-search-icon-btn"
+                  onClick={openSearchFromHeader}
+                  aria-label="Open search"
+                >
+                  <Svgs.Search />
+                </button>
+                <button
+                  type="button"
+                  className="gcal-btn-today gcal-btn-today-mobile"
+                  onClick={() => executeCalendarCommand('today')}
+                  aria-label="Go to today"
+                >
+                  {mobileTodayLabel}
+                </button>
+                {renderUserMenu()}
+              </div>
             </div>
           ) : (
             <>
