@@ -46,7 +46,7 @@ const MOBILE_DATETIME_RESTORE_DOT_CONFIG = Object.freeze({
   // Manual tuning for collapsed-circle controls inside the mobile datetime bar.
   sizePx: 20,
   slotWidthPx: 46,
-  gapPx: 4,
+  gapPx: 6.5,
   offsetXPx: 0,
   offsetYPx: 0
 });
