@@ -44,6 +44,13 @@ const MAX_PDF_PAGE_SIDE_PT = 14000;
 const MOBILE_SWIPE_ENABLED_VIEWS = new Set(['dayGridMonth', 'timeGridWeek', 'timeGridDay']);
 const MOBILE_SWIPE_MIN_DISTANCE_PX = 56;
 const MOBILE_SWIPE_AXIS_RATIO = 1.2;
+const MOBILE_HEADER_COLLAPSE_CONFIG = Object.freeze({
+  longPressMs: 560,
+  miniCircleSize: 18,
+  miniCircleIconSize: 10,
+  hideXSize: 16,
+  hideXFontSize: 11
+});
 
 const defaultTaskForm = {
   title: '',
@@ -1061,6 +1068,7 @@ const Svgs = {
       <path fill="none" d="M0 0h36v36H0z"></path>
     </svg>
   ),
+  AI: () => <svg focusable="false" viewBox="0 0 24 24"><path d="M12 2l1.95 4.45L18.5 8.4l-3.55 3.18.99 4.82L12 13.94 8.06 16.4l.99-4.82L5.5 8.4l4.55-1.95L12 2zm7.2 12.2l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9.9-2.1zM4.8 14.2l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9.9-2.1z"></path></svg>,
   Check: () => <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"></path></svg>,
   Trash: () => <svg viewBox="0 0 24 24"><path d="M15 4V3H9v1H4v2h1v13c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V6h1V4h-5zm2 15H7V6h10v13z"></path><path d="M9 8h2v9H9zm4 0h2v9h-2z"></path></svg>,
   Edit: () => <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75l10.99-10.99-3.75-3.75L3 17.25zm14.71-9.04a.996.996 0 0 0 0-1.41l-2.51-2.51a.996.996 0 1 0-1.41 1.41l2.51 2.51c.39.39 1.02.39 1.41 0z"></path></svg>,
@@ -1203,6 +1211,10 @@ export default function CalendarPage() {
   const [logoDay, setLogoDay] = useState(() => new Date().getDate());
   const [scheduleNowTick, setScheduleNowTick] = useState(Date.now());
   const [headerClockTick, setHeaderClockTick] = useState(Date.now());
+  const [mobileHeaderHidden, setMobileHeaderHidden] = useState({ menu: false, ai: false });
+  const [mobileHeaderHideTarget, setMobileHeaderHideTarget] = useState('');
+  const mobileHeaderLongPressTimerRef = useRef(null);
+  const mobileHeaderSuppressClickRef = useRef('');
   const [scheduleDragTargetDateKey, setScheduleDragTargetDateKey] = useState('');
   const [monthMorePopup, setMonthMorePopup] = useState({
     open: false,
@@ -6806,13 +6818,89 @@ export default function CalendarPage() {
     const withoutYear = stripYearFromHeaderTitle(viewTitle);
     return withoutYear || viewLabels[viewType] || viewTitle;
   }, [isMobile, viewTitle, viewType]);
-    const toggleSidebar = () => {
+  const clearMobileHeaderLongPressTimer = useCallback(() => {
+    if (!mobileHeaderLongPressTimerRef.current) return;
+    window.clearTimeout(mobileHeaderLongPressTimerRef.current);
+    mobileHeaderLongPressTimerRef.current = null;
+  }, []);
+
+  useEffect(() => () => {
+    clearMobileHeaderLongPressTimer();
+  }, [clearMobileHeaderLongPressTimer]);
+
+  useEffect(() => {
+    if (isMobile) return;
+    setMobileHeaderHidden({ menu: false, ai: false });
+    setMobileHeaderHideTarget('');
+    mobileHeaderSuppressClickRef.current = '';
+    clearMobileHeaderLongPressTimer();
+  }, [clearMobileHeaderLongPressTimer, isMobile]);
+
+  useEffect(() => {
+    if (!mobileHeaderHideTarget) return undefined;
+    const handlePointerDown = (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest('.gcal-mobile-strip-action')) return;
+      setMobileHeaderHideTarget('');
+    };
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => document.removeEventListener('pointerdown', handlePointerDown, true);
+  }, [mobileHeaderHideTarget]);
+
+  const startMobileHeaderLongPress = useCallback((targetKey) => {
+    if (!isMobile) return;
+    clearMobileHeaderLongPressTimer();
+    mobileHeaderLongPressTimerRef.current = window.setTimeout(() => {
+      mobileHeaderSuppressClickRef.current = targetKey;
+      setMobileHeaderHideTarget(targetKey);
+    }, Math.max(320, Number(MOBILE_HEADER_COLLAPSE_CONFIG.longPressMs) || 560));
+  }, [clearMobileHeaderLongPressTimer, isMobile]);
+
+  const endMobileHeaderLongPress = useCallback(() => {
+    clearMobileHeaderLongPressTimer();
+  }, [clearMobileHeaderLongPressTimer]);
+
+  const collapseMobileHeaderButton = useCallback((targetKey, event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    clearMobileHeaderLongPressTimer();
+    mobileHeaderSuppressClickRef.current = '';
+    setMobileHeaderHidden((prev) => ({ ...prev, [targetKey]: true }));
+    setMobileHeaderHideTarget('');
+    if (targetKey === 'menu') setSidebarOpen(false);
+  }, [clearMobileHeaderLongPressTimer]);
+
+  const restoreMobileHeaderButton = useCallback((targetKey, event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    setMobileHeaderHidden((prev) => ({ ...prev, [targetKey]: false }));
+    setMobileHeaderHideTarget('');
+  }, []);
+
+  const handleMobileHeaderButtonTap = useCallback((targetKey, event, onTap) => {
+    if (mobileHeaderSuppressClickRef.current === targetKey) {
+      mobileHeaderSuppressClickRef.current = '';
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      return;
+    }
+    setMobileHeaderHideTarget('');
+    onTap?.(event);
+  }, []);
+
+  const toggleSidebar = () => {
     setSidebarOpen((prev) => !prev);
     if (isMobile) {
       setViewDropdownOpen(false);
       setSettingsDropdownOpen(false);
     }
   };
+
+  const openMobileAiPage = useCallback((event) => {
+    event?.preventDefault?.();
+    navigate('/ai');
+  }, [navigate]);
 
   const openSearchFromHeader = (e) => {
     e.stopPropagation();
@@ -7111,21 +7199,100 @@ export default function CalendarPage() {
     timeZone: 'Asia/Kolkata'
   }).format(new Date(headerClockTick));
   const headerClockText = `${clockTimeText} IST`;
+  const mobileHeaderStripStyle = isMobile ? {
+    '--gcal-mobile-mini-circle-size': `${MOBILE_HEADER_COLLAPSE_CONFIG.miniCircleSize}px`,
+    '--gcal-mobile-mini-circle-icon-size': `${MOBILE_HEADER_COLLAPSE_CONFIG.miniCircleIconSize}px`,
+    '--gcal-mobile-hide-x-size': `${MOBILE_HEADER_COLLAPSE_CONFIG.hideXSize}px`,
+    '--gcal-mobile-hide-x-font-size': `${MOBILE_HEADER_COLLAPSE_CONFIG.hideXFontSize}px`
+  } : undefined;
 
   return (
     <div
       className={`gcal-page theme-${themeMode.toLowerCase()}${isMobile ? ' gcal-mobile' : ''}${searchOpen ? ' search-open' : ''}${viewType === 'timeGridWeek' ? (weekAllDayExpanded ? ' week-all-day-expanded' : ' week-all-day-collapsed') : ''}${viewType === 'timeGridDay' ? (dayAllDayExpanded ? ' day-all-day-expanded' : ' day-all-day-collapsed') : ''}`}
     >
       {isMobile && (
-        <div className="gcal-mobile-time-strip" aria-label="Current time in IST">
+        <div className="gcal-mobile-time-strip" aria-label="Current time in IST" style={mobileHeaderStripStyle}>
           {!searchOpen && (
             <div className="gcal-mobile-time-strip-left">
-              <button type="button" className="gcal-icon-btn" onClick={toggleSidebar} aria-label="Main menu">
-                <Svgs.Menu />
-              </button>
+              {!mobileHeaderHidden.menu && (
+                <div className="gcal-mobile-strip-action">
+                  <button
+                    type="button"
+                    className="gcal-icon-btn"
+                    aria-label="Main menu"
+                    onClick={(event) => handleMobileHeaderButtonTap('menu', event, toggleSidebar)}
+                    onPointerDown={() => startMobileHeaderLongPress('menu')}
+                    onPointerUp={endMobileHeaderLongPress}
+                    onPointerCancel={endMobileHeaderLongPress}
+                    onPointerLeave={endMobileHeaderLongPress}
+                  >
+                    <Svgs.Menu />
+                  </button>
+                  {mobileHeaderHideTarget === 'menu' && (
+                    <button
+                      type="button"
+                      className="gcal-mobile-strip-hide-btn"
+                      aria-label="Collapse menu button"
+                      onClick={(event) => collapseMobileHeaderButton('menu', event)}
+                    >
+                      x
+                    </button>
+                  )}
+                </div>
+              )}
+              {!mobileHeaderHidden.ai && (
+                <div className="gcal-mobile-strip-action">
+                  <button
+                    type="button"
+                    className="gcal-icon-btn gcal-mobile-ai-btn"
+                    aria-label="Open AI assistant"
+                    onClick={(event) => handleMobileHeaderButtonTap('ai', event, openMobileAiPage)}
+                    onPointerDown={() => startMobileHeaderLongPress('ai')}
+                    onPointerUp={endMobileHeaderLongPress}
+                    onPointerCancel={endMobileHeaderLongPress}
+                    onPointerLeave={endMobileHeaderLongPress}
+                  >
+                    <Svgs.AI />
+                  </button>
+                  {mobileHeaderHideTarget === 'ai' && (
+                    <button
+                      type="button"
+                      className="gcal-mobile-strip-hide-btn"
+                      aria-label="Collapse AI button"
+                      onClick={(event) => collapseMobileHeaderButton('ai', event)}
+                    >
+                      x
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
           <span className="gcal-mobile-time-value">{clockTimeText}</span>
+          {!searchOpen && (mobileHeaderHidden.menu || mobileHeaderHidden.ai) && (
+            <div className="gcal-mobile-time-strip-right">
+              {mobileHeaderHidden.menu && (
+                <button
+                  type="button"
+                  className="gcal-mobile-collapse-dot menu-dot"
+                  aria-label="Restore menu button"
+                  onClick={(event) => restoreMobileHeaderButton('menu', event)}
+                >
+                  <Svgs.Menu />
+                </button>
+              )}
+              {mobileHeaderHidden.ai && (
+                <button
+                  type="button"
+                  className="gcal-mobile-collapse-dot ai-dot"
+                  aria-label="Restore AI button"
+                  onClick={(event) => restoreMobileHeaderButton('ai', event)}
+                >
+                  <Svgs.AI />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
       
