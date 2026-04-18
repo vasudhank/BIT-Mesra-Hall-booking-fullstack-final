@@ -1,5 +1,5 @@
 import './App.css';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 
@@ -54,6 +54,33 @@ function AppRoutes({ lightMode, toggleTheme }) {
   const normalizedPath = String(location.pathname || '').toLowerCase();
   const isHomeScopedThemeRoute =
     normalizedPath === '/' || normalizedPath === '/about' || normalizedPath === '/faqs';
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.history) return undefined;
+    const previousScrollRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
+
+    return () => {
+      window.history.scrollRestoration = previousScrollRestoration;
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const resetScrollPosition = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+
+    resetScrollPosition();
+    const frameId = window.requestAnimationFrame(resetScrollPosition);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [location.pathname]);
 
   const syncThemeForCurrentRoute = useCallback(() => {
     const effectiveMode = resolveEffectiveThemeMode(location.pathname, globalMode);

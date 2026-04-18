@@ -168,7 +168,8 @@ const ThemeButton = ({ className, lightMode, toggleTheme }) => (
 
 export default function HomeUpper({
   lightMode = true,
-  toggleTheme = () => {}
+  toggleTheme = () => {},
+  compact = false
 }) {
   const auth = useSelector((state) => state.user);
   const location = useLocation();
@@ -1132,6 +1133,8 @@ export default function HomeUpper({
     setNavQuickMenuOpen(false);
   }, [location.pathname, isMobile]);
 
+  const effectiveScrolled = compact || scrolled;
+
   useLayoutEffect(() => {
     if (isMobile) return;
     const updateQuickMenuPosition = () => {
@@ -1147,7 +1150,7 @@ export default function HomeUpper({
     updateQuickMenuPosition();
     window.addEventListener('resize', updateQuickMenuPosition);
     return () => window.removeEventListener('resize', updateQuickMenuPosition);
-  }, [isMobile, scrolled, navQuickMenuOpen]);
+  }, [effectiveScrolled, isMobile, navQuickMenuOpen]);
 
   /* ================= DATE & TIME LOGIC ================= */
   useEffect(() => {
@@ -1297,7 +1300,7 @@ export default function HomeUpper({
 
       {/* 1. FLIP CLOCK COMPONENT (Desktop Only) */}
       {!isMobile && (
-        <div className={`flip-clock-wrapper ${scrolled ? 'clock-scrolled' : ''}`}>
+        <div className={`flip-clock-wrapper ${effectiveScrolled ? 'clock-scrolled' : ''}`}>
           
           {/* Theme Toggle: Left in Unscrolled (order:-1), Right in Scrolled (order:5) */}
           <div className="clock-toggle-wrapper">
@@ -1332,10 +1335,10 @@ export default function HomeUpper({
 
       {/* 2. Navbar (DESKTOP) */}
       {!isMobile && (
-        <Box className={`navbar-wrapper ${scrolled ? "navbar-wrapper--scrolled" : ""}`}>
+        <Box className={`navbar-wrapper ${effectiveScrolled ? "navbar-wrapper--scrolled" : ""}`}>
           <Grid container justifyContent="center">
             <Grid item display="flex" justifyContent="center">
-              <div ref={navShellRef} className={`navbar-shell ${scrolled ? "navbar-shell--scrolled" : ""}`}>
+              <div ref={navShellRef} className={`navbar-shell ${effectiveScrolled ? "navbar-shell--scrolled" : ""}`}>
                 <div className="navbar">
                   {/* Date on Navbar (Scrolled Only) */}
                   <div className="nav-date">{timeData.navDateStr}</div>
@@ -1373,7 +1376,7 @@ export default function HomeUpper({
                 {navQuickMenuOpen && (
                   <div
                     ref={navQuickCardRef}
-                    className={`nav-quick-card ${scrolled ? 'nav-quick-card--scrolled' : ''}`}
+                    className={`nav-quick-card ${effectiveScrolled ? 'nav-quick-card--scrolled' : ''}`}
                     style={{ left: `${navQuickMenuStyle.left}px`, width: `${navQuickMenuStyle.width}px` }}
                   >
                     <button type="button" onClick={handleNavQuickNotices}>NOTICES</button>
@@ -1770,223 +1773,225 @@ export default function HomeUpper({
       {/* =========================================================
           HERO SECTION
           ========================================================= */}
-      <section
-        ref={sectionRef}
-        className="hero-video-wrapper no-horizontal-scroll"
-        style={{
-          backgroundImage: bgImage,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      >
-        {/* --- DESKTOP: VIDEO ELEMENT --- */}
-        {!isMobile && videoEnabled && showVideo && (
-          <video
-            ref={videoRef}
-            className="hero-video"
-            src="https://res.cloudinary.com/dkgbflzrc/video/upload/f_auto,q_auto/v1768165340/hero-video_xatba1.mp4"
-            loop
-            playsInline
-            muted={isMuted}
-            preload="metadata"
-          />
-        )}
+      {!compact && (
+        <section
+          ref={sectionRef}
+          className="hero-video-wrapper no-horizontal-scroll"
+          style={{
+            backgroundImage: bgImage,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        >
+          {/* --- DESKTOP: VIDEO ELEMENT --- */}
+          {!isMobile && videoEnabled && showVideo && (
+            <video
+              ref={videoRef}
+              className="hero-video"
+              src="https://res.cloudinary.com/dkgbflzrc/video/upload/f_auto,q_auto/v1768165340/hero-video_xatba1.mp4"
+              loop
+              playsInline
+              muted={isMuted}
+              preload="metadata"
+            />
+          )}
 
-        <div className="hero-overlay" />
-          
-        {/* --- DESKTOP: STEAM & CALENDAR --- */}
-        {!isMobile && !showVideo && (
-          <>
-          <div className="steam-layer">
-            <span></span><span></span><span></span><span></span>
-            <span></span><span></span><span></span><span></span>
-          </div>
+          <div className="hero-overlay" />
+            
+          {/* --- DESKTOP: STEAM & CALENDAR --- */}
+          {!isMobile && !showVideo && (
+            <>
+            <div className="steam-layer">
+              <span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span>
+            </div>
 
-          <div className="calendar-3d-wrapper">
-            <div className="calendar-page">
-              <div className="cal-body-row">
-                <div className="cal-grid">
-                  {["S","M","T","W","T","F","S"].map((d, i) => (
-                    <div key={`head-${i}`} className="cal-header-day">{d}</div>
-                  ))}
-                  {daysArray.map((d, i) => (
-                    <div 
-                      key={i} 
-                      className={`cal-date ${d === currentDay ? 'today' : ''} ${d === null ? 'empty' : ''}`}
-                      onClick={() => handleDateClick(d)}
-                    >
-                      {d}
-                    </div>
-                  ))}
+            <div className="calendar-3d-wrapper">
+              <div className="calendar-page">
+                <div className="cal-body-row">
+                  <div className="cal-grid">
+                    {["S","M","T","W","T","F","S"].map((d, i) => (
+                      <div key={`head-${i}`} className="cal-header-day">{d}</div>
+                    ))}
+                    {daysArray.map((d, i) => (
+                      <div 
+                        key={i} 
+                        className={`cal-date ${d === currentDay ? 'today' : ''} ${d === null ? 'empty' : ''}`}
+                        onClick={() => handleDateClick(d)}
+                      >
+                        {d}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="cal-side-header">
+                    <span className="cal-side-month">{currentMonthName}</span>
+                    <span className="cal-side-year">{shortYear}</span>
+                  </div>
                 </div>
-                <div className="cal-side-header">
-                  <span className="cal-side-month">{currentMonthName}</span>
-                  <span className="cal-side-year">{shortYear}</span>
+                <div className="cal-actions">
+                  <button className="cal-btn btn-wish" onClick={handleWishClick}>
+                    Wish Your Day
+                  </button>
+                  <button className="cal-btn btn-ai" onClick={handleAIClick}>
+                    AI Mode
+                  </button>
                 </div>
-              </div>
-              <div className="cal-actions">
-                <button className="cal-btn btn-wish" onClick={handleWishClick}>
-                  Wish Your Day
-                </button>
-                <button className="cal-btn btn-ai" onClick={handleAIClick}>
-                  AI Mode
-                </button>
               </div>
             </div>
-          </div>
-          </>
-        )}
+            </>
+          )}
 
-        {/* ================= MOBILE SPECIFIC CONTENT ================= */}
-        {/* Wish Button */}
-        {isMobile && (
-          <button className="mobile-wish-btn" onClick={handleWishClick}>
-            <CakeIcon sx={{ fontSize: 18 }} />
-            <span>Wish your day</span>
-          </button>
-        )}
-
-        {/* ================= UI ELEMENTS (LOGOS & TEXT) ================= */}
-        <div className="logo-container">
-         <img
-    src="https://res.cloudinary.com/dkgbflzrc/image/upload/f_auto,q_auto,w_300/v1769371273/BIT-Mesra_dmz9iz.png"
-    alt="Logo"
-    className="logo-img"
-    fetchpriority="high"
-    width="70"
-    height="70"
-  />
-        </div>
-        <div className="logo-container2">
-         <img
-    src="https://res.cloudinary.com/dkgbflzrc/image/upload/f_auto,q_auto,w_200/v1769371285/images_uotatw.png"
-    alt="Logo"
-    className="logo-img2"
-    fetchpriority="high"
-    width="80"
-    height="80"
-  />
-        </div>
-
-        {/* Hero Text Content */}
-        <div className={`hero-content ${!isMobile ? 'hero-content-lowered' : 'hero-content-mobile'}`}>
-          <h1>
-            <span className="hero-title-primary">
-              <span className="hero-title-word">Book your</span>
-              <span className="hero-title-word">hall</span>
-            </span>
-            <span className="hero-title-secondary">
-              <span className="hero-title-word">before your coffee</span>
-              <span className="hero-title-word">gets cold</span>
-            </span>
-          </h1>
-          <p>
-            Our <span className="highlight">Hall Booking System</span> is the home
-            to all your hall bookings. <br />
-            Seamless Experience. Centralized Platform. Easy Bookings
-          </p>
-        </div>
-
-        {/* ================= CONTROLS (Desktop Only) ================= */}
-        {!isMobile && (
-        <div className="controls-container">
-          {!videoEnabled && (
-            <button className="control-btn-initial" onClick={handleInitialClick}>
-              <svg viewBox="0 0 24 24" fill="currentColor" className="icon-svg-sm">
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-              </svg>
-              <span>Play Video</span>
+          {/* ================= MOBILE SPECIFIC CONTENT ================= */}
+          {/* Wish Button */}
+          {isMobile && (
+            <button className="mobile-wish-btn" onClick={handleWishClick}>
+              <CakeIcon sx={{ fontSize: 18 }} />
+              <span>Wish your day</span>
             </button>
           )}
 
-          {videoEnabled && (
-            <div className="control-capsule">
-              {showVideo && (
-                <>
-                  <button className="icon-btn" onClick={togglePlayPause} title={isPlaying ? "Pause" : "Play"}>
-                    {isPlaying ? (
-                      <svg viewBox="0 0 24 24" fill="currentColor" className="icon-svg">
-                        <rect x="6" y="4" width="4" height="16"></rect>
-                        <rect x="14" y="4" width="4" height="16"></rect>
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" fill="currentColor" className="icon-svg">
-                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                      </svg>
-                    )}
-                  </button>
+          {/* ================= UI ELEMENTS (LOGOS & TEXT) ================= */}
+          <div className="logo-container">
+           <img
+      src="https://res.cloudinary.com/dkgbflzrc/image/upload/f_auto,q_auto,w_300/v1769371273/BIT-Mesra_dmz9iz.png"
+      alt="Logo"
+      className="logo-img"
+      fetchpriority="high"
+      width="70"
+      height="70"
+    />
+          </div>
+          <div className="logo-container2">
+           <img
+      src="https://res.cloudinary.com/dkgbflzrc/image/upload/f_auto,q_auto,w_200/v1769371285/images_uotatw.png"
+      alt="Logo"
+      className="logo-img2"
+      fetchpriority="high"
+      width="80"
+      height="80"
+    />
+          </div>
 
-                  <button className="icon-btn" onClick={toggleMute} title={isMuted ? "Unmute" : "Mute"}>
-                    {isMuted ? (
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
-                        <path d="M11 5L6 9H2v6h4l5 4V5z"></path>
-                        <line x1="23" y="9" x2="17" y2="15"></line>
-                        <line x1="17" y="9" x2="23" y2="15"></line>
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
-                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-                      </svg>
-                    )}
-                  </button>
-                    
-                  <div className="control-divider"></div>
-                </>
-              )}
+          {/* Hero Text Content */}
+          <div className={`hero-content ${!isMobile ? 'hero-content-lowered' : 'hero-content-mobile'}`}>
+            <h1>
+              <span className="hero-title-primary">
+                <span className="hero-title-word">Book your</span>
+                <span className="hero-title-word">hall</span>
+              </span>
+              <span className="hero-title-secondary">
+                <span className="hero-title-word">before your coffee</span>
+                <span className="hero-title-word">gets cold</span>
+              </span>
+            </h1>
+            <p>
+              Our <span className="highlight">Hall Booking System</span> is the home
+              to all your hall bookings. <br />
+              Seamless Experience. Centralized Platform. Easy Bookings
+            </p>
+          </div>
 
-              <button className="icon-btn" onClick={toggleMediaSource} title={showVideo ? "Switch to Image" : "Switch to Video"}>
-                  {showVideo ? (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                      <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                      <polyline points="21 15 16 10 5 21"></polyline>
-                    </svg>
-                  ) : (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
-                        <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
-                        <line x1="7" y1="2" x2="7" y2="22"></line>
-                        <line x1="17" y1="2" x2="17" y2="22"></line>
-                        <line x1="2" y1="12" x2="22" y2="12"></line>
-                        <line x1="2" y1="7" x2="7" y2="7"></line>
-                        <line x1="2" y1="17" x2="7" y2="17"></line>
-                        <line x1="17" y1="17" x2="22" y2="17"></line>
-                        <line x1="17" y1="7" x2="22" y2="7"></line>
-                    </svg>
-                  )}
+          {/* ================= CONTROLS (Desktop Only) ================= */}
+          {!isMobile && (
+          <div className="controls-container">
+            {!videoEnabled && (
+              <button className="control-btn-initial" onClick={handleInitialClick}>
+                <svg viewBox="0 0 24 24" fill="currentColor" className="icon-svg-sm">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+                <span>Play Video</span>
               </button>
-            </div>
-          )}
-        </div>
-        )}
+            )}
 
-        {/* ================= CONSENT MODAL ================= */}
-        {!isMobile && showConsent && (
-          <div className="hero-consent-backdrop">
-            <div className="hero-consent-card">
-              <h3>Play Background Video?</h3>
-              <p>
-                This video will play with sound. It may consume data and affect performance.
-              </p>
-              <div className="consent-actions">
-                <button onClick={handleConsentOk}>OK</button>
-                <button onClick={handleConsentCancel}>Cancel</button>
+            {videoEnabled && (
+              <div className="control-capsule">
+                {showVideo && (
+                  <>
+                    <button className="icon-btn" onClick={togglePlayPause} title={isPlaying ? "Pause" : "Play"}>
+                      {isPlaying ? (
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="icon-svg">
+                          <rect x="6" y="4" width="4" height="16"></rect>
+                          <rect x="14" y="4" width="4" height="16"></rect>
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="icon-svg">
+                          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                      )}
+                    </button>
+
+                    <button className="icon-btn" onClick={toggleMute} title={isMuted ? "Unmute" : "Mute"}>
+                      {isMuted ? (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
+                          <path d="M11 5L6 9H2v6h4l5 4V5z"></path>
+                          <line x1="23" y1="9" x2="17" y2="15"></line>
+                          <line x1="17" y1="9" x2="23" y2="15"></line>
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
+                          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                        </svg>
+                      )}
+                    </button>
+                      
+                    <div className="control-divider"></div>
+                  </>
+                )}
+
+                <button className="icon-btn" onClick={toggleMediaSource} title={showVideo ? "Switch to Image" : "Switch to Video"}>
+                    {showVideo ? (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
+                          <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+                          <line x1="7" y1="2" x2="7" y2="22"></line>
+                          <line x1="17" y1="2" x2="17" y2="22"></line>
+                          <line x1="2" y1="12" x2="22" y2="12"></line>
+                          <line x1="2" y1="7" x2="7" y2="7"></line>
+                          <line x1="2" y1="17" x2="7" y2="17"></line>
+                          <line x1="17" y1="17" x2="22" y2="17"></line>
+                          <line x1="17" y1="7" x2="22" y2="7"></line>
+                      </svg>
+                    )}
+                </button>
+              </div>
+            )}
+          </div>
+          )}
+
+          {/* ================= CONSENT MODAL ================= */}
+          {!isMobile && showConsent && (
+            <div className="hero-consent-backdrop">
+              <div className="hero-consent-card">
+                <h3>Play Background Video?</h3>
+                <p>
+                  This video will play with sound. It may consume data and affect performance.
+                </p>
+                <div className="consent-actions">
+                  <button onClick={handleConsentOk}>OK</button>
+                  <button onClick={handleConsentCancel}>Cancel</button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* ================= SCROLL ARROW ================= */}
-        {showArrow && (
-          <div className="scroll-down-hero" onClick={handleScrollDown}>
-            <span className="scroll-text">Scroll down</span>
-            <svg className="double-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <polyline points="7 8 12 13 17 8" />
-              <polyline points="7 12 12 17 17 12" />
-            </svg>
-          </div>
-        )}
-      </section>
+          {/* ================= SCROLL ARROW ================= */}
+          {showArrow && (
+            <div className="scroll-down-hero" onClick={handleScrollDown}>
+              <span className="scroll-text">Scroll down</span>
+              <svg className="double-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <polyline points="7 8 12 13 17 8" />
+                <polyline points="7 12 12 17 17 12" />
+              </svg>
+            </div>
+          )}
+        </section>
+      )}
       
       {/* DEEP DIVE ANIMATION OVERLAY */}
       {showDeepDiveAnim && (
