@@ -3073,6 +3073,59 @@ export default function CalendarPage() {
     };
   }, [viewType, searchOpen]);
 
+  useLayoutEffect(() => {
+    const cardEl = calendarCardRef.current;
+    if (!(cardEl instanceof HTMLElement)) return undefined;
+
+    const clearMonthRowCount = () => {
+      cardEl.style.removeProperty('--gcal-mobile-month-row-count');
+    };
+
+    if (!isMobile || searchOpen || viewType !== 'dayGridMonth') {
+      clearMonthRowCount();
+      return clearMonthRowCount;
+    }
+
+    let rafId = 0;
+
+    const applyMonthRowCount = () => {
+      rafId = 0;
+      const rows = cardEl.querySelectorAll('.fc .fc-dayGridMonth-view .fc-daygrid-body tbody > tr');
+      const rowCount = rows.length;
+      if (rowCount > 0) {
+        cardEl.style.setProperty('--gcal-mobile-month-row-count', String(rowCount));
+      }
+    };
+
+    const scheduleMonthRowCount = () => {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(applyMonthRowCount);
+    };
+
+    const observer = new MutationObserver(() => {
+      scheduleMonthRowCount();
+    });
+
+    observer.observe(cardEl, {
+      childList: true,
+      subtree: true
+    });
+
+    scheduleMonthRowCount();
+    const t1 = window.setTimeout(scheduleMonthRowCount, 0);
+    const t2 = window.setTimeout(scheduleMonthRowCount, 120);
+    window.addEventListener('resize', scheduleMonthRowCount);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', scheduleMonthRowCount);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      if (rafId) window.cancelAnimationFrame(rafId);
+      clearMonthRowCount();
+    };
+  }, [isMobile, searchOpen, viewType]);
+
   useEffect(() => {
     const handleAfterPrint = () => setSettingsDropdownOpen(false);
     window.addEventListener('afterprint', handleAfterPrint);
@@ -8092,7 +8145,7 @@ export default function CalendarPage() {
                 dayMaxEvents={true} 
                 eventOrder={compareCalendarEventPriority}
                 eventOrderStrict={true}
-                fixedWeekCount={isMobile && viewType === 'dayGridMonth'}
+                fixedWeekCount={false}
                 showNonCurrentDates={true}
                 nowIndicator={true}
                 editable={viewType === 'dayGridMonth' || viewType === 'timeGridWeek'}

@@ -5074,6 +5074,7 @@ al-search-result-date span,
   .gcal-mobile .fc .fc-dayGridMonth-view .fc-scroller,
   .gcal-mobile .fc .fc-dayGridMonth-view .fc-scrollgrid-section-body > td,
   .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-body,
+  .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-body > table > tbody,
   .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-body > table {
     height: 100% !important;
   }
@@ -5082,8 +5083,12 @@ al-search-result-date span,
     table-layout: fixed !important;
   }
 
+  .gcal-mobile .gcal-calendar-card.month-view-mode {
+    --gcal-mobile-month-row-count: 5;
+  }
+
   .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-body tbody > tr {
-    height: calc(100% / 6) !important;
+    height: calc(100% / var(--gcal-mobile-month-row-count, 5)) !important;
   }
 
   .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-day-frame {
