@@ -1115,7 +1115,7 @@ body.dark-mode .upper-toggle-thumb {
 .btn-book-now:hover { background: #1e293b; }
 
 /* Mobile Menu Styles */
-.mobile-menu-toggle { position: fixed; top: 90px; right: 20px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-radius: 50%; width: 50px; height: 50px; display: flex; justify-content: center; align-items: center; z-index: 100; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: none; transition: background 0.3s, color 0.3s, border-color 0.3s; }
+.mobile-menu-toggle { position: fixed; top: 90px; right: 20px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-radius: 50%; width: 50px; height: 50px; display: flex; justify-content: center; align-items: center; z-index: 100; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: none; transition: background 0.3s, color 0.3s, border-color 0.3s, transform 0.2s ease, box-shadow 0.2s ease; }
 
 /* === Hamburger Theme Logic === */
 /* Light Mode (Default): Black BG, White Icon */
@@ -1217,6 +1217,21 @@ body.dark-mode .mobile-datetime-bar.mobile-datetime-bar--expanded {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   z-index: 1000;
   display: none;
+}
+
+.mobile-menu-toggle,
+.mobile-ai-fab {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-menu-toggle.is-dragging,
+.mobile-ai-fab.is-dragging {
+  transform: scale(1.06);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.34);
 }
 
 .mobile-ai-fab svg {

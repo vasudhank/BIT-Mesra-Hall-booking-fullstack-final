@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useRef, useState, useEffect, useLayoutEffect } from "react";
+import React, { Suspense, lazy, useRef, useState, useEffect, useLayoutEffect, useCallback } from "react";
 import "./HomeUpper.css";
 import Grid from "@mui/material/Grid";
 import Box from "@mui/material/Box";
@@ -36,6 +36,23 @@ const MOBILE_AI_FAB_CONFIG = Object.freeze({
   bottom: 24,
   right: 10
 });
+const MOBILE_FLOATING_BUTTON_DRAG_CONFIG = Object.freeze({
+  longPressMs: 520,
+  dragStartDistancePx: 8,
+  viewportEdgePaddingPx: 4,
+  defaultButtonSizePx: 50
+});
+
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+const findTouchByIdentifier = (touchList, identifier) => {
+  if (!touchList || typeof touchList.length !== "number") return null;
+  for (let idx = 0; idx < touchList.length; idx += 1) {
+    const touch = touchList[idx];
+    if (touch && touch.identifier === identifier) return touch;
+  }
+  return null;
+};
 
 const FlipDigit = ({ value }) => {
   const normalized = String(value ?? "00").padStart(2, "0");
@@ -163,6 +180,26 @@ export default function HomeUpper({
   const [showDeepDiveAnim, setShowDeepDiveAnim] = useState(false);
   const [navQuickMenuOpen, setNavQuickMenuOpen] = useState(false);
   const [navQuickMenuStyle, setNavQuickMenuStyle] = useState({ left: 0, width: 420 });
+  const [mobileFloatingButtonPositions, setMobileFloatingButtonPositions] = useState({ menu: null, ai: null });
+  const [mobileFloatingDraggingKey, setMobileFloatingDraggingKey] = useState('');
+  const mobileFloatingButtonNodeRef = useRef({ menu: null, ai: null });
+  const mobileFloatingLongPressTimerRef = useRef(null);
+  const mobileFloatingSuppressClickRef = useRef('');
+  const mobileFloatingDragRef = useRef({
+    key: '',
+    sourceType: '',
+    pointerId: null,
+    touchId: null,
+    active: false,
+    armed: false,
+    dragging: false,
+    startX: 0,
+    startY: 0,
+    offsetX: 0,
+    offsetY: 0,
+    width: MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx,
+    height: MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx
+  });
   
   // Scroll & UI States
   const [showArrow, setShowArrow] = useState(true);
@@ -237,7 +274,324 @@ export default function HomeUpper({
     }
   }, []);
 
+  const clearMobileFloatingLongPressTimer = useCallback(() => {
+    if (!mobileFloatingLongPressTimerRef.current) return;
+    window.clearTimeout(mobileFloatingLongPressTimerRef.current);
+    mobileFloatingLongPressTimerRef.current = null;
+  }, []);
+
+  const resetMobileFloatingDrag = useCallback(() => {
+    mobileFloatingDragRef.current = {
+      key: '',
+      sourceType: '',
+      pointerId: null,
+      touchId: null,
+      active: false,
+      armed: false,
+      dragging: false,
+      startX: 0,
+      startY: 0,
+      offsetX: 0,
+      offsetY: 0,
+      width: MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx,
+      height: MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx
+    };
+    setMobileFloatingDraggingKey('');
+  }, []);
+
+  const clampMobileFloatingPosition = useCallback((rawX, rawY, width, height) => {
+    if (typeof window === 'undefined') return { x: rawX, y: rawY };
+    const safeWidth = Math.max(1, Number(width) || MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx);
+    const safeHeight = Math.max(1, Number(height) || MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx);
+    const edge = Math.max(0, Number(MOBILE_FLOATING_BUTTON_DRAG_CONFIG.viewportEdgePaddingPx) || 0);
+    const maxX = Math.max(edge, window.innerWidth - safeWidth - edge);
+    const maxY = Math.max(edge, window.innerHeight - safeHeight - edge);
+    return {
+      x: clamp(Number(rawX) || 0, edge, maxX),
+      y: clamp(Number(rawY) || 0, edge, maxY)
+    };
+  }, []);
+
+  const getMobileFloatingButtonSize = useCallback((targetKey) => {
+    const node = mobileFloatingButtonNodeRef.current?.[targetKey];
+    if (!(node instanceof Element)) {
+      const fallback = MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx;
+      return { width: fallback, height: fallback };
+    }
+    const rect = node.getBoundingClientRect();
+    const fallback = MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx;
+    return {
+      width: Math.max(1, Math.round(rect.width || fallback)),
+      height: Math.max(1, Math.round(rect.height || fallback))
+    };
+  }, []);
+
+  useEffect(() => () => {
+    clearMobileFloatingLongPressTimer();
+    resetMobileFloatingDrag();
+  }, [clearMobileFloatingLongPressTimer, resetMobileFloatingDrag]);
+
+  useEffect(() => {
+    if (isMobile) return;
+    mobileFloatingSuppressClickRef.current = '';
+    clearMobileFloatingLongPressTimer();
+    resetMobileFloatingDrag();
+  }, [clearMobileFloatingLongPressTimer, isMobile, resetMobileFloatingDrag]);
+
+  useEffect(() => {
+    if (!isMobile) return undefined;
+
+    const processDragMove = (clientX, clientY, rawEvent) => {
+      const drag = mobileFloatingDragRef.current;
+      if (!drag.active || !drag.armed) return;
+
+      const dx = clientX - drag.startX;
+      const dy = clientY - drag.startY;
+      const distance = Math.hypot(dx, dy);
+      const threshold = Math.max(3, Number(MOBILE_FLOATING_BUTTON_DRAG_CONFIG.dragStartDistancePx) || 8);
+
+      if (!drag.dragging) {
+        if (distance < threshold) return;
+        drag.dragging = true;
+        mobileFloatingSuppressClickRef.current = drag.key;
+        setMobileFloatingDraggingKey(drag.key);
+      }
+
+      const next = clampMobileFloatingPosition(
+        clientX - drag.offsetX,
+        clientY - drag.offsetY,
+        drag.width,
+        drag.height
+      );
+      setMobileFloatingButtonPositions((prev) => {
+        const existing = prev?.[drag.key];
+        if (existing && Math.abs(existing.x - next.x) < 0.5 && Math.abs(existing.y - next.y) < 0.5) return prev;
+        return { ...prev, [drag.key]: next };
+      });
+
+      rawEvent?.preventDefault?.();
+      rawEvent?.stopPropagation?.();
+    };
+
+    const finalizeDragSession = () => {
+      const drag = mobileFloatingDragRef.current;
+      if (!drag.active) return;
+      clearMobileFloatingLongPressTimer();
+      mobileFloatingDragRef.current = {
+        key: '',
+        sourceType: '',
+        pointerId: null,
+        touchId: null,
+        active: false,
+        armed: false,
+        dragging: false,
+        startX: 0,
+        startY: 0,
+        offsetX: 0,
+        offsetY: 0,
+        width: MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx,
+        height: MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx
+      };
+      if (drag.dragging) setMobileFloatingDraggingKey('');
+    };
+
+    const handlePointerMove = (event) => {
+      const drag = mobileFloatingDragRef.current;
+      if (!drag.active || drag.sourceType !== 'pointer') return;
+      if (event.pointerId !== drag.pointerId) return;
+      processDragMove(event.clientX, event.clientY, event);
+    };
+
+    const handlePointerDone = (event) => {
+      const drag = mobileFloatingDragRef.current;
+      if (!drag.active || drag.sourceType !== 'pointer') return;
+      if (event.pointerId !== drag.pointerId) return;
+      finalizeDragSession();
+    };
+
+    const handleTouchMove = (event) => {
+      const drag = mobileFloatingDragRef.current;
+      if (!drag.active || drag.sourceType !== 'touch') return;
+      const touch = findTouchByIdentifier(event.touches, drag.touchId);
+      if (!touch) return;
+      processDragMove(touch.clientX, touch.clientY, event);
+    };
+
+    const handleTouchDone = (event) => {
+      const drag = mobileFloatingDragRef.current;
+      if (!drag.active || drag.sourceType !== 'touch') return;
+      const touch = findTouchByIdentifier(event.changedTouches, drag.touchId);
+      if (!touch) return;
+      finalizeDragSession();
+    };
+
+    const handleMouseMove = (event) => {
+      const drag = mobileFloatingDragRef.current;
+      if (!drag.active || drag.sourceType !== 'mouse') return;
+      processDragMove(event.clientX, event.clientY, event);
+    };
+
+    const handleMouseDone = () => {
+      const drag = mobileFloatingDragRef.current;
+      if (!drag.active || drag.sourceType !== 'mouse') return;
+      finalizeDragSession();
+    };
+
+    const touchMoveListenerOptions = { capture: true, passive: false };
+    window.addEventListener('pointermove', handlePointerMove, true);
+    window.addEventListener('pointerup', handlePointerDone, true);
+    window.addEventListener('pointercancel', handlePointerDone, true);
+    window.addEventListener('touchmove', handleTouchMove, touchMoveListenerOptions);
+    window.addEventListener('touchend', handleTouchDone, true);
+    window.addEventListener('touchcancel', handleTouchDone, true);
+    window.addEventListener('mousemove', handleMouseMove, true);
+    window.addEventListener('mouseup', handleMouseDone, true);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove, true);
+      window.removeEventListener('pointerup', handlePointerDone, true);
+      window.removeEventListener('pointercancel', handlePointerDone, true);
+      window.removeEventListener('touchmove', handleTouchMove, touchMoveListenerOptions);
+      window.removeEventListener('touchend', handleTouchDone, true);
+      window.removeEventListener('touchcancel', handleTouchDone, true);
+      window.removeEventListener('mousemove', handleMouseMove, true);
+      window.removeEventListener('mouseup', handleMouseDone, true);
+    };
+  }, [clampMobileFloatingPosition, clearMobileFloatingLongPressTimer, isMobile]);
+
+  useEffect(() => {
+    if (!isMobile) return undefined;
+    const keepFloatingButtonsInViewport = () => {
+      setMobileFloatingButtonPositions((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        ['menu', 'ai'].forEach((key) => {
+          const pos = prev?.[key];
+          if (!pos) return;
+          const size = getMobileFloatingButtonSize(key);
+          const clamped = clampMobileFloatingPosition(pos.x, pos.y, size.width, size.height);
+          if (Math.abs(clamped.x - pos.x) > 0.5 || Math.abs(clamped.y - pos.y) > 0.5) {
+            next[key] = clamped;
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    };
+
+    window.addEventListener('resize', keepFloatingButtonsInViewport);
+    window.addEventListener('orientationchange', keepFloatingButtonsInViewport);
+    return () => {
+      window.removeEventListener('resize', keepFloatingButtonsInViewport);
+      window.removeEventListener('orientationchange', keepFloatingButtonsInViewport);
+    };
+  }, [clampMobileFloatingPosition, getMobileFloatingButtonSize, isMobile]);
+
   // --- Handlers ---
+  const setMobileFloatingButtonNode = useCallback((targetKey, node) => {
+    mobileFloatingButtonNodeRef.current = { ...mobileFloatingButtonNodeRef.current, [targetKey]: node };
+  }, []);
+
+  const startMobileFloatingButtonLongPress = useCallback((targetKey, event) => {
+    if (!isMobile) return;
+    const activeDrag = mobileFloatingDragRef.current;
+    if (activeDrag.active) return;
+
+    const nativeEvent = event?.nativeEvent || event;
+    if (!nativeEvent) return;
+
+    const buttonEl = event?.currentTarget;
+    const rect = buttonEl instanceof Element ? buttonEl.getBoundingClientRect() : null;
+    const width = Math.max(1, Math.round(rect?.width || MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx));
+    const height = Math.max(1, Math.round(rect?.height || MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx));
+    let sourceType = '';
+    let pointerId = null;
+    let touchId = null;
+    let clientX = 0;
+    let clientY = 0;
+
+    if (nativeEvent.touches?.length) {
+      const touch = nativeEvent.changedTouches?.[0] || nativeEvent.touches[0];
+      if (!touch) return;
+      sourceType = 'touch';
+      touchId = touch.identifier;
+      clientX = Number(touch.clientX) || 0;
+      clientY = Number(touch.clientY) || 0;
+    } else if (typeof nativeEvent.pointerId !== 'undefined') {
+      sourceType = 'pointer';
+      pointerId = nativeEvent.pointerId;
+      clientX = Number(nativeEvent.clientX) || 0;
+      clientY = Number(nativeEvent.clientY) || 0;
+    } else if (typeof nativeEvent.clientX === 'number' || typeof nativeEvent.clientY === 'number') {
+      if (typeof nativeEvent.button === 'number' && nativeEvent.button !== 0) return;
+      sourceType = 'mouse';
+      clientX = Number(nativeEvent.clientX) || 0;
+      clientY = Number(nativeEvent.clientY) || 0;
+    } else {
+      return;
+    }
+
+    const offsetX = clientX - Number(rect?.left || 0);
+    const offsetY = clientY - Number(rect?.top || 0);
+
+    mobileFloatingDragRef.current = {
+      key: targetKey,
+      sourceType,
+      pointerId,
+      touchId,
+      active: true,
+      armed: false,
+      dragging: false,
+      startX: clientX,
+      startY: clientY,
+      offsetX: Number.isFinite(offsetX) ? offsetX : Math.round(width / 2),
+      offsetY: Number.isFinite(offsetY) ? offsetY : Math.round(height / 2),
+      width,
+      height
+    };
+
+    if (sourceType === 'pointer' && typeof pointerId !== 'undefined' && pointerId !== null) {
+      try {
+        buttonEl?.setPointerCapture?.(pointerId);
+      } catch (_) {
+        // Pointer capture is optional on some browsers.
+      }
+    }
+
+    clearMobileFloatingLongPressTimer();
+    mobileFloatingLongPressTimerRef.current = window.setTimeout(() => {
+      const drag = mobileFloatingDragRef.current;
+      if (!drag.active || drag.key !== targetKey) return;
+      drag.armed = true;
+      mobileFloatingSuppressClickRef.current = targetKey;
+    }, Math.max(320, Number(MOBILE_FLOATING_BUTTON_DRAG_CONFIG.longPressMs) || 520));
+  }, [clearMobileFloatingLongPressTimer, isMobile]);
+
+  const endMobileFloatingButtonLongPress = useCallback(() => {
+    clearMobileFloatingLongPressTimer();
+  }, [clearMobileFloatingLongPressTimer]);
+
+  const getMobileFloatingButtonPositionStyle = useCallback((targetKey) => {
+    const pos = mobileFloatingButtonPositions?.[targetKey];
+    if (!pos || !Number.isFinite(pos?.x) || !Number.isFinite(pos?.y)) return undefined;
+    return {
+      left: `${pos.x}px`,
+      top: `${pos.y}px`,
+      right: 'auto',
+      bottom: 'auto'
+    };
+  }, [mobileFloatingButtonPositions]);
+
+  const handleMobileFloatingButtonTap = useCallback((targetKey, event, onTap) => {
+    if (mobileFloatingSuppressClickRef.current === targetKey) {
+      mobileFloatingSuppressClickRef.current = '';
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      return;
+    }
+    onTap?.(event);
+  }, []);
+
   const openContactsModal = async () => {
     setShowWishModal(true);
     setLoadingContacts(true);
@@ -317,7 +671,7 @@ export default function HomeUpper({
   };
 
   const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
+    setMobileMenuOpen((prev) => !prev);
   };
 
   const handleNavQuickNotices = () => {
@@ -902,7 +1256,22 @@ export default function HomeUpper({
 
       {/* 4. Mobile Menu Button */}
       {isMobile && (
-        <button className="mobile-menu-toggle" onClick={toggleMobileMenu}>
+        <button
+          ref={(node) => setMobileFloatingButtonNode('menu', node)}
+          className={`mobile-menu-toggle${mobileFloatingDraggingKey === 'menu' ? ' is-dragging' : ''}`.trim()}
+          style={getMobileFloatingButtonPositionStyle('menu')}
+          onClick={(event) => handleMobileFloatingButtonTap('menu', event, toggleMobileMenu)}
+          onPointerDown={(event) => startMobileFloatingButtonLongPress('menu', event)}
+          onPointerUp={endMobileFloatingButtonLongPress}
+          onPointerCancel={endMobileFloatingButtonLongPress}
+          onTouchStart={(event) => startMobileFloatingButtonLongPress('menu', event)}
+          onTouchEnd={endMobileFloatingButtonLongPress}
+          onTouchCancel={endMobileFloatingButtonLongPress}
+          onMouseDown={(event) => startMobileFloatingButtonLongPress('menu', event)}
+          onMouseUp={endMobileFloatingButtonLongPress}
+          onMouseLeave={endMobileFloatingButtonLongPress}
+          onContextMenu={(event) => event.preventDefault()}
+        >
           {/* Color set to inherit so CSS can control it */}
           <MenuIcon style={{ fontSize: '1.8rem', color: 'inherit' }} />
         </button>
@@ -911,10 +1280,22 @@ export default function HomeUpper({
       {/* 5. Mobile AI FAB */}
       {isMobile && (
         <button
-          className="mobile-ai-fab"
-          onClick={handleAIClick}
+          ref={(node) => setMobileFloatingButtonNode('ai', node)}
+          className={`mobile-ai-fab${mobileFloatingDraggingKey === 'ai' ? ' is-dragging' : ''}`.trim()}
+          onClick={(event) => handleMobileFloatingButtonTap('ai', event, handleAIClick)}
+          onPointerDown={(event) => startMobileFloatingButtonLongPress('ai', event)}
+          onPointerUp={endMobileFloatingButtonLongPress}
+          onPointerCancel={endMobileFloatingButtonLongPress}
+          onTouchStart={(event) => startMobileFloatingButtonLongPress('ai', event)}
+          onTouchEnd={endMobileFloatingButtonLongPress}
+          onTouchCancel={endMobileFloatingButtonLongPress}
+          onMouseDown={(event) => startMobileFloatingButtonLongPress('ai', event)}
+          onMouseUp={endMobileFloatingButtonLongPress}
+          onMouseLeave={endMobileFloatingButtonLongPress}
+          onContextMenu={(event) => event.preventDefault()}
           aria-label="Open AI assistant"
           style={{
+            ...getMobileFloatingButtonPositionStyle('ai'),
             "--mobile-ai-fab-size": `${MOBILE_AI_FAB_CONFIG.size}px`,
             "--mobile-ai-fab-icon-size": `${MOBILE_AI_FAB_CONFIG.iconSize}px`,
             "--mobile-ai-fab-bottom": `${MOBILE_AI_FAB_CONFIG.bottom}px`,
@@ -1444,4 +1825,3 @@ export default function HomeUpper({
     </>
   );
 }
-
