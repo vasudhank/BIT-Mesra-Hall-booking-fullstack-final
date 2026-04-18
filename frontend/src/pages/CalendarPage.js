@@ -571,6 +571,15 @@ const isMobileSwipeBlockedTarget = (target) => {
   );
 };
 
+const findTouchByIdentifier = (touchList, identifier) => {
+  if (!touchList || typeof touchList.length !== 'number') return null;
+  for (let idx = 0; idx < touchList.length; idx += 1) {
+    const touch = touchList[idx];
+    if (touch && touch.identifier === identifier) return touch;
+  }
+  return null;
+};
+
 const resolveCalendarPasteTarget = (target, point = null) => {
   const candidates = [];
   if (target instanceof Element) candidates.push(target);
@@ -1224,7 +1233,9 @@ export default function CalendarPage() {
   const mobileHeaderSuppressClickRef = useRef('');
   const mobileHeaderDragRef = useRef({
     key: '',
+    sourceType: '',
     pointerId: null,
+    touchId: null,
     active: false,
     armed: false,
     dragging: false,
@@ -6874,7 +6885,9 @@ export default function CalendarPage() {
   const resetMobileHeaderDrag = useCallback(() => {
     mobileHeaderDragRef.current = {
       key: '',
+      sourceType: '',
       pointerId: null,
+      touchId: null,
       active: false,
       armed: false,
       dragging: false,
@@ -6915,13 +6928,12 @@ export default function CalendarPage() {
   }, [mobileHeaderHideTarget]);
 
   useEffect(() => {
-    const handlePointerMove = (event) => {
+    const processDragMove = (clientX, clientY, rawEvent) => {
       const drag = mobileHeaderDragRef.current;
-      if (!drag.active || event.pointerId !== drag.pointerId) return;
-      if (!drag.armed) return;
+      if (!drag.active || !drag.armed) return;
 
-      const dx = event.clientX - drag.startX;
-      const dy = event.clientY - drag.startY;
+      const dx = clientX - drag.startX;
+      const dy = clientY - drag.startY;
       const distance = Math.hypot(dx, dy);
       const threshold = Math.max(3, Number(MOBILE_HEADER_COLLAPSE_CONFIG.dragStartDistancePx) || 8);
 
@@ -6934,8 +6946,8 @@ export default function CalendarPage() {
       }
 
       const next = clampMobileHeaderPosition(
-        event.clientX - drag.offsetX,
-        event.clientY - drag.offsetY,
+        clientX - drag.offsetX,
+        clientY - drag.offsetY,
         drag.width,
         drag.height
       );
@@ -6944,18 +6956,20 @@ export default function CalendarPage() {
         if (existing && Math.abs(existing.x - next.x) < 0.5 && Math.abs(existing.y - next.y) < 0.5) return prev;
         return { ...prev, [drag.key]: next };
       });
-      event.preventDefault();
-      event.stopPropagation();
+      rawEvent?.preventDefault?.();
+      rawEvent?.stopPropagation?.();
     };
 
-    const finalizeDragPointer = (event) => {
+    const finalizeDragSession = () => {
       const drag = mobileHeaderDragRef.current;
-      if (!drag.active || event.pointerId !== drag.pointerId) return;
+      if (!drag.active) return;
       const wasDragging = drag.dragging;
       clearMobileHeaderLongPressTimer();
       mobileHeaderDragRef.current = {
         key: '',
+        sourceType: '',
         pointerId: null,
+        touchId: null,
         active: false,
         armed: false,
         dragging: false,
@@ -6969,13 +6983,66 @@ export default function CalendarPage() {
       if (wasDragging) setMobileHeaderDraggingKey('');
     };
 
+    const handlePointerMove = (event) => {
+      const drag = mobileHeaderDragRef.current;
+      if (!drag.active || drag.sourceType !== 'pointer') return;
+      if (event.pointerId !== drag.pointerId) return;
+      processDragMove(event.clientX, event.clientY, event);
+    };
+
+    const handlePointerDone = (event) => {
+      const drag = mobileHeaderDragRef.current;
+      if (!drag.active || drag.sourceType !== 'pointer') return;
+      if (event.pointerId !== drag.pointerId) return;
+      finalizeDragSession();
+    };
+
+    const handleTouchMove = (event) => {
+      const drag = mobileHeaderDragRef.current;
+      if (!drag.active || drag.sourceType !== 'touch') return;
+      const touch = findTouchByIdentifier(event.touches, drag.touchId);
+      if (!touch) return;
+      processDragMove(touch.clientX, touch.clientY, event);
+    };
+
+    const handleTouchDone = (event) => {
+      const drag = mobileHeaderDragRef.current;
+      if (!drag.active || drag.sourceType !== 'touch') return;
+      const touch = findTouchByIdentifier(event.changedTouches, drag.touchId);
+      if (!touch) return;
+      finalizeDragSession();
+    };
+
+    const handleMouseMove = (event) => {
+      const drag = mobileHeaderDragRef.current;
+      if (!drag.active || drag.sourceType !== 'mouse') return;
+      processDragMove(event.clientX, event.clientY, event);
+    };
+
+    const handleMouseDone = () => {
+      const drag = mobileHeaderDragRef.current;
+      if (!drag.active || drag.sourceType !== 'mouse') return;
+      finalizeDragSession();
+    };
+
+    const touchMoveListenerOptions = { capture: true, passive: false };
     window.addEventListener('pointermove', handlePointerMove, true);
-    window.addEventListener('pointerup', finalizeDragPointer, true);
-    window.addEventListener('pointercancel', finalizeDragPointer, true);
+    window.addEventListener('pointerup', handlePointerDone, true);
+    window.addEventListener('pointercancel', handlePointerDone, true);
+    window.addEventListener('touchmove', handleTouchMove, touchMoveListenerOptions);
+    window.addEventListener('touchend', handleTouchDone, true);
+    window.addEventListener('touchcancel', handleTouchDone, true);
+    window.addEventListener('mousemove', handleMouseMove, true);
+    window.addEventListener('mouseup', handleMouseDone, true);
     return () => {
       window.removeEventListener('pointermove', handlePointerMove, true);
-      window.removeEventListener('pointerup', finalizeDragPointer, true);
-      window.removeEventListener('pointercancel', finalizeDragPointer, true);
+      window.removeEventListener('pointerup', handlePointerDone, true);
+      window.removeEventListener('pointercancel', handlePointerDone, true);
+      window.removeEventListener('touchmove', handleTouchMove, touchMoveListenerOptions);
+      window.removeEventListener('touchend', handleTouchDone, true);
+      window.removeEventListener('touchcancel', handleTouchDone, true);
+      window.removeEventListener('mousemove', handleMouseMove, true);
+      window.removeEventListener('mouseup', handleMouseDone, true);
     };
   }, [clampMobileHeaderPosition, clearMobileHeaderLongPressTimer]);
 
@@ -7008,33 +7075,68 @@ export default function CalendarPage() {
 
   const startMobileHeaderLongPress = useCallback((targetKey, event) => {
     if (!isMobile) return;
-    const pointerEvent = event;
-    if (!pointerEvent || typeof pointerEvent.pointerId === 'undefined') return;
-    const buttonEl = pointerEvent.currentTarget;
+    const activeDrag = mobileHeaderDragRef.current;
+    if (activeDrag.active) return;
+
+    const nativeEvent = event?.nativeEvent || event;
+    if (!nativeEvent) return;
+
+    const buttonEl = event?.currentTarget;
     const rect = buttonEl instanceof Element ? buttonEl.getBoundingClientRect() : null;
     const width = Math.max(1, Math.round(rect?.width || MOBILE_HEADER_COLLAPSE_CONFIG.floatingButtonSizePx));
     const height = Math.max(1, Math.round(rect?.height || MOBILE_HEADER_COLLAPSE_CONFIG.floatingButtonSizePx));
-    const offsetX = Number(pointerEvent.clientX) - Number(rect?.left || 0);
-    const offsetY = Number(pointerEvent.clientY) - Number(rect?.top || 0);
+    let sourceType = '';
+    let pointerId = null;
+    let touchId = null;
+    let clientX = 0;
+    let clientY = 0;
+
+    if (nativeEvent.touches?.length) {
+      const touch = nativeEvent.changedTouches?.[0] || nativeEvent.touches[0];
+      if (!touch) return;
+      sourceType = 'touch';
+      touchId = touch.identifier;
+      clientX = Number(touch.clientX) || 0;
+      clientY = Number(touch.clientY) || 0;
+    } else if (typeof nativeEvent.pointerId !== 'undefined') {
+      sourceType = 'pointer';
+      pointerId = nativeEvent.pointerId;
+      clientX = Number(nativeEvent.clientX) || 0;
+      clientY = Number(nativeEvent.clientY) || 0;
+    } else if (typeof nativeEvent.clientX === 'number' || typeof nativeEvent.clientY === 'number') {
+      if (typeof nativeEvent.button === 'number' && nativeEvent.button !== 0) return;
+      sourceType = 'mouse';
+      clientX = Number(nativeEvent.clientX) || 0;
+      clientY = Number(nativeEvent.clientY) || 0;
+    } else {
+      return;
+    }
+
+    const offsetX = clientX - Number(rect?.left || 0);
+    const offsetY = clientY - Number(rect?.top || 0);
 
     mobileHeaderDragRef.current = {
       key: targetKey,
-      pointerId: pointerEvent.pointerId,
+      sourceType,
+      pointerId,
+      touchId,
       active: true,
       armed: false,
       dragging: false,
-      startX: Number(pointerEvent.clientX) || 0,
-      startY: Number(pointerEvent.clientY) || 0,
+      startX: clientX,
+      startY: clientY,
       offsetX: Number.isFinite(offsetX) ? offsetX : Math.round(width / 2),
       offsetY: Number.isFinite(offsetY) ? offsetY : Math.round(height / 2),
       width,
       height
     };
 
-    try {
-      buttonEl?.setPointerCapture?.(pointerEvent.pointerId);
-    } catch (_) {
-      // Pointer capture is optional on some devices.
+    if (sourceType === 'pointer' && typeof pointerId !== 'undefined' && pointerId !== null) {
+      try {
+        buttonEl?.setPointerCapture?.(pointerId);
+      } catch (_) {
+        // Pointer capture is optional on some devices.
+      }
     }
 
     clearMobileHeaderLongPressTimer();
@@ -7434,7 +7536,13 @@ export default function CalendarPage() {
                     onPointerDown={(event) => startMobileHeaderLongPress('menu', event)}
                     onPointerUp={endMobileHeaderLongPress}
                     onPointerCancel={endMobileHeaderLongPress}
-                    onPointerLeave={endMobileHeaderLongPress}
+                    onTouchStart={(event) => startMobileHeaderLongPress('menu', event)}
+                    onTouchEnd={endMobileHeaderLongPress}
+                    onTouchCancel={endMobileHeaderLongPress}
+                    onMouseDown={(event) => startMobileHeaderLongPress('menu', event)}
+                    onMouseUp={endMobileHeaderLongPress}
+                    onMouseLeave={endMobileHeaderLongPress}
+                    onContextMenu={(event) => event.preventDefault()}
                   >
                     <Svgs.Menu />
                   </button>
@@ -7464,7 +7572,13 @@ export default function CalendarPage() {
                     onPointerDown={(event) => startMobileHeaderLongPress('ai', event)}
                     onPointerUp={endMobileHeaderLongPress}
                     onPointerCancel={endMobileHeaderLongPress}
-                    onPointerLeave={endMobileHeaderLongPress}
+                    onTouchStart={(event) => startMobileHeaderLongPress('ai', event)}
+                    onTouchEnd={endMobileHeaderLongPress}
+                    onTouchCancel={endMobileHeaderLongPress}
+                    onMouseDown={(event) => startMobileHeaderLongPress('ai', event)}
+                    onMouseUp={endMobileHeaderLongPress}
+                    onMouseLeave={endMobileHeaderLongPress}
+                    onContextMenu={(event) => event.preventDefault()}
                   >
                     <Svgs.AI />
                   </button>

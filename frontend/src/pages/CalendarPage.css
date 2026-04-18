@@ -4657,6 +4657,8 @@ al-search-result-date span,
   .gcal-mobile-strip-action .gcal-icon-btn {
     touch-action: none;
     -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
     user-select: none;
   }
 
