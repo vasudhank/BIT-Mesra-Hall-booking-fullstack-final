@@ -7205,11 +7205,6 @@ export default function CalendarPage() {
     }
   };
 
-  const openMobileAiPage = useCallback((event) => {
-    event?.preventDefault?.();
-    navigate('/ai');
-  }, [navigate]);
-
   const openSearchFromHeader = (e) => {
     e.stopPropagation();
     const api = calendarRef.current?.getApi();
@@ -7558,46 +7553,10 @@ export default function CalendarPage() {
                   )}
                 </div>
               )}
-              {!mobileHeaderHidden.ai && (
-                <div
-                  className={`gcal-mobile-strip-action${getMobileStripActionStyle('ai') ? ' is-floating' : ''}`}
-                  style={getMobileStripActionStyle('ai')}
-                >
-                  <button
-                    type="button"
-                    ref={(node) => setMobileHeaderButtonNode('ai', node)}
-                    className={`gcal-icon-btn gcal-mobile-ai-btn${mobileHeaderDraggingKey === 'ai' ? ' is-dragging' : ''}`.trim()}
-                    aria-label="Open AI assistant"
-                    onClick={(event) => handleMobileHeaderButtonTap('ai', event, openMobileAiPage)}
-                    onPointerDown={(event) => startMobileHeaderLongPress('ai', event)}
-                    onPointerUp={endMobileHeaderLongPress}
-                    onPointerCancel={endMobileHeaderLongPress}
-                    onTouchStart={(event) => startMobileHeaderLongPress('ai', event)}
-                    onTouchEnd={endMobileHeaderLongPress}
-                    onTouchCancel={endMobileHeaderLongPress}
-                    onMouseDown={(event) => startMobileHeaderLongPress('ai', event)}
-                    onMouseUp={endMobileHeaderLongPress}
-                    onMouseLeave={endMobileHeaderLongPress}
-                    onContextMenu={(event) => event.preventDefault()}
-                  >
-                    <Svgs.AI />
-                  </button>
-                  {mobileHeaderHideTarget === 'ai' && (
-                    <button
-                      type="button"
-                      className="gcal-mobile-strip-hide-btn"
-                      aria-label="Collapse AI button"
-                      onClick={(event) => collapseMobileHeaderButton('ai', event)}
-                    >
-                      x
-                    </button>
-                  )}
-                </div>
-              )}
             </div>
           )}
           <span className="gcal-mobile-time-value">{clockTimeText}</span>
-          {!searchOpen && (mobileHeaderHidden.menu || mobileHeaderHidden.ai) && (
+          {!searchOpen && mobileHeaderHidden.menu && (
             <div className="gcal-mobile-time-strip-right">
               {mobileHeaderHidden.menu && (
                 <button
@@ -7607,16 +7566,6 @@ export default function CalendarPage() {
                   onClick={(event) => restoreMobileHeaderButton('menu', event)}
                 >
                   <Svgs.Menu />
-                </button>
-              )}
-              {mobileHeaderHidden.ai && (
-                <button
-                  type="button"
-                  className="gcal-mobile-collapse-dot ai-dot"
-                  aria-label="Restore AI button"
-                  onClick={(event) => restoreMobileHeaderButton('ai', event)}
-                >
-                  <Svgs.AI />
                 </button>
               )}
             </div>

@@ -2096,6 +2096,7 @@ export default function AIChatWidget({
             <div className="pill-actions">
               <Tooltip title="Attach files or images">
                 <IconButton
+                  className="attach-files-btn"
                   size="small"
                   onClick={openAttachmentPicker}
                   disabled={isLoading || pendingAttachments.length >= MAX_ATTACHMENT_COUNT}

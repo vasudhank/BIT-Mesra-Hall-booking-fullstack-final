@@ -1010,6 +1010,14 @@ body.dark-mode .message-search-mark {
   margin-bottom: 2px;
 }
 
+.attach-files-btn {
+  color: #000000 !important;
+}
+
+body.dark-mode .attach-files-btn {
+  color: #ffffff !important;
+}
+
 .live-pill-btn {
   color: var(--gemini-brand) !important;
   background: var(--gemini-brand-soft) !important;
