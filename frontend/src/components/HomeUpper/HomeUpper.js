@@ -181,6 +181,7 @@ export default function HomeUpper({
   const navQuickButtonRef = useRef(null);
   const navQuickCardRef = useRef(null);
   const selectAllContactsRef = useRef(null);
+  const mobileAiModalScrollLockRef = useRef({ active: false, scrollY: 0 });
 
   // === RESPONSIVE STATE ===
   const [isMobile, setIsMobile] = useState(window.innerWidth <= DESKTOP_BREAKPOINT);
@@ -1026,6 +1027,60 @@ export default function HomeUpper({
   }, []);
 
   useEffect(() => {
+    if (!isMobile) return undefined;
+    const updateArrowVisibility = () => {
+      const scrollY = Number(window.scrollY || window.pageYOffset || 0);
+      setShowArrow(scrollY <= 12);
+    };
+    updateArrowVisibility();
+    window.addEventListener('scroll', updateArrowVisibility, { passive: true });
+    window.addEventListener('resize', updateArrowVisibility);
+    return () => {
+      window.removeEventListener('scroll', updateArrowVisibility);
+      window.removeEventListener('resize', updateArrowVisibility);
+    };
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!isMobile || !showAIModal) {
+      if (mobileAiModalScrollLockRef.current.active) {
+        const lockedY = Number(mobileAiModalScrollLockRef.current.scrollY) || 0;
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.right = '';
+        document.body.style.width = '';
+        document.body.style.overflow = '';
+        window.scrollTo({ top: lockedY, behavior: 'auto' });
+        mobileAiModalScrollLockRef.current = { active: false, scrollY: 0 };
+      }
+      return undefined;
+    }
+
+    const scrollY = Number(window.scrollY || window.pageYOffset || 0);
+    mobileAiModalScrollLockRef.current = { active: true, scrollY };
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      if (!mobileAiModalScrollLockRef.current.active) return;
+      const lockedY = Number(mobileAiModalScrollLockRef.current.scrollY) || 0;
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+      window.scrollTo({ top: lockedY, behavior: 'auto' });
+      mobileAiModalScrollLockRef.current = { active: false, scrollY: 0 };
+    };
+  }, [isMobile, showAIModal]);
+
+  useEffect(() => {
     if (!navQuickMenuOpen) return;
     const onPointerDown = (event) => {
       const target = event.target;
@@ -1153,7 +1208,6 @@ export default function HomeUpper({
     }
   };
   const handleScrollDown = () => {
-    setShowArrow(false);
     const target =
       document.querySelector(".section-top-anchor") ||
       document.querySelector(".lower-div");
@@ -1366,7 +1420,7 @@ export default function HomeUpper({
       )}
 
       {/* 5. Mobile AI FAB */}
-      {isMobile && !mobileFloatingHidden.ai && (
+      {isMobile && !mobileFloatingHidden.ai && !showAIModal && (
         <div
           className={`mobile-floating-action ai-action${getMobileFloatingActionStyle('ai') ? ' is-floating' : ''}`.trim()}
           style={{
