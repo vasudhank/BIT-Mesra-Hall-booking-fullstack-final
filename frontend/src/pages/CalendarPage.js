@@ -7983,7 +7983,7 @@ export default function CalendarPage() {
           ) : (
             <div
               ref={calendarCardRef}
-              className={`gcal-calendar-card ${viewType === 'multiMonthYear' ? 'year-view-mode' : ''}${viewType === 'listYear' ? ' schedule-view-mode' : ''}${isMobile && MOBILE_SWIPE_ENABLED_VIEWS.has(viewType) ? ' mobile-swipe-enabled' : ''}`}
+              className={`gcal-calendar-card${viewType === 'dayGridMonth' ? ' month-view-mode' : ''}${viewType === 'multiMonthYear' ? ' year-view-mode' : ''}${viewType === 'listYear' ? ' schedule-view-mode' : ''}${isMobile && MOBILE_SWIPE_ENABLED_VIEWS.has(viewType) ? ' mobile-swipe-enabled' : ''}`}
             >
               {viewType === 'multiMonthYear' && (
                 <section className="gcal-custom-year-wrapper" aria-label={`Year view ${activeYearForCustomView}`}>
@@ -8088,10 +8088,11 @@ export default function CalendarPage() {
                     ? `+${arg.num} more`
                     : `+${arg.num}`
                 )}
+                expandRows={isMobile && viewType === 'dayGridMonth'}
                 dayMaxEvents={true} 
                 eventOrder={compareCalendarEventPriority}
                 eventOrderStrict={true}
-                fixedWeekCount={false}
+                fixedWeekCount={isMobile && viewType === 'dayGridMonth'}
                 showNonCurrentDates={true}
                 nowIndicator={true}
                 editable={viewType === 'dayGridMonth' || viewType === 'timeGridWeek'}

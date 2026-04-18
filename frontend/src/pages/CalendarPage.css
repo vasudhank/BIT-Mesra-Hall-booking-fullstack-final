@@ -5053,7 +5053,7 @@ al-search-result-date span,
   }
 
   .gcal-mobile .fc .fc-dayGridMonth-view .fc-col-header-cell-cushion {
-    padding: 6px 0 2px !important;
+    padding: 4px 0 1px !important;
     font-size: 10px;
   }
 
@@ -5064,10 +5064,34 @@ al-search-result-date span,
     border: none !important;
   }
 
+  .gcal-mobile .gcal-calendar-card.month-view-mode .fc,
+  .gcal-mobile .fc .fc-dayGridMonth-view {
+    height: 100%;
+  }
+
+  .gcal-mobile .fc .fc-dayGridMonth-view .fc-scrollgrid,
+  .gcal-mobile .fc .fc-dayGridMonth-view .fc-scroller-harness,
+  .gcal-mobile .fc .fc-dayGridMonth-view .fc-scroller,
+  .gcal-mobile .fc .fc-dayGridMonth-view .fc-scrollgrid-section-body > td,
+  .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-body,
+  .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-body > table {
+    height: 100% !important;
+  }
+
+  .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-body > table {
+    table-layout: fixed !important;
+  }
+
+  .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-body tbody > tr {
+    height: calc(100% / 6) !important;
+  }
 
   .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-day-frame {
     min-height: var(--gcal-mobile-month-day-frame-min-height);
     padding-bottom: var(--gcal-mobile-month-day-frame-padding-bottom);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
   }
 
   .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-day-top {
@@ -5078,6 +5102,21 @@ al-search-result-date span,
     width: var(--gcal-mobile-month-day-number-size);
     height: var(--gcal-mobile-month-day-number-size);
     font-size: var(--gcal-mobile-month-day-number-font-size);
+  }
+
+  .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-day-events {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin-top: 1px !important;
+  }
+
+  .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-event-harness {
+    margin: 1px 0 !important;
+  }
+
+  .gcal-mobile .fc .fc-dayGridMonth-view .fc-more-link {
+    padding: 0 4px;
+    line-height: 1.15;
   }
 
   
