@@ -30,11 +30,6 @@
   transition: background-color 0.2s, color 0.2s;
 }
 
-html.gcal-browser-chrome-sync-root,
-body.gcal-browser-chrome-sync-root {
-  overscroll-behavior-y: auto !important;
-}
-
 /* --- TOP BAR --- */
 .gcal-topbar {
   height: 64px;
@@ -709,6 +704,7 @@ body.gcal-browser-chrome-sync-root {
   height: 100%;
   min-height: 0;
   overflow: hidden;
+  overscroll-behavior: none;
 }
 
 .gcal-calendar-card.mobile-swipe-enabled {
@@ -4624,9 +4620,6 @@ al-search-result-date span,
     --gcal-mobile-clock-strip-height: 36px;
     --gcal-mobile-topbar-height: 58px;
     --gcal-mobile-top-stack-height: calc(var(--gcal-mobile-clock-strip-height) + var(--gcal-mobile-topbar-height));
-    --gcal-mobile-shell-surface: linear-gradient(180deg, #ffffff 0%, #fbfcfe 28%, #f3f7fb 100%);
-    --gcal-mobile-shell-edge: rgba(219, 229, 240, 0.92);
-    --gcal-browser-chrome-scroll-slack: 12px;
     --gcal-mobile-month-day-frame-min-height: 24px;
     --gcal-mobile-month-day-frame-padding-bottom: 0px;
     --gcal-mobile-month-day-top-padding: 1px;
@@ -4641,12 +4634,6 @@ al-search-result-date span,
     --gcal-day-all-day-expanded-max-height: 126px;
   }
 
-  .gcal-page.gcal-mobile.month-browser-chrome-sync {
-    position: sticky;
-    top: 0;
-    padding-bottom: var(--gcal-browser-chrome-scroll-slack);
-  }
-
   .gcal-mobile-time-strip {
     width: 100%;
     height: var(--gcal-mobile-clock-strip-height);
@@ -4656,8 +4643,8 @@ al-search-result-date span,
     position: relative;
     padding: 0 8px;
     box-sizing: border-box;
-    border-bottom: none;
-    background: var(--gcal-mobile-shell-surface);
+    border-bottom: 1px solid #dfe5ec;
+    background: #ffffff;
     flex-shrink: 0;
   }
 
@@ -4792,7 +4779,6 @@ al-search-result-date span,
     gap: 0;
     align-items: center;
     justify-content: center;
-    background: var(--gcal-mobile-shell-surface);
   }
 
   .gcal-create-mini-btn {
@@ -4952,8 +4938,7 @@ al-search-result-date span,
     width: min(280px, 78vw);
     max-width: 78vw;
     z-index: 110;
-    border-right: 1px solid var(--gcal-mobile-shell-edge);
-    background: var(--gcal-mobile-shell-surface);
+    border-right: 1px solid #dadce0;
     box-shadow: 14px 0 28px rgba(15, 23, 42, 0.18);
     transition: transform 0.22s ease, opacity 0.22s ease;
   }
@@ -5124,7 +5109,8 @@ al-search-result-date span,
 
   .gcal-mobile .gcal-calendar-card.month-view-mode {
     --gcal-mobile-month-row-count: 5;
-    touch-action: pan-y;
+    touch-action: none;
+    overscroll-behavior: none;
   }
 
   .gcal-mobile .fc .fc-dayGridMonth-view .fc-scrollgrid-section-header > td,
@@ -5392,7 +5378,8 @@ al-search-result-date span,
 
 @media (max-width: 900px) {
   .theme-dark .gcal-mobile-time-strip {
-    background: var(--gcal-mobile-shell-surface);
+    background: #202124;
+    border-bottom-color: #3c4043;
   }
 
   .theme-dark .gcal-mobile-time-value {
@@ -5452,9 +5439,4 @@ al-search-result-date span,
     border-color: #8ab4f8;
     color: #202124;
   }
-}
-
-.gcal-page.theme-dark.gcal-mobile {
-  --gcal-mobile-shell-surface: linear-gradient(180deg, #202124 0%, #23262b 30%, #1f2329 100%);
-  --gcal-mobile-shell-edge: rgba(95, 99, 104, 0.82);
 }

@@ -3070,29 +3070,6 @@ export default function CalendarPage() {
     };
   }, []);
 
-  const monthBrowserChromeSyncEnabled = isMobile && !searchOpen && viewType === 'dayGridMonth';
-
-  useEffect(() => {
-    const htmlEl = document.documentElement;
-    const bodyEl = document.body;
-    const syncClass = 'gcal-browser-chrome-sync-root';
-
-    if (monthBrowserChromeSyncEnabled) {
-      htmlEl.classList.add(syncClass);
-      bodyEl.classList.add(syncClass);
-      return () => {
-        htmlEl.classList.remove(syncClass);
-        bodyEl.classList.remove(syncClass);
-      };
-    }
-
-    htmlEl.classList.remove(syncClass);
-    bodyEl.classList.remove(syncClass);
-    window.scrollTo({ top: 0, behavior: 'auto' });
-
-    return undefined;
-  }, [monthBrowserChromeSyncEnabled]);
-
   useLayoutEffect(() => {
     const api = calendarRef.current?.getApi();
     const cardEl = calendarCardRef.current;
@@ -7627,7 +7604,7 @@ export default function CalendarPage() {
   return (
     <div
       ref={calendarPageShellRef}
-      className={`gcal-page theme-${themeMode.toLowerCase()}${isMobile ? ' gcal-mobile' : ''}${searchOpen ? ' search-open' : ''}${monthBrowserChromeSyncEnabled ? ' month-browser-chrome-sync' : ''}${viewType === 'timeGridWeek' ? (weekAllDayExpanded ? ' week-all-day-expanded' : ' week-all-day-collapsed') : ''}${viewType === 'timeGridDay' ? (dayAllDayExpanded ? ' day-all-day-expanded' : ' day-all-day-collapsed') : ''}`}
+      className={`gcal-page theme-${themeMode.toLowerCase()}${isMobile ? ' gcal-mobile' : ''}${searchOpen ? ' search-open' : ''}${viewType === 'timeGridWeek' ? (weekAllDayExpanded ? ' week-all-day-expanded' : ' week-all-day-collapsed') : ''}${viewType === 'timeGridDay' ? (dayAllDayExpanded ? ' day-all-day-expanded' : ' day-all-day-collapsed') : ''}`}
     >
       {isMobile && (
         <div className="gcal-mobile-time-strip" aria-label="Current time in IST" style={mobileHeaderStripStyle}>
