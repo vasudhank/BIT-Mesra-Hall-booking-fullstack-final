@@ -30,6 +30,12 @@ const AIChatWidget = lazy(() => import("../AI/AIChatWidget"));
 const FOLD_PHASE_MS = 250;
 const UNFOLD_PHASE_MS = 340;
 const DESKTOP_BREAKPOINT = 1364;
+const MOBILE_AI_FAB_CONFIG = Object.freeze({
+  size: 50,
+  iconSize: 20,
+  bottom: 24,
+  right: 10
+});
 
 const FlipDigit = ({ value }) => {
   const normalized = String(value ?? "00").padStart(2, "0");
@@ -904,8 +910,33 @@ export default function HomeUpper({
 
       {/* 5. Mobile AI FAB */}
       {isMobile && (
-        <button className="mobile-ai-fab" onClick={handleAIClick}>
-          <AutoAwesomeIcon sx={{ fontSize: 26, color: 'white' }} />
+        <button
+          className="mobile-ai-fab"
+          onClick={handleAIClick}
+          aria-label="Open AI assistant"
+          style={{
+            "--mobile-ai-fab-size": `${MOBILE_AI_FAB_CONFIG.size}px`,
+            "--mobile-ai-fab-icon-size": `${MOBILE_AI_FAB_CONFIG.iconSize}px`,
+            "--mobile-ai-fab-bottom": `${MOBILE_AI_FAB_CONFIG.bottom}px`,
+            "--mobile-ai-fab-right": `${MOBILE_AI_FAB_CONFIG.right}px`
+          }}
+        >
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path
+              d="M4 4H20C21.1046 4 22 4.89543 22 6V18C22 19.1046 21.1046 20 20 20H8L4 24V4Z"
+              stroke="white"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M12 8L13.122 10.878L16 12L13.122 13.122L12 16L10.878 13.122L8 12L10.878 10.878L12 8Z"
+              stroke="white"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </button>
       )}
 

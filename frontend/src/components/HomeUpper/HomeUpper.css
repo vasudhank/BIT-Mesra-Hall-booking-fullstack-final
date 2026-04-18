@@ -688,9 +688,10 @@ body.dark-mode .clock-scrolled .clock-separator {
   --toggle-w: 46px;
   --toggle-h: 24px;
   --toggle-icon-size: 10px;
+  width: var(--mobile-datetime-side-slot, 46px);
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   flex-shrink: 0;
 }
 
@@ -1139,16 +1140,21 @@ body.dark-mode .mobile-menu-toggle {
   width: 100%;
   min-height: 36px;
   padding: 6px 10px;
+  --mobile-datetime-side-slot: 46px;
   font-family: 'Inter', sans-serif;
   font-size: 0.8rem;
   font-weight: 600;
   z-index: 110;
-  display: flex;
-  justify-content: flex-start;
+  display: grid;
+  grid-template-columns: var(--mobile-datetime-side-slot) minmax(0, 1fr) var(--mobile-datetime-side-slot);
   align-items: center;
-  gap: 10px;
   box-sizing: border-box;
   animation: fadeIn 0.5s ease;
+}
+
+.mobile-datetime-bar::after {
+  content: "";
+  width: var(--mobile-datetime-side-slot);
 }
 
 .mobile-datetime-bar.mobile-datetime-bar--expanded {
@@ -1157,9 +1163,10 @@ body.dark-mode .mobile-menu-toggle {
 }
 
 .mobile-datetime-text {
-  flex: 1;
+  grid-column: 2;
   min-width: 0;
-  margin-left: 3vw;
+  margin: 0;
+  text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1193,7 +1200,39 @@ body.dark-mode .mobile-datetime-bar.mobile-datetime-bar--expanded {
 }
 
 .mobile-wish-btn { position: absolute; top: 90px; left: 20px; background: rgba(255, 255, 255, 0.9); color: #333; border: none; border-radius: 30px; padding: 10px 18px; display: flex; align-items: center; gap: 8px; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.9rem; box-shadow: 0 4px 15px rgba(0,0,0,0.15); z-index: 9; cursor: pointer; display: none; }
-.mobile-ai-fab { position: fixed; bottom: 25px; right: 20px; width: 56px; height: 56px; border-radius: 50%; border: none; cursor: pointer; z-index: 100; box-shadow: 0 6px 20px rgba(0,0,0,0.3); display: flex; justify-content: center; align-items: center; background: linear-gradient(45deg, #4285f4, #9b72cb, #d96570, #fbbc05); background-size: 300% 300%; animation: aiGradient 4s ease infinite; display: none; }
+.mobile-ai-fab {
+  position: fixed;
+  bottom: var(--mobile-ai-fab-bottom, 24px);
+  right: var(--mobile-ai-fab-right, 24px);
+  width: var(--mobile-ai-fab-size, 64px);
+  height: var(--mobile-ai-fab-size, 64px);
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #ff2e5b 0%, #8418d1 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  z-index: 1000;
+  display: none;
+}
+
+.mobile-ai-fab svg {
+  width: var(--mobile-ai-fab-icon-size, 28px);
+  height: var(--mobile-ai-fab-icon-size, 28px);
+}
+
+.mobile-ai-fab:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.mobile-ai-fab:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 2px;
+}
 .drag-hint-card { position: absolute; right: 65px; top: 50%; transform: translateY(-50%) translateX(10px); background: rgba(0, 0, 0, 0.85); color: white; padding: 6px 12px; border-radius: 8px; font-size: 0.75rem; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.2s ease, transform 0.2s ease; }
 .drag-hint-card.visible { opacity: 1; transform: translateY(-50%) translateX(0); }
 .mobile-menu-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 999; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
