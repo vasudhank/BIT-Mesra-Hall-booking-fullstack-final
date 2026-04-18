@@ -44,7 +44,7 @@ const MOBILE_FLOATING_BUTTON_DRAG_CONFIG = Object.freeze({
 });
 const MOBILE_DATETIME_RESTORE_DOT_CONFIG = Object.freeze({
   // Manual tuning for collapsed-circle controls inside the mobile datetime bar.
-  sizePx: 14,
+  sizePx: 20,
   slotWidthPx: 46,
   gapPx: 4,
   offsetXPx: 0,
