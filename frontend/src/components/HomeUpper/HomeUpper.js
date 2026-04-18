@@ -182,6 +182,8 @@ export default function HomeUpper({
   const [navQuickMenuStyle, setNavQuickMenuStyle] = useState({ left: 0, width: 420 });
   const [mobileFloatingButtonPositions, setMobileFloatingButtonPositions] = useState({ menu: null, ai: null });
   const [mobileFloatingDraggingKey, setMobileFloatingDraggingKey] = useState('');
+  const [mobileFloatingHidden, setMobileFloatingHidden] = useState({ menu: false, ai: false });
+  const [mobileFloatingHideTarget, setMobileFloatingHideTarget] = useState('');
   const mobileFloatingButtonNodeRef = useRef({ menu: null, ai: null });
   const mobileFloatingLongPressTimerRef = useRef(null);
   const mobileFloatingSuppressClickRef = useRef('');
@@ -333,10 +335,24 @@ export default function HomeUpper({
 
   useEffect(() => {
     if (isMobile) return;
+    setMobileFloatingHidden({ menu: false, ai: false });
+    setMobileFloatingHideTarget('');
     mobileFloatingSuppressClickRef.current = '';
     clearMobileFloatingLongPressTimer();
     resetMobileFloatingDrag();
   }, [clearMobileFloatingLongPressTimer, isMobile, resetMobileFloatingDrag]);
+
+  useEffect(() => {
+    if (!mobileFloatingHideTarget) return undefined;
+    const handlePointerDown = (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest('.mobile-floating-action')) return;
+      setMobileFloatingHideTarget('');
+    };
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => document.removeEventListener('pointerdown', handlePointerDown, true);
+  }, [mobileFloatingHideTarget]);
 
   useEffect(() => {
     if (!isMobile) return undefined;
@@ -355,6 +371,7 @@ export default function HomeUpper({
         drag.dragging = true;
         mobileFloatingSuppressClickRef.current = drag.key;
         setMobileFloatingDraggingKey(drag.key);
+        setMobileFloatingHideTarget('');
       }
 
       const next = clampMobileFloatingPosition(
@@ -564,6 +581,7 @@ export default function HomeUpper({
       if (!drag.active || drag.key !== targetKey) return;
       drag.armed = true;
       mobileFloatingSuppressClickRef.current = targetKey;
+      setMobileFloatingHideTarget(targetKey);
     }, Math.max(320, Number(MOBILE_FLOATING_BUTTON_DRAG_CONFIG.longPressMs) || 520));
   }, [clearMobileFloatingLongPressTimer, isMobile]);
 
@@ -571,7 +589,7 @@ export default function HomeUpper({
     clearMobileFloatingLongPressTimer();
   }, [clearMobileFloatingLongPressTimer]);
 
-  const getMobileFloatingButtonPositionStyle = useCallback((targetKey) => {
+  const getMobileFloatingActionStyle = useCallback((targetKey) => {
     const pos = mobileFloatingButtonPositions?.[targetKey];
     if (!pos || !Number.isFinite(pos?.x) || !Number.isFinite(pos?.y)) return undefined;
     return {
@@ -582,6 +600,25 @@ export default function HomeUpper({
     };
   }, [mobileFloatingButtonPositions]);
 
+  const collapseMobileFloatingButton = useCallback((targetKey, event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    clearMobileFloatingLongPressTimer();
+    mobileFloatingSuppressClickRef.current = '';
+    setMobileFloatingHidden((prev) => ({ ...prev, [targetKey]: true }));
+    setMobileFloatingHideTarget('');
+    if (targetKey === 'menu') {
+      setMobileMenuOpen(false);
+    }
+  }, [clearMobileFloatingLongPressTimer]);
+
+  const restoreMobileFloatingButton = useCallback((targetKey, event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    setMobileFloatingHidden((prev) => ({ ...prev, [targetKey]: false }));
+    setMobileFloatingHideTarget('');
+  }, []);
+
   const handleMobileFloatingButtonTap = useCallback((targetKey, event, onTap) => {
     if (mobileFloatingSuppressClickRef.current === targetKey) {
       mobileFloatingSuppressClickRef.current = '';
@@ -589,6 +626,7 @@ export default function HomeUpper({
       event?.stopPropagation?.();
       return;
     }
+    setMobileFloatingHideTarget('');
     onTap?.(event);
   }, []);
 
@@ -1251,74 +1289,124 @@ export default function HomeUpper({
             toggleTheme={toggleTheme}
           />
           <span className="mobile-datetime-text">{timeData.mobileDateTimeStr}</span>
+          <div className="mobile-datetime-restore-slot">
+            {mobileFloatingHidden.menu && (
+              <button
+                type="button"
+                className="mobile-datetime-restore-dot menu-dot"
+                aria-label="Restore menu button"
+                onClick={(event) => restoreMobileFloatingButton('menu', event)}
+              >
+                <MenuIcon style={{ fontSize: '0.95rem' }} />
+              </button>
+            )}
+            {mobileFloatingHidden.ai && (
+              <button
+                type="button"
+                className="mobile-datetime-restore-dot ai-dot"
+                aria-label="Restore AI button"
+                onClick={(event) => restoreMobileFloatingButton('ai', event)}
+              >
+                <AutoAwesomeIcon style={{ fontSize: '0.82rem' }} />
+              </button>
+            )}
+          </div>
         </div>
       )}
 
       {/* 4. Mobile Menu Button */}
-      {isMobile && (
-        <button
-          ref={(node) => setMobileFloatingButtonNode('menu', node)}
-          className={`mobile-menu-toggle${mobileFloatingDraggingKey === 'menu' ? ' is-dragging' : ''}`.trim()}
-          style={getMobileFloatingButtonPositionStyle('menu')}
-          onClick={(event) => handleMobileFloatingButtonTap('menu', event, toggleMobileMenu)}
-          onPointerDown={(event) => startMobileFloatingButtonLongPress('menu', event)}
-          onPointerUp={endMobileFloatingButtonLongPress}
-          onPointerCancel={endMobileFloatingButtonLongPress}
-          onTouchStart={(event) => startMobileFloatingButtonLongPress('menu', event)}
-          onTouchEnd={endMobileFloatingButtonLongPress}
-          onTouchCancel={endMobileFloatingButtonLongPress}
-          onMouseDown={(event) => startMobileFloatingButtonLongPress('menu', event)}
-          onMouseUp={endMobileFloatingButtonLongPress}
-          onMouseLeave={endMobileFloatingButtonLongPress}
-          onContextMenu={(event) => event.preventDefault()}
+      {isMobile && !mobileFloatingHidden.menu && (
+        <div
+          className={`mobile-floating-action menu-action${getMobileFloatingActionStyle('menu') ? ' is-floating' : ''}`.trim()}
+          style={getMobileFloatingActionStyle('menu')}
         >
-          {/* Color set to inherit so CSS can control it */}
-          <MenuIcon style={{ fontSize: '1.8rem', color: 'inherit' }} />
-        </button>
+          <button
+            ref={(node) => setMobileFloatingButtonNode('menu', node)}
+            className={`mobile-menu-toggle${mobileFloatingDraggingKey === 'menu' ? ' is-dragging' : ''}`.trim()}
+            onClick={(event) => handleMobileFloatingButtonTap('menu', event, toggleMobileMenu)}
+            onPointerDown={(event) => startMobileFloatingButtonLongPress('menu', event)}
+            onPointerUp={endMobileFloatingButtonLongPress}
+            onPointerCancel={endMobileFloatingButtonLongPress}
+            onTouchStart={(event) => startMobileFloatingButtonLongPress('menu', event)}
+            onTouchEnd={endMobileFloatingButtonLongPress}
+            onTouchCancel={endMobileFloatingButtonLongPress}
+            onMouseDown={(event) => startMobileFloatingButtonLongPress('menu', event)}
+            onMouseUp={endMobileFloatingButtonLongPress}
+            onMouseLeave={endMobileFloatingButtonLongPress}
+            onContextMenu={(event) => event.preventDefault()}
+          >
+            {/* Color set to inherit so CSS can control it */}
+            <MenuIcon style={{ fontSize: '1.8rem', color: 'inherit' }} />
+          </button>
+          {mobileFloatingHideTarget === 'menu' && (
+            <button
+              type="button"
+              className="mobile-floating-hide-btn"
+              aria-label="Hide menu button"
+              onClick={(event) => collapseMobileFloatingButton('menu', event)}
+            >
+              x
+            </button>
+          )}
+        </div>
       )}
 
       {/* 5. Mobile AI FAB */}
-      {isMobile && (
-        <button
-          ref={(node) => setMobileFloatingButtonNode('ai', node)}
-          className={`mobile-ai-fab${mobileFloatingDraggingKey === 'ai' ? ' is-dragging' : ''}`.trim()}
-          onClick={(event) => handleMobileFloatingButtonTap('ai', event, handleAIClick)}
-          onPointerDown={(event) => startMobileFloatingButtonLongPress('ai', event)}
-          onPointerUp={endMobileFloatingButtonLongPress}
-          onPointerCancel={endMobileFloatingButtonLongPress}
-          onTouchStart={(event) => startMobileFloatingButtonLongPress('ai', event)}
-          onTouchEnd={endMobileFloatingButtonLongPress}
-          onTouchCancel={endMobileFloatingButtonLongPress}
-          onMouseDown={(event) => startMobileFloatingButtonLongPress('ai', event)}
-          onMouseUp={endMobileFloatingButtonLongPress}
-          onMouseLeave={endMobileFloatingButtonLongPress}
-          onContextMenu={(event) => event.preventDefault()}
-          aria-label="Open AI assistant"
+      {isMobile && !mobileFloatingHidden.ai && (
+        <div
+          className={`mobile-floating-action ai-action${getMobileFloatingActionStyle('ai') ? ' is-floating' : ''}`.trim()}
           style={{
-            ...getMobileFloatingButtonPositionStyle('ai'),
+            ...getMobileFloatingActionStyle('ai'),
             "--mobile-ai-fab-size": `${MOBILE_AI_FAB_CONFIG.size}px`,
             "--mobile-ai-fab-icon-size": `${MOBILE_AI_FAB_CONFIG.iconSize}px`,
             "--mobile-ai-fab-bottom": `${MOBILE_AI_FAB_CONFIG.bottom}px`,
             "--mobile-ai-fab-right": `${MOBILE_AI_FAB_CONFIG.right}px`
           }}
         >
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path
-              d="M4 4H20C21.1046 4 22 4.89543 22 6V18C22 19.1046 21.1046 20 20 20H8L4 24V4Z"
-              stroke="white"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M12 8L13.122 10.878L16 12L13.122 13.122L12 16L10.878 13.122L8 12L10.878 10.878L12 8Z"
-              stroke="white"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
+          <button
+            ref={(node) => setMobileFloatingButtonNode('ai', node)}
+            className={`mobile-ai-fab${mobileFloatingDraggingKey === 'ai' ? ' is-dragging' : ''}`.trim()}
+            onClick={(event) => handleMobileFloatingButtonTap('ai', event, handleAIClick)}
+            onPointerDown={(event) => startMobileFloatingButtonLongPress('ai', event)}
+            onPointerUp={endMobileFloatingButtonLongPress}
+            onPointerCancel={endMobileFloatingButtonLongPress}
+            onTouchStart={(event) => startMobileFloatingButtonLongPress('ai', event)}
+            onTouchEnd={endMobileFloatingButtonLongPress}
+            onTouchCancel={endMobileFloatingButtonLongPress}
+            onMouseDown={(event) => startMobileFloatingButtonLongPress('ai', event)}
+            onMouseUp={endMobileFloatingButtonLongPress}
+            onMouseLeave={endMobileFloatingButtonLongPress}
+            onContextMenu={(event) => event.preventDefault()}
+            aria-label="Open AI assistant"
+          >
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path
+                d="M4 4H20C21.1046 4 22 4.89543 22 6V18C22 19.1046 21.1046 20 20 20H8L4 24V4Z"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M12 8L13.122 10.878L16 12L13.122 13.122L12 16L10.878 13.122L8 12L10.878 10.878L12 8Z"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          {mobileFloatingHideTarget === 'ai' && (
+            <button
+              type="button"
+              className="mobile-floating-hide-btn"
+              aria-label="Hide AI button"
+              onClick={(event) => collapseMobileFloatingButton('ai', event)}
+            >
+              x
+            </button>
+          )}
+        </div>
       )}
 
       {/* 6. Mobile Menu Overlay */}
