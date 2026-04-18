@@ -131,8 +131,9 @@
 
 .developer-login-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, max-content));
+  justify-content: center;
+  gap: 10px;
   margin-bottom: 20px;
 }
 
@@ -142,7 +143,11 @@
   background: rgba(255, 255, 255, 0.12);
   color: #ffffff;
   font-weight: 600;
-  padding: 10px 12px;
+  min-width: 124px;
+  padding: 10px 14px;
+  font-size: 0.92rem;
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -292,6 +297,12 @@
   .developer-otp-row {
     grid-template-columns: 1fr;
     gap: 10px;
+  }
+
+  .developer-tab-btn {
+    min-width: 108px;
+    padding-inline: 12px;
+    font-size: 0.84rem;
   }
 }
 

@@ -1,7 +1,57 @@
 import React from 'react';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
+import ArrowOutwardRoundedIcon from '@mui/icons-material/ArrowOutwardRounded';
 import HomeUpper from '../components/HomeUpper/HomeUpper';
 import HomeFooter from '../components/HomeFooter/HomeFooter';
 import './About.css';
+
+function normalizeExternalUrl(value) {
+  const trimmedValue = String(value || '').trim();
+
+  if (!trimmedValue) {
+    return '';
+  }
+
+  if (/^https?:\/\//i.test(trimmedValue)) {
+    return trimmedValue;
+  }
+
+  return `https://${trimmedValue.replace(/^\/+/, '')}`;
+}
+
+function getExternalId(url) {
+  const normalizedUrl = normalizeExternalUrl(url);
+
+  if (!normalizedUrl) {
+    return '';
+  }
+
+  return normalizedUrl.replace(/^https?:\/\//i, '').replace(/\/$/, '');
+}
+
+const teamProfiles = [
+  {
+    badge: 'Developer',
+    name: String(process.env.REACT_APP_ABOUT_DEV_NAME || '').trim(),
+    role: String(process.env.REACT_APP_ABOUT_DEV_ROLE || 'Project Developer').trim(),
+    image: String(process.env.REACT_APP_ABOUT_DEV_IMAGE || '').trim(),
+    profileUrl: normalizeExternalUrl(process.env.REACT_APP_ABOUT_DEV_LINKEDIN),
+    profileId: getExternalId(process.env.REACT_APP_ABOUT_DEV_LINKEDIN),
+    profileLabel: String(process.env.REACT_APP_ABOUT_DEV_PROFILE_LABEL || 'LinkedIn').trim(),
+    email: String(process.env.REACT_APP_ABOUT_DEV_EMAIL || '').trim()
+  },
+  {
+    badge: 'Guide',
+    name: String(process.env.REACT_APP_ABOUT_GUIDE_NAME || '').trim(),
+    role: String(process.env.REACT_APP_ABOUT_GUIDE_ROLE || 'Project Guide').trim(),
+    image: String(process.env.REACT_APP_ABOUT_GUIDE_IMAGE || '').trim(),
+    profileUrl: normalizeExternalUrl(process.env.REACT_APP_ABOUT_GUIDE_LINKEDIN),
+    profileId: getExternalId(process.env.REACT_APP_ABOUT_GUIDE_LINKEDIN),
+    profileLabel: String(process.env.REACT_APP_ABOUT_GUIDE_PROFILE_LABEL || 'LinkedIn').trim(),
+    email: String(process.env.REACT_APP_ABOUT_GUIDE_EMAIL || '').trim()
+  }
+].filter((profile) => profile.name && profile.image);
 
 export default function About({ lightMode, toggleTheme }) {
   return (
@@ -64,6 +114,77 @@ export default function About({ lightMode, toggleTheme }) {
                 Overall, the BIT Mesra Institute Hall Booking System transforms a previously chaotic and inefficient process into a streamlined, intelligent, and user-friendly digital experience. It reduces administrative burden, prevents booking conflicts, improves transparency, and ensures that hall management at BIT Mesra is accurate, fast, and future-ready.
               </p>
             </div>
+
+            {teamProfiles.length > 0 ? (
+              <section className="about-team-section" aria-labelledby="about-team-title">
+                <div className="about-team-header">
+                  <p className="about-team-eyebrow">People Behind The Platform</p>
+                  <h2 className="about-team-title" id="about-team-title">
+                    Developer &amp; Guide
+                  </h2>
+                  <p className="about-team-description">
+                    The platform has been shaped through focused project development and academic guidance.
+                  </p>
+                </div>
+
+                <div className="about-team-gallery">
+                  {teamProfiles.map((profile, index) => (
+                    <article
+                      key={profile.badge}
+                      className={`about-team-card ${index % 2 === 0 ? 'about-team-card--left' : 'about-team-card--right'}`}
+                    >
+                      <span className="about-team-badge">{profile.badge}</span>
+
+                      <div className="about-team-avatar-shell">
+                        <img
+                          className="about-team-avatar"
+                          src={profile.image}
+                          alt={`${profile.name} profile`}
+                          loading="lazy"
+                        />
+                      </div>
+
+                      <div className="about-team-card-body">
+                        <h3 className="about-team-name">{profile.name}</h3>
+                        {profile.role ? <p className="about-team-role">{profile.role}</p> : null}
+
+                        <div className="about-team-links">
+                          {profile.profileUrl ? (
+                            <a
+                              className="about-team-link"
+                              href={profile.profileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              <span className="about-team-link-icon">
+                                <LinkedInIcon fontSize="small" />
+                              </span>
+                              <span className="about-team-link-text">
+                                <span className="about-team-link-label">{profile.profileLabel}</span>
+                                <span className="about-team-link-value">{profile.profileId}</span>
+                              </span>
+                              <ArrowOutwardRoundedIcon fontSize="small" />
+                            </a>
+                          ) : null}
+
+                          {profile.email ? (
+                            <a className="about-team-link" href={`mailto:${profile.email}`}>
+                              <span className="about-team-link-icon">
+                                <EmailOutlinedIcon fontSize="small" />
+                              </span>
+                              <span className="about-team-link-text">
+                                <span className="about-team-link-label">Mail ID</span>
+                                <span className="about-team-link-value">{profile.email}</span>
+                              </span>
+                            </a>
+                          ) : null}
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : null}
           </div>
         </div>
 
