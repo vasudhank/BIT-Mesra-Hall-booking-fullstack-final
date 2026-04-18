@@ -1106,6 +1106,7 @@ export default function CalendarPage() {
   );
 
   const calendarRef = useRef(null);
+  const calendarPageShellRef = useRef(null);
   const calendarCardRef = useRef(null);
   const popoverRef = useRef(null);
   const activeRangeRef = useRef(null);
@@ -3030,6 +3031,44 @@ export default function CalendarPage() {
         : prev));
     }
   }, [searchOpen]);
+
+  useLayoutEffect(() => {
+    const pageEl = calendarPageShellRef.current;
+    if (!(pageEl instanceof HTMLElement)) return undefined;
+
+    let rafId = 0;
+
+    const applyViewportHeight = () => {
+      rafId = 0;
+      const viewportHeight = Math.round(
+        window.visualViewport?.height || window.innerHeight || pageEl.clientHeight || 0
+      );
+      if (viewportHeight > 0) {
+        pageEl.style.setProperty('--gcal-app-height', `${viewportHeight}px`);
+      }
+    };
+
+    const scheduleViewportHeightSync = () => {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(applyViewportHeight);
+    };
+
+    scheduleViewportHeightSync();
+
+    window.addEventListener('resize', scheduleViewportHeightSync);
+    window.addEventListener('orientationchange', scheduleViewportHeightSync);
+    window.visualViewport?.addEventListener('resize', scheduleViewportHeightSync);
+    window.visualViewport?.addEventListener('scroll', scheduleViewportHeightSync);
+
+    return () => {
+      window.removeEventListener('resize', scheduleViewportHeightSync);
+      window.removeEventListener('orientationchange', scheduleViewportHeightSync);
+      window.visualViewport?.removeEventListener('resize', scheduleViewportHeightSync);
+      window.visualViewport?.removeEventListener('scroll', scheduleViewportHeightSync);
+      if (rafId) window.cancelAnimationFrame(rafId);
+      pageEl.style.removeProperty('--gcal-app-height');
+    };
+  }, []);
 
   useLayoutEffect(() => {
     const api = calendarRef.current?.getApi();
@@ -7564,6 +7603,7 @@ export default function CalendarPage() {
 
   return (
     <div
+      ref={calendarPageShellRef}
       className={`gcal-page theme-${themeMode.toLowerCase()}${isMobile ? ' gcal-mobile' : ''}${searchOpen ? ' search-open' : ''}${viewType === 'timeGridWeek' ? (weekAllDayExpanded ? ' week-all-day-expanded' : ' week-all-day-collapsed') : ''}${viewType === 'timeGridDay' ? (dayAllDayExpanded ? ' day-all-day-expanded' : ' day-all-day-collapsed') : ''}`}
     >
       {isMobile && (

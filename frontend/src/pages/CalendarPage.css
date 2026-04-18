@@ -13,7 +13,14 @@
   --gcal-week-more-toggle-radius: 50%; /* Week view: hover-circle radius */
   --gcal-week-axis-width: var(--gcal-week-grid-start-offset);
   --gcal-week-grid-line: rgba(218, 220, 224, 0.46);
+  --gcal-app-height: 100vh;
   height: 100vh;
+  height: 100dvh;
+  height: var(--gcal-app-height);
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: var(--gcal-app-height);
+  max-height: var(--gcal-app-height);
   display: flex;
   flex-direction: column;
   background: #ffffff;
@@ -686,6 +693,16 @@
   flex: 1;
   min-height: 0;
   width: 100%;
+}
+
+.gcal-calendar-card.month-view-mode,
+.gcal-calendar-card.month-view-mode .fc,
+.gcal-calendar-card.month-view-mode .fc-media-screen,
+.gcal-calendar-card.month-view-mode .fc-view-harness,
+.gcal-calendar-card.month-view-mode .fc-view-harness-active,
+.gcal-calendar-card.month-view-mode .fc .fc-dayGridMonth-view {
+  height: 100%;
+  min-height: 0;
 }
 
 .gcal-calendar-card.mobile-swipe-enabled {
@@ -5024,7 +5041,7 @@ al-search-result-date span,
     grid-template-columns: repeat(3, minmax(0, 1fr));
     grid-auto-rows: 1fr;
     gap: 8px 10px;
-    min-height: calc(100vh - var(--gcal-mobile-top-stack-height) - 18px);
+    min-height: calc(var(--gcal-app-height) - var(--gcal-mobile-top-stack-height) - 18px);
   }
 
   .gcal-custom-year-wrapper .month-container {
@@ -5065,8 +5082,12 @@ al-search-result-date span,
   }
 
   .gcal-mobile .gcal-calendar-card.month-view-mode .fc,
+  .gcal-mobile .gcal-calendar-card.month-view-mode .fc-media-screen,
+  .gcal-mobile .gcal-calendar-card.month-view-mode .fc-view-harness,
+  .gcal-mobile .gcal-calendar-card.month-view-mode .fc-view-harness-active,
   .gcal-mobile .fc .fc-dayGridMonth-view {
     height: 100%;
+    min-height: 0;
   }
 
   .gcal-mobile .fc .fc-dayGridMonth-view .fc-scrollgrid,
@@ -5077,6 +5098,7 @@ al-search-result-date span,
   .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-body > table > tbody,
   .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-body > table {
     height: 100% !important;
+    min-height: 0 !important;
   }
 
   .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-body > table {
