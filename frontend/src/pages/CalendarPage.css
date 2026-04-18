@@ -4601,6 +4601,11 @@ al-search-result-date span,
     --gcal-mobile-clock-strip-height: 36px;
     --gcal-mobile-topbar-height: 58px;
     --gcal-mobile-top-stack-height: calc(var(--gcal-mobile-clock-strip-height) + var(--gcal-mobile-topbar-height));
+    --gcal-mobile-month-day-frame-min-height: 24px;
+    --gcal-mobile-month-day-frame-padding-bottom: 0px;
+    --gcal-mobile-month-day-top-padding: 1px;
+    --gcal-mobile-month-day-number-size: 18px;
+    --gcal-mobile-month-day-number-font-size: 10px;
     --gcal-week-grid-start-offset: 56px;
     --gcal-week-time-text-right-gap: 8px;
     --gcal-week-hour-row-height: 46px;
@@ -5061,18 +5066,18 @@ al-search-result-date span,
 
 
   .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-day-frame {
-    min-height: 30px;
-    padding-bottom: 1px;
+    min-height: var(--gcal-mobile-month-day-frame-min-height);
+    padding-bottom: var(--gcal-mobile-month-day-frame-padding-bottom);
   }
 
   .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-day-top {
-    padding-top: 2px !important;
+    padding-top: var(--gcal-mobile-month-day-top-padding) !important;
   }
 
   .gcal-mobile .fc .fc-dayGridMonth-view .fc-daygrid-day-number {
-    width: 20px;
-    height: 20px;
-    font-size: 11px;
+    width: var(--gcal-mobile-month-day-number-size);
+    height: var(--gcal-mobile-month-day-number-size);
+    font-size: var(--gcal-mobile-month-day-number-font-size);
   }
 
   

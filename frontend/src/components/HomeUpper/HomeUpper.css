@@ -1425,6 +1425,11 @@ body.dark-mode .mobile-floating-hide-btn {
   .modal-footer-actions { width: auto; justify-content: flex-end; margin-left: auto; }
   .popup-card, .popup-card-wide { width: 95%; max-width: 95%; padding: 20px 15px; }
 }
+
+@media (min-width: 401px) and (max-width: 1364px) {
+  .hero-content h1 span { font-size: 3.1rem; }
+}
+
 @media (max-width: 400px) {
   .hero-content h1 { font-size: 2.8rem; }
   .mobile-wish-btn { top: 80px; font-size: 0.8rem; padding: 8px 14px; }
