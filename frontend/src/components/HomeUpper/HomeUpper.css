@@ -969,7 +969,19 @@ body.dark-mode .upper-toggle-thumb {
 .btn-ai { background: linear-gradient(135deg, #f41505, #ed5188, #eff314, rgb(70, 237, 73)); color: white; background-size: 200% 200%; animation: gradientShift 3s ease infinite; }
 
 /* Popup/Modal styles */
-.popup-overlay-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.3); z-index: 200; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); } /* Z-Index Increased to 200 to cover hamburger (100) */
+.popup-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 16, 28, 0.36);
+  z-index: 3200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  touch-action: none;
+  overscroll-behavior: contain;
+}
 .popup-card { background: white; width: 90%; max-width: 400px; border-radius: 12px; padding: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.25); animation: popup 0.3s ease-out; position: relative; text-align: center; }
 .popup-card-wide { max-width: 900px; width: 90%; text-align: left; }
 .popup-close { position: absolute; top: 10px; right: 15px; font-size: 1.5rem; cursor: pointer; color: #999; }

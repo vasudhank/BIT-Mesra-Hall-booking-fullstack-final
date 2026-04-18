@@ -181,7 +181,13 @@ export default function HomeUpper({
   const navQuickButtonRef = useRef(null);
   const navQuickCardRef = useRef(null);
   const selectAllContactsRef = useRef(null);
-  const mobileAiModalScrollLockRef = useRef({ active: false, scrollY: 0 });
+  const mobileAiModalScrollLockRef = useRef({
+    active: false,
+    scrollY: 0,
+    prevHtmlOverflow: "",
+    prevHtmlOverscrollBehavior: "",
+    prevBodyTouchAction: ""
+  });
 
   // === RESPONSIVE STATE ===
   const [isMobile, setIsMobile] = useState(window.innerWidth <= DESKTOP_BREAKPOINT);
@@ -1045,38 +1051,68 @@ export default function HomeUpper({
     if (!isMobile || !showAIModal) {
       if (mobileAiModalScrollLockRef.current.active) {
         const lockedY = Number(mobileAiModalScrollLockRef.current.scrollY) || 0;
+        const htmlEl = document.documentElement;
         document.body.style.position = '';
         document.body.style.top = '';
         document.body.style.left = '';
         document.body.style.right = '';
         document.body.style.width = '';
         document.body.style.overflow = '';
+        document.body.style.touchAction = mobileAiModalScrollLockRef.current.prevBodyTouchAction || '';
+        htmlEl.style.overflow = mobileAiModalScrollLockRef.current.prevHtmlOverflow || '';
+        htmlEl.style.overscrollBehavior = mobileAiModalScrollLockRef.current.prevHtmlOverscrollBehavior || '';
         window.scrollTo({ top: lockedY, behavior: 'auto' });
-        mobileAiModalScrollLockRef.current = { active: false, scrollY: 0 };
+        mobileAiModalScrollLockRef.current = {
+          active: false,
+          scrollY: 0,
+          prevHtmlOverflow: "",
+          prevHtmlOverscrollBehavior: "",
+          prevBodyTouchAction: ""
+        };
       }
       return undefined;
     }
 
+    const htmlEl = document.documentElement;
     const scrollY = Number(window.scrollY || window.pageYOffset || 0);
-    mobileAiModalScrollLockRef.current = { active: true, scrollY };
+    mobileAiModalScrollLockRef.current = {
+      active: true,
+      scrollY,
+      prevHtmlOverflow: htmlEl.style.overflow || "",
+      prevHtmlOverscrollBehavior: htmlEl.style.overscrollBehavior || "",
+      prevBodyTouchAction: document.body.style.touchAction || ""
+    };
+    htmlEl.style.overflow = 'hidden';
+    htmlEl.style.overscrollBehavior = 'none';
     document.body.style.position = 'fixed';
     document.body.style.top = `-${scrollY}px`;
     document.body.style.left = '0';
     document.body.style.right = '0';
     document.body.style.width = '100%';
     document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
 
     return () => {
       if (!mobileAiModalScrollLockRef.current.active) return;
       const lockedY = Number(mobileAiModalScrollLockRef.current.scrollY) || 0;
+      const cleanupHtmlEl = document.documentElement;
       document.body.style.position = '';
       document.body.style.top = '';
       document.body.style.left = '';
       document.body.style.right = '';
       document.body.style.width = '';
       document.body.style.overflow = '';
+      document.body.style.touchAction = mobileAiModalScrollLockRef.current.prevBodyTouchAction || '';
+      cleanupHtmlEl.style.overflow = mobileAiModalScrollLockRef.current.prevHtmlOverflow || '';
+      cleanupHtmlEl.style.overscrollBehavior = mobileAiModalScrollLockRef.current.prevHtmlOverscrollBehavior || '';
       window.scrollTo({ top: lockedY, behavior: 'auto' });
-      mobileAiModalScrollLockRef.current = { active: false, scrollY: 0 };
+      mobileAiModalScrollLockRef.current = {
+        active: false,
+        scrollY: 0,
+        prevHtmlOverflow: "",
+        prevHtmlOverscrollBehavior: "",
+        prevBodyTouchAction: ""
+      };
     };
   }, [isMobile, showAIModal]);
 
