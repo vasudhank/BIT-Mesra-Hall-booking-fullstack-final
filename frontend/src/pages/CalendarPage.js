@@ -46,6 +46,10 @@ const MOBILE_SWIPE_MIN_DISTANCE_PX = 56;
 const MOBILE_SWIPE_AXIS_RATIO = 1.2;
 const MOBILE_HEADER_COLLAPSE_CONFIG = Object.freeze({
   longPressMs: 560,
+  dragStartDistancePx: 8,
+  viewportEdgePaddingPx: 2,
+  floatingButtonSizePx: 30,
+  floatingButtonZIndex: 220,
   miniCircleSize: 18,
   miniCircleIconSize: 10,
   hideXSize: 16,
@@ -1211,10 +1215,26 @@ export default function CalendarPage() {
   const [logoDay, setLogoDay] = useState(() => new Date().getDate());
   const [scheduleNowTick, setScheduleNowTick] = useState(Date.now());
   const [headerClockTick, setHeaderClockTick] = useState(Date.now());
+  const [mobileHeaderButtonPositions, setMobileHeaderButtonPositions] = useState({ menu: null, ai: null });
+  const [mobileHeaderDraggingKey, setMobileHeaderDraggingKey] = useState('');
   const [mobileHeaderHidden, setMobileHeaderHidden] = useState({ menu: false, ai: false });
   const [mobileHeaderHideTarget, setMobileHeaderHideTarget] = useState('');
+  const mobileHeaderButtonNodeRef = useRef({ menu: null, ai: null });
   const mobileHeaderLongPressTimerRef = useRef(null);
   const mobileHeaderSuppressClickRef = useRef('');
+  const mobileHeaderDragRef = useRef({
+    key: '',
+    pointerId: null,
+    active: false,
+    armed: false,
+    dragging: false,
+    startX: 0,
+    startY: 0,
+    offsetX: 0,
+    offsetY: 0,
+    width: MOBILE_HEADER_COLLAPSE_CONFIG.floatingButtonSizePx,
+    height: MOBILE_HEADER_COLLAPSE_CONFIG.floatingButtonSizePx
+  });
   const [scheduleDragTargetDateKey, setScheduleDragTargetDateKey] = useState('');
   const [monthMorePopup, setMonthMorePopup] = useState({
     open: false,
@@ -6818,15 +6838,60 @@ export default function CalendarPage() {
     const withoutYear = stripYearFromHeaderTitle(viewTitle);
     return withoutYear || viewLabels[viewType] || viewTitle;
   }, [isMobile, viewTitle, viewType]);
+  const clampMobileHeaderPosition = useCallback((rawX, rawY, width, height) => {
+    if (typeof window === 'undefined') return { x: rawX, y: rawY };
+    const safeWidth = Math.max(1, Number(width) || MOBILE_HEADER_COLLAPSE_CONFIG.floatingButtonSizePx);
+    const safeHeight = Math.max(1, Number(height) || MOBILE_HEADER_COLLAPSE_CONFIG.floatingButtonSizePx);
+    const edge = Math.max(0, Number(MOBILE_HEADER_COLLAPSE_CONFIG.viewportEdgePaddingPx) || 0);
+    const maxX = Math.max(edge, window.innerWidth - safeWidth - edge);
+    const maxY = Math.max(edge, window.innerHeight - safeHeight - edge);
+    return {
+      x: clamp(Number(rawX) || 0, edge, maxX),
+      y: clamp(Number(rawY) || 0, edge, maxY)
+    };
+  }, []);
+
+  const getMobileHeaderButtonSize = useCallback((targetKey) => {
+    const node = mobileHeaderButtonNodeRef.current?.[targetKey];
+    if (!(node instanceof Element)) {
+      const fallback = MOBILE_HEADER_COLLAPSE_CONFIG.floatingButtonSizePx;
+      return { width: fallback, height: fallback };
+    }
+    const rect = node.getBoundingClientRect();
+    const fallback = MOBILE_HEADER_COLLAPSE_CONFIG.floatingButtonSizePx;
+    return {
+      width: Math.max(1, Math.round(rect.width || fallback)),
+      height: Math.max(1, Math.round(rect.height || fallback))
+    };
+  }, []);
+
   const clearMobileHeaderLongPressTimer = useCallback(() => {
     if (!mobileHeaderLongPressTimerRef.current) return;
     window.clearTimeout(mobileHeaderLongPressTimerRef.current);
     mobileHeaderLongPressTimerRef.current = null;
   }, []);
 
+  const resetMobileHeaderDrag = useCallback(() => {
+    mobileHeaderDragRef.current = {
+      key: '',
+      pointerId: null,
+      active: false,
+      armed: false,
+      dragging: false,
+      startX: 0,
+      startY: 0,
+      offsetX: 0,
+      offsetY: 0,
+      width: MOBILE_HEADER_COLLAPSE_CONFIG.floatingButtonSizePx,
+      height: MOBILE_HEADER_COLLAPSE_CONFIG.floatingButtonSizePx
+    };
+    setMobileHeaderDraggingKey('');
+  }, []);
+
   useEffect(() => () => {
     clearMobileHeaderLongPressTimer();
-  }, [clearMobileHeaderLongPressTimer]);
+    resetMobileHeaderDrag();
+  }, [clearMobileHeaderLongPressTimer, resetMobileHeaderDrag]);
 
   useEffect(() => {
     if (isMobile) return;
@@ -6834,7 +6899,8 @@ export default function CalendarPage() {
     setMobileHeaderHideTarget('');
     mobileHeaderSuppressClickRef.current = '';
     clearMobileHeaderLongPressTimer();
-  }, [clearMobileHeaderLongPressTimer, isMobile]);
+    resetMobileHeaderDrag();
+  }, [clearMobileHeaderLongPressTimer, isMobile, resetMobileHeaderDrag]);
 
   useEffect(() => {
     if (!mobileHeaderHideTarget) return undefined;
@@ -6848,10 +6914,134 @@ export default function CalendarPage() {
     return () => document.removeEventListener('pointerdown', handlePointerDown, true);
   }, [mobileHeaderHideTarget]);
 
-  const startMobileHeaderLongPress = useCallback((targetKey) => {
+  useEffect(() => {
+    const handlePointerMove = (event) => {
+      const drag = mobileHeaderDragRef.current;
+      if (!drag.active || event.pointerId !== drag.pointerId) return;
+      if (!drag.armed) return;
+
+      const dx = event.clientX - drag.startX;
+      const dy = event.clientY - drag.startY;
+      const distance = Math.hypot(dx, dy);
+      const threshold = Math.max(3, Number(MOBILE_HEADER_COLLAPSE_CONFIG.dragStartDistancePx) || 8);
+
+      if (!drag.dragging) {
+        if (distance < threshold) return;
+        drag.dragging = true;
+        mobileHeaderSuppressClickRef.current = drag.key;
+        setMobileHeaderDraggingKey(drag.key);
+        setMobileHeaderHideTarget('');
+      }
+
+      const next = clampMobileHeaderPosition(
+        event.clientX - drag.offsetX,
+        event.clientY - drag.offsetY,
+        drag.width,
+        drag.height
+      );
+      setMobileHeaderButtonPositions((prev) => {
+        const existing = prev?.[drag.key];
+        if (existing && Math.abs(existing.x - next.x) < 0.5 && Math.abs(existing.y - next.y) < 0.5) return prev;
+        return { ...prev, [drag.key]: next };
+      });
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    const finalizeDragPointer = (event) => {
+      const drag = mobileHeaderDragRef.current;
+      if (!drag.active || event.pointerId !== drag.pointerId) return;
+      const wasDragging = drag.dragging;
+      clearMobileHeaderLongPressTimer();
+      mobileHeaderDragRef.current = {
+        key: '',
+        pointerId: null,
+        active: false,
+        armed: false,
+        dragging: false,
+        startX: 0,
+        startY: 0,
+        offsetX: 0,
+        offsetY: 0,
+        width: MOBILE_HEADER_COLLAPSE_CONFIG.floatingButtonSizePx,
+        height: MOBILE_HEADER_COLLAPSE_CONFIG.floatingButtonSizePx
+      };
+      if (wasDragging) setMobileHeaderDraggingKey('');
+    };
+
+    window.addEventListener('pointermove', handlePointerMove, true);
+    window.addEventListener('pointerup', finalizeDragPointer, true);
+    window.addEventListener('pointercancel', finalizeDragPointer, true);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove, true);
+      window.removeEventListener('pointerup', finalizeDragPointer, true);
+      window.removeEventListener('pointercancel', finalizeDragPointer, true);
+    };
+  }, [clampMobileHeaderPosition, clearMobileHeaderLongPressTimer]);
+
+  useEffect(() => {
+    if (!isMobile) return undefined;
+    const keepFloatingButtonsInViewport = () => {
+      setMobileHeaderButtonPositions((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        ['menu', 'ai'].forEach((key) => {
+          const pos = prev?.[key];
+          if (!pos) return;
+          const size = getMobileHeaderButtonSize(key);
+          const clamped = clampMobileHeaderPosition(pos.x, pos.y, size.width, size.height);
+          if (Math.abs(clamped.x - pos.x) > 0.5 || Math.abs(clamped.y - pos.y) > 0.5) {
+            next[key] = clamped;
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    };
+    window.addEventListener('resize', keepFloatingButtonsInViewport);
+    window.addEventListener('orientationchange', keepFloatingButtonsInViewport);
+    return () => {
+      window.removeEventListener('resize', keepFloatingButtonsInViewport);
+      window.removeEventListener('orientationchange', keepFloatingButtonsInViewport);
+    };
+  }, [clampMobileHeaderPosition, getMobileHeaderButtonSize, isMobile]);
+
+  const startMobileHeaderLongPress = useCallback((targetKey, event) => {
     if (!isMobile) return;
+    const pointerEvent = event;
+    if (!pointerEvent || typeof pointerEvent.pointerId === 'undefined') return;
+    const buttonEl = pointerEvent.currentTarget;
+    const rect = buttonEl instanceof Element ? buttonEl.getBoundingClientRect() : null;
+    const width = Math.max(1, Math.round(rect?.width || MOBILE_HEADER_COLLAPSE_CONFIG.floatingButtonSizePx));
+    const height = Math.max(1, Math.round(rect?.height || MOBILE_HEADER_COLLAPSE_CONFIG.floatingButtonSizePx));
+    const offsetX = Number(pointerEvent.clientX) - Number(rect?.left || 0);
+    const offsetY = Number(pointerEvent.clientY) - Number(rect?.top || 0);
+
+    mobileHeaderDragRef.current = {
+      key: targetKey,
+      pointerId: pointerEvent.pointerId,
+      active: true,
+      armed: false,
+      dragging: false,
+      startX: Number(pointerEvent.clientX) || 0,
+      startY: Number(pointerEvent.clientY) || 0,
+      offsetX: Number.isFinite(offsetX) ? offsetX : Math.round(width / 2),
+      offsetY: Number.isFinite(offsetY) ? offsetY : Math.round(height / 2),
+      width,
+      height
+    };
+
+    try {
+      buttonEl?.setPointerCapture?.(pointerEvent.pointerId);
+    } catch (_) {
+      // Pointer capture is optional on some devices.
+    }
+
     clearMobileHeaderLongPressTimer();
     mobileHeaderLongPressTimerRef.current = window.setTimeout(() => {
+      const drag = mobileHeaderDragRef.current;
+      if (!drag.active || drag.key !== targetKey) return;
+      drag.armed = true;
       mobileHeaderSuppressClickRef.current = targetKey;
       setMobileHeaderHideTarget(targetKey);
     }, Math.max(320, Number(MOBILE_HEADER_COLLAPSE_CONFIG.longPressMs) || 560));
@@ -6877,6 +7067,22 @@ export default function CalendarPage() {
     setMobileHeaderHidden((prev) => ({ ...prev, [targetKey]: false }));
     setMobileHeaderHideTarget('');
   }, []);
+
+  const setMobileHeaderButtonNode = useCallback((targetKey, node) => {
+    mobileHeaderButtonNodeRef.current = { ...mobileHeaderButtonNodeRef.current, [targetKey]: node };
+  }, []);
+
+  const getMobileStripActionStyle = useCallback((targetKey) => {
+    const pos = mobileHeaderButtonPositions?.[targetKey];
+    if (!pos || !Number.isFinite(pos?.x) || !Number.isFinite(pos?.y)) return undefined;
+    return {
+      position: 'fixed',
+      left: `${pos.x}px`,
+      top: `${pos.y}px`,
+      zIndex: MOBILE_HEADER_COLLAPSE_CONFIG.floatingButtonZIndex,
+      touchAction: 'none'
+    };
+  }, [mobileHeaderButtonPositions]);
 
   const handleMobileHeaderButtonTap = useCallback((targetKey, event, onTap) => {
     if (mobileHeaderSuppressClickRef.current === targetKey) {
@@ -7215,13 +7421,17 @@ export default function CalendarPage() {
           {!searchOpen && (
             <div className="gcal-mobile-time-strip-left">
               {!mobileHeaderHidden.menu && (
-                <div className="gcal-mobile-strip-action">
+                <div
+                  className={`gcal-mobile-strip-action${getMobileStripActionStyle('menu') ? ' is-floating' : ''}`}
+                  style={getMobileStripActionStyle('menu')}
+                >
                   <button
                     type="button"
-                    className="gcal-icon-btn"
+                    ref={(node) => setMobileHeaderButtonNode('menu', node)}
+                    className={`gcal-icon-btn${mobileHeaderDraggingKey === 'menu' ? ' is-dragging' : ''}`.trim()}
                     aria-label="Main menu"
                     onClick={(event) => handleMobileHeaderButtonTap('menu', event, toggleSidebar)}
-                    onPointerDown={() => startMobileHeaderLongPress('menu')}
+                    onPointerDown={(event) => startMobileHeaderLongPress('menu', event)}
                     onPointerUp={endMobileHeaderLongPress}
                     onPointerCancel={endMobileHeaderLongPress}
                     onPointerLeave={endMobileHeaderLongPress}
@@ -7241,13 +7451,17 @@ export default function CalendarPage() {
                 </div>
               )}
               {!mobileHeaderHidden.ai && (
-                <div className="gcal-mobile-strip-action">
+                <div
+                  className={`gcal-mobile-strip-action${getMobileStripActionStyle('ai') ? ' is-floating' : ''}`}
+                  style={getMobileStripActionStyle('ai')}
+                >
                   <button
                     type="button"
-                    className="gcal-icon-btn gcal-mobile-ai-btn"
+                    ref={(node) => setMobileHeaderButtonNode('ai', node)}
+                    className={`gcal-icon-btn gcal-mobile-ai-btn${mobileHeaderDraggingKey === 'ai' ? ' is-dragging' : ''}`.trim()}
                     aria-label="Open AI assistant"
                     onClick={(event) => handleMobileHeaderButtonTap('ai', event, openMobileAiPage)}
-                    onPointerDown={() => startMobileHeaderLongPress('ai')}
+                    onPointerDown={(event) => startMobileHeaderLongPress('ai', event)}
                     onPointerUp={endMobileHeaderLongPress}
                     onPointerCancel={endMobileHeaderLongPress}
                     onPointerLeave={endMobileHeaderLongPress}

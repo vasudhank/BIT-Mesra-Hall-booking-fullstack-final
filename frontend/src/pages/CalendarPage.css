@@ -4650,6 +4650,21 @@ al-search-result-date span,
     justify-content: center;
   }
 
+  .gcal-mobile-strip-action.is-floating {
+    z-index: 220;
+  }
+
+  .gcal-mobile-strip-action .gcal-icon-btn {
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .gcal-mobile-strip-action .gcal-icon-btn.is-dragging {
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.26);
+    transform: scale(1.04);
+  }
+
   .gcal-mobile-time-strip-left .gcal-icon-btn {
     width: 30px;
     height: 30px;
