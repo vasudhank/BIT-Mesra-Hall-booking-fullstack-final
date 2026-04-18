@@ -307,7 +307,8 @@ export default function AIChatWidget({
   immersive = false,
   showHeaderBrand = true,
   onSidebarHiddenChange = null,
-  externalRestoreSignal = 0
+  externalRestoreSignal = 0,
+  defaultSidebarHidden = false
 }) {
   const navigate = useNavigate();
   const [input, setInput] = useState("");
@@ -319,8 +320,8 @@ export default function AIChatWidget({
   const [identityReady, setIdentityReady] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(Boolean(immersive));
-  const [sidebarHidden, setSidebarHidden] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => Boolean(immersive && !defaultSidebarHidden));
+  const [sidebarHidden, setSidebarHidden] = useState(() => Boolean(defaultSidebarHidden));
   const [sidebarWidth, setSidebarWidth] = useState(null);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [isCompactLayout, setIsCompactLayout] = useState(() =>

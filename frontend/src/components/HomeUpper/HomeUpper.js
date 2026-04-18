@@ -182,7 +182,7 @@ export default function HomeUpper({
   // === MODAL STATES ===
   const [showWishModal, setShowWishModal] = useState(false);
   const [showAIModal, setShowAIModal] = useState(false);
-  const [aiPopupSidebarHidden, setAiPopupSidebarHidden] = useState(false);
+  const [aiPopupSidebarHidden, setAiPopupSidebarHidden] = useState(true);
   const [aiPopupRestoreSignal, setAiPopupRestoreSignal] = useState(0);
   const [showDateModal, setShowDateModal] = useState(false);
   const [clickedDate, setClickedDate] = useState(null);
@@ -278,7 +278,7 @@ export default function HomeUpper({
   };
 
   const openAIModal = () => {
-    setAiPopupSidebarHidden(false);
+    setAiPopupSidebarHidden(true);
     setAiPopupRestoreSignal(0);
     setShowAIModal(true);
   };
@@ -289,6 +289,7 @@ export default function HomeUpper({
   };
 
   const handlePopupSidebarRestore = () => {
+    setAiPopupSidebarHidden(false);
     setAiPopupRestoreSignal((prev) => prev + 1);
   };
 
@@ -301,7 +302,7 @@ export default function HomeUpper({
   const closeModals = () => {
     setShowWishModal(false);
     setShowAIModal(false);
-    setAiPopupSidebarHidden(false);
+    setAiPopupSidebarHidden(true);
     setAiPopupRestoreSignal(0);
     setShowDateModal(false);
     setSearchText("");
@@ -1134,6 +1135,7 @@ export default function HomeUpper({
                    showHeaderBrand={false}
                    onSidebarHiddenChange={setAiPopupSidebarHidden}
                    externalRestoreSignal={aiPopupRestoreSignal}
+                   defaultSidebarHidden
                  />
                </Suspense>
              </div>
