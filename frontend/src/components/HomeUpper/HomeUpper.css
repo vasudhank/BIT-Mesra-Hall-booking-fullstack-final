@@ -688,7 +688,7 @@ body.dark-mode .clock-scrolled .clock-separator {
   --toggle-w: 46px;
   --toggle-h: 24px;
   --toggle-icon-size: 10px;
-  width: var(--mobile-datetime-side-slot, 46px);
+  width: var(--mobile-datetime-left-slot, 46px);
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
@@ -1140,13 +1140,14 @@ body.dark-mode .mobile-menu-toggle {
   width: 100%;
   min-height: 36px;
   padding: 6px 10px;
-  --mobile-datetime-side-slot: 46px;
+  --mobile-datetime-left-slot: 46px;
+  --mobile-datetime-right-slot: var(--mobile-restore-slot-width, 46px);
   font-family: 'Inter', sans-serif;
   font-size: 0.8rem;
   font-weight: 600;
   z-index: 110;
   display: grid;
-  grid-template-columns: var(--mobile-datetime-side-slot) minmax(0, 1fr) var(--mobile-datetime-side-slot);
+  grid-template-columns: var(--mobile-datetime-left-slot) minmax(0, 1fr) var(--mobile-datetime-right-slot);
   align-items: center;
   box-sizing: border-box;
   animation: fadeIn 0.5s ease;
@@ -1169,34 +1170,37 @@ body.dark-mode .mobile-menu-toggle {
 
 .mobile-datetime-restore-slot {
   grid-column: 3;
-  width: var(--mobile-datetime-side-slot, 46px);
-  min-width: var(--mobile-datetime-side-slot, 46px);
+  width: var(--mobile-datetime-right-slot, 46px);
+  min-width: var(--mobile-datetime-right-slot, 46px);
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 4px;
+  gap: var(--mobile-restore-dot-gap, 4px);
+  transform: translate(var(--mobile-restore-slot-offset-x, 0px), var(--mobile-restore-slot-offset-y, 0px));
 }
 
 .mobile-datetime-restore-dot {
-  width: 18px;
-  height: 18px;
-  min-width: 18px;
+  width: var(--mobile-restore-dot-size, 18px);
+  height: var(--mobile-restore-dot-size, 18px);
+  min-width: var(--mobile-restore-dot-size, 18px);
   border-radius: 50%;
-  border: 1px solid #cdd2d9;
-  background: linear-gradient(180deg, #f8fafc 0%, #e9eef4 100%);
-  color: #4b5563;
+  border: none;
+  background: transparent;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   padding: 0;
   line-height: 1;
+  font-size: 0;
+}
+
+.mobile-datetime-restore-dot.menu-dot {
+  background: #0f172a;
 }
 
 .mobile-datetime-restore-dot.ai-dot {
-  background: linear-gradient(145deg, #2f6dff 0%, #35a7ff 72%);
-  border-color: rgba(45, 103, 226, 0.42);
-  color: #ffffff;
+  background: linear-gradient(135deg, #ff2e5b 0%, #8418d1 100%);
 }
 
 /* Theme Colors for Date-Time Bar */
@@ -1218,16 +1222,12 @@ body.dark-mode .mobile-datetime-bar.mobile-datetime-bar--expanded {
   background-color: #000000;
 }
 
-body.dark-mode .mobile-datetime-restore-dot {
-  border-color: rgba(148, 163, 184, 0.52);
-  background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
-  color: #dbe2ec;
+body.dark-mode .mobile-datetime-restore-dot.menu-dot {
+  background: #ffffff;
 }
 
 body.dark-mode .mobile-datetime-restore-dot.ai-dot {
-  background: linear-gradient(145deg, #2563eb 0%, #0ea5e9 72%);
-  border-color: rgba(96, 165, 250, 0.62);
-  color: #ffffff;
+  background: linear-gradient(135deg, #ff2e5b 0%, #8418d1 100%);
 }
 
 body.dark-mode .mobile-floating-hide-btn {

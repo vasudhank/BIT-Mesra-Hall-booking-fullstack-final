@@ -42,6 +42,14 @@ const MOBILE_FLOATING_BUTTON_DRAG_CONFIG = Object.freeze({
   viewportEdgePaddingPx: 4,
   defaultButtonSizePx: 50
 });
+const MOBILE_DATETIME_RESTORE_DOT_CONFIG = Object.freeze({
+  // Manual tuning for collapsed-circle controls inside the mobile datetime bar.
+  sizePx: 14,
+  slotWidthPx: 46,
+  gapPx: 4,
+  offsetXPx: 0,
+  offsetYPx: 0
+});
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
@@ -1180,6 +1188,16 @@ export default function HomeUpper({
     selectAllContactsRef.current.indeterminate = isPartiallyVisibleContactsSelected;
   }, [isPartiallyVisibleContactsSelected, isAllVisibleContactsSelected, visibleContactKeys.length]);
 
+  const mobileDateTimeBarStyle = isMobile
+    ? {
+      "--mobile-restore-dot-size": `${MOBILE_DATETIME_RESTORE_DOT_CONFIG.sizePx}px`,
+      "--mobile-restore-slot-width": `${MOBILE_DATETIME_RESTORE_DOT_CONFIG.slotWidthPx}px`,
+      "--mobile-restore-dot-gap": `${MOBILE_DATETIME_RESTORE_DOT_CONFIG.gapPx}px`,
+      "--mobile-restore-slot-offset-x": `${MOBILE_DATETIME_RESTORE_DOT_CONFIG.offsetXPx}px`,
+      "--mobile-restore-slot-offset-y": `${MOBILE_DATETIME_RESTORE_DOT_CONFIG.offsetYPx}px`
+    }
+    : undefined;
+
   /* ================= RENDER ================= */
   return (
     <>
@@ -1282,7 +1300,7 @@ export default function HomeUpper({
 
       {/* 3. Mobile Date Time Bar (Fixed Top) */}
       {isMobile && (
-        <div className="mobile-datetime-bar mobile-datetime-bar--expanded">
+        <div className="mobile-datetime-bar mobile-datetime-bar--expanded" style={mobileDateTimeBarStyle}>
           <ThemeButton
             className="mobile-toggle-in-bar"
             lightMode={lightMode}
@@ -1296,9 +1314,7 @@ export default function HomeUpper({
                 className="mobile-datetime-restore-dot menu-dot"
                 aria-label="Restore menu button"
                 onClick={(event) => restoreMobileFloatingButton('menu', event)}
-              >
-                <MenuIcon style={{ fontSize: '0.95rem' }} />
-              </button>
+              />
             )}
             {mobileFloatingHidden.ai && (
               <button
@@ -1306,9 +1322,7 @@ export default function HomeUpper({
                 className="mobile-datetime-restore-dot ai-dot"
                 aria-label="Restore AI button"
                 onClick={(event) => restoreMobileFloatingButton('ai', event)}
-              >
-                <AutoAwesomeIcon style={{ fontSize: '0.82rem' }} />
-              </button>
+              />
             )}
           </div>
         </div>
