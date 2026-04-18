@@ -1441,7 +1441,20 @@ body.dark-mode .mobile-floating-hide-btn {
 }
 
 @media (max-width: 400px) {
-  .hero-content h1 { font-size: 2.8rem; }
+  .hero-content-mobile { align-items: flex-start; }
+  .hero-content h1 {
+    font-size: 3.2rem;
+    text-align: left;
+    align-self: flex-start;
+    padding-top: 22vh;
+    line-height: 1.02;
+  }
+  .hero-content h1 .hero-title-primary,
+  .hero-content h1 .hero-title-secondary {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
   .hero-content h1 .hero-title-word + .hero-title-word {
     margin-left: 0;
   }
@@ -1450,7 +1463,8 @@ body.dark-mode .mobile-floating-hide-btn {
     display: block;
   }
   .hero-content h1 .hero-title-secondary {
-    font-size: 2rem;
+    margin-top: 8px;
+    font-size: 2.35rem;
   }
   .mobile-wish-btn { top: 80px; font-size: 0.8rem; padding: 8px 14px; }
   .mobile-floating-action.menu-action { top: 80px; }
