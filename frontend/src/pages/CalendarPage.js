@@ -4386,6 +4386,9 @@ export default function CalendarPage() {
 
     const handleTouchMove = (ev) => {
       if (!swipeState.active) return;
+      if (viewType === 'dayGridMonth' && ev.cancelable) {
+        ev.preventDefault();
+      }
       const touch = ev.touches?.[0];
       if (!touch) return;
       swipeState.lastX = touch.clientX;
@@ -4417,7 +4420,7 @@ export default function CalendarPage() {
       resetSwipeState();
     };
 
-    const listenerOptions = { passive: true };
+    const listenerOptions = viewType === 'dayGridMonth' ? { passive: false } : { passive: true };
     calendarCardEl.addEventListener('touchstart', handleTouchStart, listenerOptions);
     calendarCardEl.addEventListener('touchmove', handleTouchMove, listenerOptions);
     calendarCardEl.addEventListener('touchend', handleTouchEnd, listenerOptions);
