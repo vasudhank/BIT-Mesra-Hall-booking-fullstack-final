@@ -797,6 +797,97 @@ body.dark-mode .sidebar-menu-icon-btn {
   border-color: rgba(37, 99, 235, 0.34);
 }
 
+.ai-agent-panel {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-agent-badges,
+.ai-review-card-meta,
+.ai-agent-trace {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ai-agent-badge,
+.ai-agent-trace span {
+  border: 1px solid var(--gemini-border);
+  background: var(--gemini-surface);
+  color: var(--gemini-muted-text);
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 0.69rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.ai-agent-badge.warning {
+  color: #b45309;
+  border-color: rgba(245, 158, 11, 0.34);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.ai-agent-summary {
+  font-size: 0.76rem;
+  color: var(--gemini-muted-text);
+  line-height: 1.5;
+}
+
+.ai-review-card,
+.ai-agent-call {
+  border: 1px solid var(--gemini-border);
+  background: var(--gemini-muted-surface);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.ai-review-card.autonomous {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.ai-review-card-head,
+.ai-agent-call-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ai-review-card-head strong,
+.ai-agent-call-head strong {
+  font-size: 0.79rem;
+  color: var(--gemini-user-text);
+}
+
+.ai-review-card-head span,
+.ai-agent-call-head span {
+  font-size: 0.68rem;
+  color: var(--gemini-muted-text);
+  font-weight: 700;
+}
+
+.ai-review-card p,
+.ai-agent-call p {
+  margin: 6px 0 0;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: var(--gemini-ai-text);
+}
+
+.ai-review-card-meta span {
+  font-size: 0.68rem;
+  color: var(--gemini-muted-text);
+}
+
+.ai-agent-call-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .message-search-mark {
   background: #fde68a;
   color: inherit;

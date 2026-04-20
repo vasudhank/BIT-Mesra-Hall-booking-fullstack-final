@@ -212,6 +212,9 @@ export default function FeedbackPage({ mode = 'public' }) {
                 <Link to="/developer/account" className="dev-action-btn">
                   Accounts
                 </Link>
+                <Link to="/developer/monitoring" className="dev-action-btn">
+                  Monitoring
+                </Link>
                 <button className="dev-action-btn" onClick={logoutDeveloper}>
                   Logout
                 </button>

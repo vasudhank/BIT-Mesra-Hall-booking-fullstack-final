@@ -9,12 +9,24 @@ const { generateText, cleanResponseText } = require('../services/llmGatewayServi
 const { getKnowledgeContextForPrompt } = require('../services/supportKnowledgeService');
 const { runSupportWorkflow } = require('../services/supportWorkflowService');
 const { beginAiTimer } = require('../services/metricsService');
+const {
+  getAgentMemoryContext,
+  persistAgentTurn,
+  extractReplyTextForMemory
+} = require('../services/agentMemoryService');
+const { captureException } = require('../services/observabilityService');
 
 const MAX_ATTACHMENT_COUNT = 4;
 const MAX_ATTACHMENT_BYTES = 6 * 1024 * 1024;
 const MAX_ATTACHMENT_TEXT_CHARS = 7000;
 const MAX_TOTAL_ATTACHMENT_CHARS = 18000;
 const MAX_ATTACHMENT_IMAGE_CHARS = 2_000_000;
+
+const enrichProjectContextWithMemory = (projectContext, memoryBlock) => [
+  String(projectContext || '').trim(),
+  'Persistent agent memory:',
+  String(memoryBlock || 'No persistent memory available.').trim()
+].filter(Boolean).join('\n\n');
 
 const INTENT_EMOJI = {
   greeting: ['👋', '🙂', '✨'],
@@ -341,14 +353,18 @@ const hasConstrainedFuzzyKeyword = (
 const ACTION_TOOLCHAIN = {
   BOOK_REQUEST: ['intent-parser', 'payload-normalizer', 'booking-request-executor'],
   ADMIN_EXECUTE: ['intent-parser', 'role-policy-check', 'admin-booking-executor'],
+  VACATE_HALL: ['intent-parser', 'role-policy-check', 'booking-lookup-tool', 'hall-vacate-executor'],
   SHOW_HALL_STATUS: ['intent-parser', 'availability-query-tool'],
   LIST_BOOKING_REQUESTS: ['intent-parser', 'conflict-analyzer', 'pending-list-query-tool'],
-  EXPORT_SCHEDULE: ['intent-parser', 'schedule-query-tool', 'artifact-exporter']
+  EXPORT_SCHEDULE: ['intent-parser', 'schedule-query-tool', 'artifact-exporter'],
+  SEND_SLACK_MESSAGE: ['planner-agent', 'tool-coordinator', 'human-review-gate', 'slack-executor'],
+  SEND_WHATSAPP_MESSAGE: ['planner-agent', 'tool-coordinator', 'human-review-gate', 'whatsapp-executor'],
+  SYNC_CRM_RECORD: ['planner-agent', 'tool-coordinator', 'human-review-gate', 'crm-sync-executor']
 };
 
 const buildReplyMeta = (type, extra = {}) => ({
   orchestrationMode: type === 'ACTION' ? 'AGENTIC' : 'CONVERSATIONAL',
-  orchestrationVersion: 'hybrid-router-v2',
+  orchestrationVersion: 'hybrid-router-v3',
   ...extra
 });
 
@@ -631,8 +647,14 @@ const bookingMissingReply = (missingList = []) => {
   );
 };
 
+const vacateMissingReply = () =>
+  chatReply('I can vacate a booked hall, but I need the hall name and date. Example: vacate hall23 on 2026-04-20.');
+
 const hasHallReference = (lower, tokens) => {
-  const explicit = /\b(hall|halls|auditorium|seminar|room|haal|hallon)\b/i.test(lower) || /(हॉल|हाल)/.test(lower);
+  const explicit =
+    /\b(hall|halls|auditorium|seminar|room|haal|hallon)\b/i.test(lower) ||
+    /\bhall\s*[-:]?\s*[a-z0-9]+\b/i.test(lower) ||
+    /(हॉल|हाल)/.test(lower);
   if (explicit) return true;
 
   const longTokens = (tokens || []).filter((token) => String(token || '').length >= 4);
@@ -856,6 +878,35 @@ const hasAdminRejectVerb = (lower, tokens) => {
   return directReject || fuzzyReject;
 };
 
+const hasVacateVerb = (lower, tokens) => {
+  const direct = /\b(vacate|clear|remove|free\s+up|release|unbook|cancel\s+booking|cancel\s+the\s+booking)\b/i.test(lower);
+  const actionTokens = (tokens || []).filter((token) =>
+    !['vacant', 'vacancy', 'unbooked', 'available', 'availability', 'free'].includes(String(token || '').toLowerCase())
+  );
+  const fuzzy = hasConstrainedFuzzyKeyword(actionTokens, ['vacate', 'clear', 'remove', 'release', 'unbook'], {
+    maxDistance: 2,
+    requireSameFirstChar: true,
+    maxLengthDelta: 2
+  });
+  return direct || fuzzy;
+};
+
+const inferVacateHallIntent = (message, lower, tokens, allHalls) => {
+  if (!hasVacateVerb(lower, tokens)) return null;
+  if (!hasHallReference(lower, tokens)) return null;
+  if (hasReadOnlyIntentSignal(lower, tokens) && !/\b(vacate|clear|remove|free\s+up|release|unbook|cancel\s+booking|cancel\s+the\s+booking)\b/i.test(lower)) {
+    return null;
+  }
+
+  const targetHall = detectHallFromMessage(message, allHalls);
+  const date = extractDateFromMessage(message);
+
+  return {
+    targetHall,
+    date: normalizeDateInput(date) || date || null
+  };
+};
+
 const isLikelyBookingIntent = (lower, tokens) => {
   const directBookingVerb = /\b(book|reserve|request|schedule|allot|buk|bookk)\b/i.test(lower) || /(बुक|आरक्षित|शेड्यूल)/.test(lower);
   const longTokens = (tokens || []).filter((token) => String(token || '').length >= 4);
@@ -868,8 +919,9 @@ const isLikelyBookingIntent = (lower, tokens) => {
   const hallWord = hasHallReference(lower, tokens);
   const adminWorkflowVerb = hasAdminApproveVerb(lower, tokens) || hasAdminRejectVerb(lower, tokens);
   const pureStatusQuestion = hasHallStatusSignal(lower, tokens) && !directBookingVerb;
+  const readOnlyRequestQuery = /\brequests?\b/i.test(lower) && hasReadOnlyIntentSignal(lower, tokens);
 
-  return bookingVerb && hallWord && !adminWorkflowVerb && !pureStatusQuestion;
+  return bookingVerb && hallWord && !adminWorkflowVerb && !pureStatusQuestion && !readOnlyRequestQuery;
 };
 
 const inferAdminSubActionFromText = (lower, tokens) => {
@@ -1086,6 +1138,53 @@ Answer:
     images: Array.isArray(attachmentContext?.images) ? attachmentContext.images : []
   });
   return cleanLLMText(result.text);
+};
+
+const cleanOfflineTopic = (value) =>
+  String(value || '')
+    .replace(/[?.!]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 120);
+
+const extractGeneralKnowledgeTopic = (message) => {
+  const raw = String(message || '').trim();
+  const patterns = [
+    /\b(?:tell|write|describe|explain|give)\s+(?:me\s+)?(?:an?\s+)?(?:around\s+)?(?:\d{1,4}\s+words?\s+)?(?:for|about|on)\s+(.+)$/i,
+    /\b(?:who|what)\s+is\s+(.+)$/i,
+    /\b(?:biography|overview|note|paragraph)\s+(?:of|on|about)\s+(.+)$/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = raw.match(pattern);
+    if (match && match[1]) return cleanOfflineTopic(match[1]);
+  }
+
+  return '';
+};
+
+const trimToApproxWords = (text, targetWords) => {
+  const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+  if (!targetWords || words.length <= targetWords + 12) return words.join(' ');
+  return `${words.slice(0, Math.max(20, targetWords)).join(' ')}.`;
+};
+
+const buildOfflineGeneralChatFallback = ({ message, detailReq, preferredLanguage = 'auto' } = {}) => {
+  const topic = extractGeneralKnowledgeTopic(message);
+  if (!topic) return '';
+
+  const lowerTopic = topic.toLowerCase();
+  const targetWords = detailReq?.requestedWords || (detailReq?.needsDetailed ? 120 : 80);
+  const responseLanguage = detectResponseLanguage(message, preferredLanguage);
+
+  if (lowerTopic.includes('virat') && lowerTopic.includes('kohli')) {
+    const english = 'Virat Kohli is one of India\'s most influential modern cricketers, known for his aggressive batting, elite fitness, and intense competitiveness. He has captained India across formats and built a reputation for chasing targets under pressure. Kohli is especially admired for his consistency in ODI cricket, his sharp running between wickets, and his ability to turn difficult matches with controlled aggression. Beyond statistics, he changed the fitness culture of Indian cricket and became a global sporting icon. His journey from a passionate Delhi youngster to an international great reflects discipline, confidence, and a relentless hunger to improve.';
+    const hindi = 'Virat Kohli Bharat ke sabse prabhavshali modern cricketers mein se ek hain. Unki batting aggression, fitness aur pressure mein chase karne ki ability ke liye mashhoor hai. Kohli ne India ko kai formats mein captain kiya aur ODI cricket mein remarkable consistency dikhayi. Unki running between wickets, match awareness aur discipline ne Indian cricket ki fitness culture ko bhi badla. Delhi ke passionate youngster se global cricket icon banne tak ka safar hard work, confidence aur continuous improvement ka strong example hai.';
+    return trimToApproxWords(responseLanguage === 'hi' ? hindi : english, targetWords);
+  }
+
+  const generic = `${topic} is a topic I can discuss conversationally. At a high level, it can be understood by looking at its background, key people or ideas, real-world impact, and why it matters today. If you want a stronger answer, ask for a specific angle such as history, advantages, biography, comparison, or current relevance.`;
+  return trimToApproxWords(generic, targetWords);
 };
 
 const hasExtractableAttachmentText = (attachmentContext) => {
@@ -1352,7 +1451,7 @@ JSON schema:
 {
   "type": "CHAT" | "ACTION",
   "message": "string or null",
-  "action": "BOOK_REQUEST" | "ADMIN_EXECUTE" | "SHOW_HALL_STATUS" | "LIST_BOOKING_REQUESTS" | "EXPORT_SCHEDULE" | null,
+  "action": "BOOK_REQUEST" | "ADMIN_EXECUTE" | "VACATE_HALL" | "SHOW_HALL_STATUS" | "LIST_BOOKING_REQUESTS" | "EXPORT_SCHEDULE" | null,
   "payload": object,
   "reply": "string or null"
 }
@@ -1368,6 +1467,11 @@ Action guidance:
   {
     "subAction": "APPROVE_SAFE" | "APPROVE_ALL" | "REJECT_CONFLICTS" | "REJECT_ALL" | "APPROVE_SPECIFIC" | "REJECT_SPECIFIC",
     "targetHall": "Hall Name or null"
+  }
+- VACATE_HALL payload format:
+  {
+    "targetHall": "Hall Name",
+    "date": "YYYY-MM-DD or null"
   }
 - SHOW_HALL_STATUS payload format:
   {
@@ -1396,6 +1500,9 @@ Response: {"type":"ACTION","message":null,"action":"BOOK_REQUEST","payload":{"re
 
 User: "aproove all non cliflicting bookings"
 Response: {"type":"ACTION","message":null,"action":"ADMIN_EXECUTE","payload":{"subAction":"APPROVE_SAFE","targetHall":null},"reply":"Approving all non-conflicting pending bookings."}
+
+User: "vacate hall23 for 20 april"
+Response: {"type":"ACTION","message":null,"action":"VACATE_HALL","payload":{"targetHall":"hall23","date":"2026-04-20"},"reply":"Checking and vacating that booked hall if it exists."}
 
 User: "show all conflicting and non conflicting booking requests"
 Response: {"type":"ACTION","message":null,"action":"LIST_BOOKING_REQUESTS","payload":{"filter":"ALL","date":null,"targetHall":null},"reply":"Listing pending booking requests."}
@@ -1486,12 +1593,15 @@ router.post('/chat', async (req, res) => {
 
     const history = sanitizeChatHistory(req.body?.history);
     const preferredLanguage = normalizeLanguagePreference(req.body?.language);
+    const userRole = req.isAuthenticated && req.isAuthenticated()
+      ? String(req.user?.type || '').toUpperCase()
+      : 'GUEST';
     const historyQueryText = history
       .slice(-6)
       .map((entry) => `${entry.role}: ${entry.text}`)
       .join('\n');
 
-    const [attachmentContext, projectContext, halls, knowledgeBundle] = await Promise.all([
+    const [attachmentContext, projectContextBase, halls, knowledgeBundle, agentMemoryContext] = await Promise.all([
       buildAttachmentContext(req.body?.attachments || []),
       getProjectSupportContext(),
       Hall.find({}, 'name'),
@@ -1499,14 +1609,45 @@ router.post('/chat', async (req, res) => {
         query: `${message}\n${historyQueryText}`,
         maxFaq: 5,
         maxNotices: 3
+      }),
+      getAgentMemoryContext({
+        req,
+        message,
+        history,
+        userRole,
+        threadId: req.body?.threadId,
+        accountKey: req.body?.accountKey,
+        channel: 'http_chat'
       })
     ]);
 
     const knowledgeContext = String(knowledgeBundle?.block || 'No retrieval snippets available.').trim();
+    const projectContext = enrichProjectContextWithMemory(projectContextBase, agentMemoryContext?.block);
 
-    const userRole = req.isAuthenticated && req.isAuthenticated()
-      ? String(req.user?.type || '').toUpperCase()
-      : 'GUEST';
+    const originalJson = res.json.bind(res);
+    let memoryPersistQueued = false;
+    res.json = (body) => {
+      if (!memoryPersistQueued) {
+        memoryPersistQueued = true;
+        const reply = body?.reply && typeof body.reply === 'object' ? body.reply : null;
+        persistAgentTurn({
+          context: agentMemoryContext,
+          userMessage: message,
+          assistantReply: extractReplyTextForMemory(body),
+          replyType: reply?.type || 'CHAT',
+          action: reply?.action || null,
+          status: res.statusCode >= 400 || body?.error ? 'ERROR' : 'OK',
+          metadata: {
+            userRole,
+            channel: 'http_chat',
+            replyMeta: reply?.meta || null
+          }
+        }).catch((memoryErr) => {
+          captureException(memoryErr, { area: 'ai_chat_memory_persist' });
+        });
+      }
+      return originalJson(body);
+    };
 
     const hallNames = halls.map((h) => h.name);
 
@@ -1528,15 +1669,41 @@ router.post('/chat', async (req, res) => {
       });
     }
 
+    const vacateHallIntent = inferVacateHallIntent(message, lower, tokens, halls);
+    if (vacateHallIntent) {
+      if (userRole !== 'ADMIN') {
+        return res.json({
+          reply: chatReply('Vacating a booked hall requires admin access. Please log in as admin first.')
+        });
+      }
+
+      if (!vacateHallIntent.targetHall) {
+        return res.json({ reply: vacateMissingReply() });
+      }
+
+      return res.json({
+        reply: actionReply(
+          'VACATE_HALL',
+          {
+            targetHall: vacateHallIntent.targetHall,
+            date: vacateHallIntent.date || null
+          },
+          vacateHallIntent.date
+            ? `Checking ${vacateHallIntent.targetHall} on ${vacateHallIntent.date} and vacating matching booking(s).`
+            : `Checking current bookings in ${vacateHallIntent.targetHall} and vacating matching booking(s).`
+        )
+      });
+    }
+
     const strongBookingVerb = /\b(book|reserve|request|schedule|allot|buk|bookk)\b/i.test(lower) || /(बुक|आरक्षित|शेड्यूल)/.test(lower);
     const hallMentioned = lower.includes('hall') || /(हॉल|हाल)/.test(lower) || Boolean(detectHallFromMessage(message, halls));
     if (strongBookingVerb && hallMentioned) {
       const built = buildBookingRequestFromMessage(message, halls);
 
       if (built.request && built.missing.length === 0) {
-        if (userRole !== 'DEPARTMENT') {
+        if (userRole !== 'DEPARTMENT' && userRole !== 'ADMIN') {
           return res.json({
-            reply: chatReply('To place a hall booking request, please log in as faculty/department first.')
+            reply: chatReply('To book a hall with AI, please log in as admin or faculty/department first.')
           });
         }
 
@@ -1551,9 +1718,9 @@ router.post('/chat', async (req, res) => {
     }
 
     if (isLikelyBookingIntent(lower, tokens)) {
-      if (userRole !== 'DEPARTMENT') {
+      if (userRole !== 'DEPARTMENT' && userRole !== 'ADMIN') {
         return res.json({
-          reply: chatReply('To place a hall booking request, please log in as faculty/department first.')
+          reply: chatReply('To book a hall with AI, please log in as admin or faculty/department first.')
         });
       }
 
@@ -1713,9 +1880,9 @@ router.post('/chat', async (req, res) => {
       console.error('AI model error:', modelErr.message || modelErr);
 
       if (isLikelyBookingIntent(lower, tokens)) {
-        if (userRole !== 'DEPARTMENT') {
+        if (userRole !== 'DEPARTMENT' && userRole !== 'ADMIN') {
           return res.json({
-            reply: chatReply('To place a hall booking request, please log in as faculty/department first.')
+            reply: chatReply('To book a hall with AI, please log in as admin or faculty/department first.')
           });
         }
 
@@ -1732,6 +1899,17 @@ router.post('/chat', async (req, res) => {
       const quickFallback = getQuickGeneralReply(message);
       if (quickFallback) {
         return res.json({ reply: chatReply(quickFallback) });
+      }
+
+      const offlineFallback = buildOfflineGeneralChatFallback({
+        message,
+        detailReq,
+        preferredLanguage
+      });
+      if (offlineFallback) {
+        return res.json({
+          reply: chatReply(offlineFallback, 'neutral', { fallback: 'offline_general_knowledge' })
+        });
       }
 
       try {
@@ -1754,7 +1932,7 @@ router.post('/chat', async (req, res) => {
       }
 
       return res.json({
-        reply: chatReply('I can chat and help with booking workflows. Please try again with clear details.')
+        reply: chatReply('I can chat and help with booking workflows. Please try again with a little more detail.')
       });
     }
 
@@ -1780,14 +1958,39 @@ router.post('/chat', async (req, res) => {
             userRole,
             preferredLanguage,
             history,
-            projectContext
+            projectContext,
+            memoryContext: agentMemoryContext?.block || '',
+            ownerKey: agentMemoryContext?.ownerKey || '',
+            threadId: agentMemoryContext?.threadId || ''
           });
 
           if (workflow?.answer) {
             messageText = workflow.answer;
           }
           if (workflow?.meta) {
-            chatMeta = { ...chatMeta, agentGraph: workflow.meta };
+            if (workflow.meta.actionIntent && !workflow.meta.reviewTask) {
+              const workflowActionMeta = {
+                agentWorkflow: workflow.meta
+              };
+              if (Array.isArray(workflow.meta.toolCalls)) {
+                workflowActionMeta.plannedTools = workflow.meta.toolCalls.map((item) => item.name).filter(Boolean);
+              }
+
+              return res.json({
+                reply: actionReply(
+                  workflow.meta.actionIntent.action,
+                  workflow.meta.actionIntent.payload || {},
+                  workflow.meta.actionIntent.reply || workflow.answer || 'Prepared action for execution.',
+                  workflowActionMeta
+                )
+              });
+            }
+
+            chatMeta = {
+              ...chatMeta,
+              agentWorkflow: workflow.meta,
+              agentGraph: workflow.meta
+            };
           }
         } catch (graphErr) {
           console.error('Agent graph fallback error:', graphErr.message || graphErr);
@@ -1850,8 +2053,19 @@ router.post('/chat', async (req, res) => {
         }
       }
 
+      if (!messageText) {
+        messageText = buildOfflineGeneralChatFallback({
+          message,
+          detailReq,
+          preferredLanguage
+        });
+        if (messageText) {
+          chatMeta = { ...chatMeta, fallback: 'offline_general_knowledge' };
+        }
+      }
+
       return res.json({
-        reply: chatReply(messageText || 'I can help with chat, booking requests, and admin booking workflows.', 'neutral', chatMeta)
+        reply: chatReply(messageText || 'I can help with normal conversation, booking requests, hall availability, admin actions, and schedule exports. Please share the exact thing you want to do.', 'neutral', chatMeta)
       });
     }
 
@@ -1903,9 +2117,9 @@ router.post('/chat', async (req, res) => {
     }
 
     if (action === 'BOOK_REQUEST') {
-      if (userRole !== 'DEPARTMENT') {
+      if (userRole !== 'DEPARTMENT' && userRole !== 'ADMIN') {
         return res.json({
-          reply: chatReply('To place a hall booking request, please log in as faculty/department first.')
+          reply: chatReply('To book a hall with AI, please log in as admin or faculty/department first.')
         });
       }
 
@@ -1919,6 +2133,33 @@ router.post('/chat', async (req, res) => {
           'BOOK_REQUEST',
           { requests: ensured.requests },
           reply || `Sending ${ensured.requests.length} booking request(s) to admin for approval.`
+        )
+      });
+    }
+
+    if (action === 'VACATE_HALL') {
+      if (userRole !== 'ADMIN') {
+        return res.json({
+          reply: chatReply('Vacating a booked hall requires admin access. Please log in as admin first.')
+        });
+      }
+
+      const targetHall = fixHallName(payload.targetHall || detectHallFromMessage(message, halls), halls);
+      const date = normalizeDateInput(payload.date || extractDateFromMessage(message));
+      if (!targetHall) {
+        return res.json({ reply: vacateMissingReply() });
+      }
+
+      return res.json({
+        reply: actionReply(
+          'VACATE_HALL',
+          {
+            targetHall,
+            date: date || null
+          },
+          date
+            ? `Checking ${targetHall} on ${date} and vacating matching booking(s).`
+            : `Checking current bookings in ${targetHall} and vacating matching booking(s).`
         )
       });
     }
@@ -2032,6 +2273,17 @@ router.post('/chat', async (req, res) => {
       }
     } catch (plainErr) {
       console.error('General chat unknown-action fallback error:', plainErr.message || plainErr);
+    }
+
+    const offlineFallback = buildOfflineGeneralChatFallback({
+      message,
+      detailReq,
+      preferredLanguage
+    });
+    if (offlineFallback) {
+      return res.json({
+        reply: chatReply(offlineFallback, 'neutral', { fallback: 'offline_general_knowledge' })
+      });
     }
 
     return res.json({

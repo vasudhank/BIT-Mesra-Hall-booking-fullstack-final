@@ -268,6 +268,32 @@ body.dark-mode .developer-otp-btn {
   color: #ffffff;
 }
 
+.developer-monitoring-link-btn {
+  margin-top: 14px !important;
+  min-height: 46px !important;
+  border-radius: 18px !important;
+  color: #07111f !important;
+  background: rgba(255, 255, 255, 0.28) !important;
+  border: 1px solid rgba(255, 255, 255, 0.42) !important;
+  font-size: 0.88rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.02em !important;
+  text-transform: none !important;
+  white-space: nowrap !important;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease !important;
+}
+
+.developer-monitoring-link-btn:hover {
+  transform: translateY(-3px);
+  border-color: rgba(56, 189, 248, 0.78) !important;
+  box-shadow: 0 16px 32px rgba(8, 47, 73, 0.2);
+}
+
+body.dark-mode .developer-monitoring-link-btn {
+  color: #ffffff !important;
+  background: rgba(15, 23, 42, 0.44) !important;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

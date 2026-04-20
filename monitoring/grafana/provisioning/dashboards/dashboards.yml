@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: BIT Booking Observability
+    orgId: 1
+    folder: BIT Booking
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

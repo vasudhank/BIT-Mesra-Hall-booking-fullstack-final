@@ -1,0 +1,51 @@
+groups:
+  - name: bit-booking-ai-production-alerts
+    rules:
+      - alert: BitBookingBackendDown
+        expr: up{job="bit-booking-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "BIT Booking backend is down"
+          description: "Prometheus cannot scrape the backend metrics endpoint."
+
+      - alert: BitBookingHighAiErrorRate
+        expr: |
+          sum(rate(bit_booking_ai_requests_total{status="error"}[5m]))
+          /
+          clamp_min(sum(rate(bit_booking_ai_requests_total[5m])), 1)
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI error rate is above 5%"
+          description: "Agent/chat/action requests are failing above the configured production threshold."
+
+      - alert: BitBookingLlmProviderFailures
+        expr: sum(rate(bit_booking_llm_provider_calls_total{status="error"}[5m])) > 0
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM provider calls are failing"
+          description: "Check OpenAI/Anthropic/Ollama credentials, network connectivity, and rate limits."
+
+      - alert: BitBookingAgentGraphNodeFailures
+        expr: sum(rate(bit_booking_agent_graph_node_executions_total{status="error"}[5m])) > 0
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Agent graph node failures detected"
+          description: "Inspect strategist/retriever/responder/critic traces and fallback behavior."
+
+      - alert: BitBookingAgentMemoryFailures
+        expr: sum(rate(bit_booking_agent_memory_operations_total{status="error"}[5m])) > 0
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Persistent agent memory operation failures detected"
+          description: "Check MongoDB readiness, memory indexes, and vector-store configuration."

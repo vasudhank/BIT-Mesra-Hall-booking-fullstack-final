@@ -1,4 +1,6 @@
 const fetch = require('node-fetch');
+const { observeLlmProviderCall } = require('./metricsService');
+const { captureException, withDatadogSpan } = require('./observabilityService');
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434/api/generate';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'phi3';
@@ -12,6 +14,56 @@ const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-latest
 
 const DEFAULT_TIMEOUT_MS = Math.max(Number(process.env.AI_LLM_TIMEOUT_MS || 25000), 3000);
 const DEFAULT_MAX_TOKENS = Math.max(Number(process.env.AI_LLM_DEFAULT_MAX_TOKENS || 900), 64);
+
+const providerPresentation = (provider) => {
+  if (provider === 'ollama') {
+    return {
+      id: 'ollama',
+      label: 'Ollama',
+      vendor: 'Local model runtime',
+      delivery: 'Runs on this machine or LAN'
+    };
+  }
+
+  if (provider === 'openai') {
+    return {
+      id: 'openai',
+      label: 'OpenAI',
+      vendor: 'OpenAI',
+      delivery: 'Hosted API'
+    };
+  }
+
+  if (provider === 'anthropic') {
+    return {
+      id: 'anthropic',
+      label: 'Claude',
+      vendor: 'Anthropic',
+      delivery: 'Hosted API'
+    };
+  }
+
+  return {
+    id: 'unknown',
+    label: 'Unknown',
+    vendor: 'Unknown',
+    delivery: 'Unknown'
+  };
+};
+
+const resolveProviderModel = (provider) => {
+  if (provider === 'ollama') return OLLAMA_MODEL;
+  if (provider === 'openai') return OPENAI_MODEL;
+  if (provider === 'anthropic') return ANTHROPIC_MODEL;
+  return '';
+};
+
+const isProviderConfigured = (provider) => {
+  if (provider === 'ollama') return Boolean(String(OLLAMA_URL || '').trim());
+  if (provider === 'openai') return Boolean(String(process.env.OPENAI_API_KEY || '').trim());
+  if (provider === 'anthropic') return Boolean(String(process.env.ANTHROPIC_API_KEY || '').trim());
+  return false;
+};
 
 const normalizeProvider = (providerLike) => {
   const raw = String(providerLike || '').trim().toLowerCase();
@@ -289,24 +341,63 @@ const cleanResponseText = (text) =>
     .replace(/```\s*$/i, '')
     .trim();
 
+const getLlmRuntimeProfile = () => {
+  const preferredOrder = resolveProviderOrder();
+  const providers = preferredOrder.map((provider) => {
+    const presentation = providerPresentation(provider);
+    return {
+      ...presentation,
+      model: resolveProviderModel(provider),
+      configured: isProviderConfigured(provider)
+    };
+  });
+
+  return {
+    preferredOrder,
+    providers,
+    primaryProvider: providers[0] || null
+  };
+};
+
 const generateText = async (input = {}) => {
   const providerOrder = resolveProviderOrder(input.providers);
   const failures = [];
 
   for (const provider of providerOrder) {
     try {
-      let result = null;
-      if (provider === 'ollama') result = await callOllama(input);
-      if (provider === 'openai') result = await callOpenAI(input);
-      if (provider === 'anthropic') result = await callAnthropic(input);
+      const result = await withDatadogSpan(
+        'ai.llm.generate',
+        {
+          provider,
+          model: String(input.model || ''),
+          'ai.max_tokens': Math.max(Number(input.maxTokens || DEFAULT_MAX_TOKENS), 64)
+        },
+        async () => {
+          if (provider === 'ollama') return callOllama(input);
+          if (provider === 'openai') return callOpenAI(input);
+          if (provider === 'anthropic') return callAnthropic(input);
+          return null;
+        }
+      );
 
       if (result && String(result.text || '').trim()) {
+        observeLlmProviderCall({
+          provider,
+          model: result.model || input.model || resolveProviderModel(provider),
+          error: false
+        });
         return {
           ...result,
           text: cleanResponseText(result.text)
         };
       }
     } catch (err) {
+      observeLlmProviderCall({
+        provider,
+        model: input.model || resolveProviderModel(provider),
+        error: true
+      });
+      captureException(err, { area: 'llm_gateway', provider });
       failures.push(`${provider}: ${err.message || err}`);
     }
   }
@@ -316,5 +407,6 @@ const generateText = async (input = {}) => {
 
 module.exports = {
   generateText,
-  cleanResponseText
+  cleanResponseText,
+  getLlmRuntimeProfile
 };

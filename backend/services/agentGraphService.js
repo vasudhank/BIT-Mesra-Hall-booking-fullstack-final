@@ -2,6 +2,8 @@ const { generateText, cleanResponseText } = require('./llmGatewayService');
 const { getProjectSupportContext } = require('./projectSupportContextService');
 const { getKnowledgeContextForPrompt } = require('./supportKnowledgeService');
 const { querySimilarVectors, DEFAULT_VECTOR_NAMESPACE } = require('./vectorStoreService');
+const { observeAgentGraphNode } = require('./metricsService');
+const { captureException, withDatadogSpan } = require('./observabilityService');
 
 const clip = (text, limit = 5000) => String(text || '').trim().slice(0, limit);
 
@@ -56,12 +58,26 @@ const buildHistoryBlock = (history = []) => {
     .join('\n');
 };
 
+const runNode = async (node, state, fn) =>
+  withDatadogSpan('ai.agent.node', { runtime: 'agent_graph', node }, async () => {
+    try {
+      const output = await fn();
+      observeAgentGraphNode({ runtime: 'agent_graph', node });
+      return output;
+    } catch (err) {
+      observeAgentGraphNode({ runtime: 'agent_graph', node, error: true });
+      captureException(err, { area: 'agent_graph_node', node, message: clip(state?.message, 300) });
+      throw err;
+    }
+  });
+
 const runStrategistAgent = async ({
   message,
   userRole,
   preferredLanguage,
   historyBlock,
-  projectContext
+  projectContext,
+  memoryContext
 }) => {
   const prompt = `
 You are StrategistAgent in a multi-agent support system.
@@ -77,6 +93,9 @@ Context:
 - Project context:
 ${projectContext}
 
+Persistent memory:
+${memoryContext || 'No persistent memory available.'}
+
 Recent chat history:
 ${historyBlock}
 
@@ -86,6 +105,7 @@ ${message}
 Return ONLY valid JSON:
 {
   "goal": "string",
+  "queryMode": "CONVERSATIONAL|AGENTIC_ACTION|MIXED",
   "complexity": "LOW|MEDIUM|HIGH",
   "requiresActionWorkflow": true|false,
   "humanReviewRecommended": true|false,
@@ -143,6 +163,7 @@ const runResponderAgent = async ({
   preferredLanguage,
   userRole,
   projectContext,
+  memoryContext,
   historyBlock,
   strategy,
   retrieval
@@ -169,6 +190,9 @@ ${JSON.stringify(strategy, null, 2)}
 Project context:
 ${projectContext}
 
+Persistent memory:
+${memoryContext || 'No persistent memory available.'}
+
 Retriever keyword context:
 ${retrieval.keywordKnowledge}
 
@@ -193,7 +217,7 @@ Return plain text only.
   return cleanResponseText(result.text);
 };
 
-const runCriticAgent = async ({ message, draftAnswer, strategy, preferredLanguage }) => {
+const runCriticAgent = async ({ message, draftAnswer, strategy, preferredLanguage, memoryContext }) => {
   const langInstruction = String(preferredLanguage || '').toLowerCase() === 'hi'
     ? 'Keep improved answer in Hindi.'
     : 'Keep improved answer in English.';
@@ -213,6 +237,9 @@ ${message}
 
 Strategist output:
 ${JSON.stringify(strategy, null, 2)}
+
+Persistent memory:
+${memoryContext || 'No persistent memory available.'}
 
 Draft answer:
 ${draftAnswer}
@@ -252,7 +279,8 @@ const runAgenticSupportWorkflow = async ({
   userRole = 'GUEST',
   preferredLanguage = 'en',
   history = [],
-  projectContext = ''
+  projectContext = '',
+  memoryContext = ''
 } = {}) => {
   const cleanMessage = clip(message, 12000);
   if (!cleanMessage) {
@@ -270,16 +298,25 @@ const runAgenticSupportWorkflow = async ({
   const effectiveProjectContext = projectContext || await getProjectSupportContext();
   const historyBlock = buildHistoryBlock(history);
 
-  const strategy = await runStrategistAgent({
-    message: cleanMessage,
-    userRole,
-    preferredLanguage,
-    historyBlock,
-    projectContext: effectiveProjectContext
-  });
+  const strategy = await runNode(
+    'StrategistAgent',
+    { message: cleanMessage },
+    () => runStrategistAgent({
+      message: cleanMessage,
+      userRole,
+      preferredLanguage,
+      historyBlock,
+      projectContext: effectiveProjectContext,
+      memoryContext
+    })
+  );
   trace.push({ agent: 'StrategistAgent', output: strategy });
 
-  const retrieval = await runRetrieverAgent({ message: cleanMessage });
+  const retrieval = await runNode(
+    'RetrieverAgent',
+    { message: cleanMessage },
+    () => runRetrieverAgent({ message: cleanMessage })
+  );
   trace.push({
     agent: 'RetrieverAgent',
     output: {
@@ -288,23 +325,33 @@ const runAgenticSupportWorkflow = async ({
     }
   });
 
-  const draftAnswer = await runResponderAgent({
-    message: cleanMessage,
-    preferredLanguage,
-    userRole,
-    projectContext: effectiveProjectContext,
-    historyBlock,
-    strategy,
-    retrieval
-  });
+  const draftAnswer = await runNode(
+    'ResponderAgent',
+    { message: cleanMessage },
+    () => runResponderAgent({
+      message: cleanMessage,
+      preferredLanguage,
+      userRole,
+      projectContext: effectiveProjectContext,
+      memoryContext,
+      historyBlock,
+      strategy,
+      retrieval
+    })
+  );
   trace.push({ agent: 'ResponderAgent', output: { draftLength: draftAnswer.length } });
 
-  const critic = await runCriticAgent({
-    message: cleanMessage,
-    draftAnswer,
-    strategy,
-    preferredLanguage
-  });
+  const critic = await runNode(
+    'CriticAgent',
+    { message: cleanMessage },
+    () => runCriticAgent({
+      message: cleanMessage,
+      draftAnswer,
+      strategy,
+      preferredLanguage,
+      memoryContext
+    })
+  );
   trace.push({ agent: 'CriticAgent', output: critic });
 
   const finalAnswer = critic.needsRevision && critic.improvedAnswer
@@ -318,6 +365,7 @@ const runAgenticSupportWorkflow = async ({
       agentCount: 4,
       humanReviewRecommended: Boolean(strategy?.humanReviewRecommended),
       complexity: String(strategy?.complexity || 'MEDIUM'),
+      queryMode: String(strategy?.queryMode || 'CONVERSATIONAL'),
       trace
     }
   };

@@ -15,6 +15,7 @@ import EmailIcon from '@mui/icons-material/Email';
 import HttpsIcon from '@mui/icons-material/Https';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import HomeIcon from '@mui/icons-material/Home';
+import QueryStatsIcon from '@mui/icons-material/QueryStats';
 import QuickPageMenu from '../Navigation/QuickPageMenu';
 import './DeveloperLogin.css';
 
@@ -172,6 +173,11 @@ export default function DeveloperLogin() {
                       HOME
                     </Link>
                   </Button>
+
+                  <Button type="button" fullWidth className="developer-monitoring-link-btn" onClick={() => navigate('/developer/monitoring')}>
+                    <QueryStatsIcon sx={{ mr: 1 }} />
+                    Monitoring Dashboard
+                  </Button>
                 </form>
               ) : (
                 <form onSubmit={resetPassword} autoComplete="off">
@@ -276,6 +282,11 @@ export default function DeveloperLogin() {
                       <HomeIcon sx={{ mr: 1 }} />
                       HOME
                     </Link>
+                  </Button>
+
+                  <Button type="button" fullWidth className="developer-monitoring-link-btn" onClick={() => navigate('/developer/monitoring')}>
+                    <QueryStatsIcon sx={{ mr: 1 }} />
+                    Monitoring Dashboard
                   </Button>
                 </form>
               )}

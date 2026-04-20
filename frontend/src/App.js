@@ -30,6 +30,7 @@ import QueryDetailPage from './pages/QueryDetailPage';
 import FeedbackPage from './pages/FeedbackPage';
 import AdminAccountPage from './pages/AdminAccountPage';
 import DeveloperAccountPage from './pages/DeveloperAccountPage';
+import DeveloperMonitoringPage from './pages/DeveloperMonitoringPage';
 import NoticesPage from './pages/NoticesPage';
 import NoticeDetailPage from './pages/NoticeDetailPage';
 import CalendarPage from './pages/CalendarPage';
@@ -256,6 +257,14 @@ function AppRoutes({ lightMode, toggleTheme }) {
         element={(
           <DeveloperRoute>
             <DeveloperAccountPage />
+          </DeveloperRoute>
+        )}
+      />
+      <Route
+        path="/developer/monitoring"
+        element={(
+          <DeveloperRoute>
+            <DeveloperMonitoringPage />
           </DeveloperRoute>
         )}
       />

@@ -1,0 +1,101 @@
+{
+  "uid": "bit-booking-observability",
+  "title": "BIT Booking AI Observability",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "HTTP Requests",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(bit_booking_http_requests_total[5m]))",
+          "legendFormat": "requests/sec"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "AI Requests",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(bit_booking_ai_requests_total[5m]))",
+          "legendFormat": "ai/sec"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "AI Errors",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(bit_booking_ai_requests_total{status=\"error\"}[5m]))",
+          "legendFormat": "errors/sec"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Memory Ops",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(bit_booking_agent_memory_operations_total[5m]))",
+          "legendFormat": "ops/sec"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP Latency p95",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(bit_booking_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "AI Latency p95",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(bit_booking_ai_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Agent Graph Nodes",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(bit_booking_agent_graph_node_executions_total[5m])) by (runtime, node, status)",
+          "legendFormat": "{{runtime}}/{{node}}/{{status}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "LLM Provider Calls",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(bit_booking_llm_provider_calls_total[5m])) by (provider, status)",
+          "legendFormat": "{{provider}}/{{status}}"
+        }
+      ]
+    }
+  ]
+}

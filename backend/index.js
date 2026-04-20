@@ -1,13 +1,21 @@
-const express = require('express');
 const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+
+const {
+  initializeDatadog,
+  initializeSentry,
+  attachSentryErrorHandler,
+  captureException
+} = require('./services/observabilityService');
+initializeDatadog();
+
+const express = require('express');
 const cors = require('cors');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const { hashSync } = require('bcrypt');
-
-require('dotenv').config({ path: path.join(__dirname, '.env') });
-
 const app = express();
+initializeSentry();
 
 require('./config/mongoose');
 const passport = require('./config/passport');
@@ -75,6 +83,7 @@ app.use(passport.session());
 
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/ai', require('./routes/aiExecute'));
+app.use('/api/ai', require('./routes/aiReviews'));
 app.use('/api/voice', require('./routes/voice'));
 app.use('/api/vector', require('./routes/vector'));
 app.use('/api/ops', require('./routes/ops'));
@@ -82,6 +91,18 @@ app.use('/api/integrations/whatsapp', require('./routes/integrationsWhatsApp'));
 app.use('/api/integrations/slack', require('./routes/integrationsSlack'));
 app.use('/api/integrations/crm', require('./routes/integrationsCrm'));
 app.use('/api', require('./index1'));
+
+attachSentryErrorHandler(app);
+
+app.use((err, req, res, next) => {
+  captureException(err, {
+    route: req?.originalUrl || req?.url || '',
+    method: req?.method || ''
+  });
+  logger.error('Unhandled Express error', { error: err?.message || err });
+  if (res.headersSent) return next(err);
+  return res.status(500).json({ error: 'Internal server error' });
+});
 
 const ensureDefaultDeveloper = async () => {
   try {

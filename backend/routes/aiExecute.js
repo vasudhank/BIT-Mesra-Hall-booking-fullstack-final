@@ -6,6 +6,16 @@ const PDFDocument = require('pdfkit');
 const { safeExecute } = require('../utils/safeNotify');
 const { generateApprovalToken, getTokenExpiry } = require('../utils/token');
 const { beginAiTimer } = require('../services/metricsService');
+const {
+  getAgentMemoryContext,
+  persistAgentTurn,
+  extractReplyTextForMemory
+} = require('../services/agentMemoryService');
+const { captureException } = require('../services/observabilityService');
+const { dispatchSlackNotification } = require('../services/slackIntegrationService');
+const { sendWhatsAppTextMessage } = require('../services/whatsappIntegrationService');
+const { syncSupportThreadToCrm, syncBookingEventToCrm } = require('../services/crmIntegrationService');
+const { getReviewTaskById, markReviewTaskExecuted } = require('../services/agentReviewService');
 
 const {
   sendBookingApprovalMail,
@@ -69,6 +79,15 @@ const to24 = (time) => {
   return null;
 };
 
+const escapeRegex = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const findHallByNameLoose = async (name) => {
+  const cleanName = String(name || '').trim();
+  if (!cleanName) return null;
+  return Hall.findOne({ name: cleanName })
+    .then((hall) => hall || Hall.findOne({ name: new RegExp(`^${escapeRegex(cleanName)}$`, 'i') }));
+};
+
 const normalizeSubAction = (subAction) => {
   const raw = String(subAction || '').toUpperCase().trim();
   const supported = [
@@ -122,6 +141,12 @@ const parseDateRange = (dateText) => {
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
 
   return { date: raw, start, end };
+};
+
+const parseOptionalDateRange = (dateText) => {
+  const raw = String(dateText || '').trim();
+  if (!raw) return null;
+  return parseDateRange(raw);
 };
 
 const getTodayISTDate = () => {
@@ -286,6 +311,8 @@ const overlaps = (startA, endA, startB, endB) =>
   new Date(startA).getTime() < new Date(endB).getTime() &&
   new Date(endA).getTime() > new Date(startB).getTime();
 
+const formatDateLabel = (dateRange) => dateRange?.date || 'the current active time';
+
 const analyzeRequestConflict = async (requestDoc, allPending) => {
   const startA = new Date(requestDoc.startDateTime).getTime();
   const endA = new Date(requestDoc.endDateTime).getTime();
@@ -379,15 +406,79 @@ router.post('/execute', async (req, res) => {
   let hadAiError = false;
   try {
     const intent = req.body?.intent || {};
+    const reviewId = String(req.body?.reviewId || intent?.meta?.reviewTaskId || '').trim();
     const user = req.isAuthenticated && req.isAuthenticated()
       ? req.user
       : { type: 'Guest', id: null, email: '' };
-    const actionType = String(intent.action || '').toUpperCase();
-    const payload = intent.payload || {};
+    const normalizedUserRole = String(user.type || 'Guest').toUpperCase();
+    let actionType = String(intent.action || '').toUpperCase();
+    let payload = intent.payload || {};
+    let reviewTask = null;
+
+    if (!actionType && reviewId) {
+      reviewTask = await getReviewTaskById(reviewId);
+      if (!reviewTask) {
+        return res.json({ status: 'ERROR', msg: 'Review task not found.' });
+      }
+      if (reviewTask.status !== 'APPROVED') {
+        return res.json({ status: 'ERROR', msg: 'Review task must be approved before execution.' });
+      }
+
+      actionType = String(reviewTask.actionIntent?.action || '').toUpperCase();
+      payload = reviewTask.actionIntent?.payload || {};
+    }
 
     if (!actionType) {
       return res.json({ status: 'ERROR', msg: 'AI action is missing.' });
     }
+
+    const agentMemoryContext = await getAgentMemoryContext({
+      req,
+      message: `Execute AI action: ${actionType}`,
+      history: [],
+      userRole: String(user.type || 'Guest').toUpperCase(),
+      threadId: req.body?.threadId,
+      accountKey: req.body?.accountKey,
+      channel: 'http_execute'
+    });
+
+    const originalJson = res.json.bind(res);
+    let memoryPersistQueued = false;
+    res.json = (body) => {
+      if (!memoryPersistQueued) {
+        memoryPersistQueued = true;
+        const status = body?.status || (res.statusCode >= 400 ? 'ERROR' : 'OK');
+        persistAgentTurn({
+          context: agentMemoryContext,
+          userMessage: `Execute AI action: ${actionType}`,
+          assistantReply: extractReplyTextForMemory({
+            reply: body?.message || body?.msg || body?.data?.kind || JSON.stringify(body || {})
+          }),
+          replyType: 'ACTION_RESULT',
+          action: actionType,
+          status,
+          metadata: {
+            userRole: user.type || 'Guest',
+            channel: 'http_execute',
+            payload,
+            reviewId: reviewTask?.id || reviewId || null
+          }
+        }).catch((memoryErr) => {
+          captureException(memoryErr, { area: 'ai_execute_memory_persist' });
+        });
+
+        const finalStatus = String(body?.status || '').toUpperCase();
+        if ((reviewTask?.id || reviewId) && ['DONE', 'ERROR'].includes(finalStatus)) {
+          markReviewTaskExecuted({
+            reviewId: reviewTask?.id || reviewId,
+            error: finalStatus === 'ERROR'
+          }).catch((reviewErr) => {
+            captureException(reviewErr, { area: 'ai_execute_review_mark' });
+          });
+        }
+      }
+      return originalJson(body);
+    };
 
     if (actionType === 'EXPORT_SCHEDULE') {
       const requestedDate = String(payload.date || '').trim();
@@ -458,13 +549,93 @@ router.post('/execute', async (req, res) => {
     }
 
     if (actionType === 'BOOK_REQUEST') {
-      if (user.type !== 'Department') {
-        return res.json({ status: 'ERROR', msg: 'Booking requests via AI are allowed only for logged-in faculty/department accounts.' });
-      }
-
       const requests = Array.isArray(payload.requests) ? payload.requests : [];
       if (requests.length === 0) {
         return res.json({ status: 'ERROR', msg: 'AI understood booking intent but required details are missing.' });
+      }
+
+      if (user.type === 'Admin') {
+        let successCount = 0;
+        const failMessages = [];
+
+        for (const requestItem of requests) {
+          try {
+            const hall = String(requestItem.hall || '').trim();
+            const date = String(requestItem.date || '').trim();
+            const start12 = to12(requestItem.start || requestItem.startTime || requestItem.from);
+            const end12 = to12(requestItem.end || requestItem.endTime || requestItem.to);
+            const event = String(requestItem.event || 'Admin AI Booking').trim().slice(0, 150);
+
+            if (!hall || !date || !start12 || !end12) {
+              failMessages.push('One admin booking had missing hall/date/time details.');
+              continue;
+            }
+
+            const start24 = to24(start12);
+            const end24 = to24(end12);
+            if (!start24 || !end24) {
+              failMessages.push(`Invalid time format for ${hall}.`);
+              continue;
+            }
+
+            const startDateTime = new Date(`${date}T${start24}:00`);
+            const endDateTime = new Date(`${date}T${end24}:00`);
+            if (Number.isNaN(startDateTime.getTime()) || Number.isNaN(endDateTime.getTime())) {
+              failMessages.push(`Invalid date/time for ${hall}.`);
+              continue;
+            }
+
+            if (endDateTime <= startDateTime) {
+              failMessages.push(`End time must be after start time for ${hall}.`);
+              continue;
+            }
+
+            const hallDoc = await findHallByNameLoose(hall);
+            if (!hallDoc) {
+              failMessages.push(`Hall not found: ${hall}.`);
+              continue;
+            }
+
+            const hasConflict = (hallDoc.bookings || []).some((booking) =>
+              overlaps(startDateTime, endDateTime, booking.startDateTime, booking.endDateTime)
+            );
+            if (hasConflict) {
+              failMessages.push(`${hallDoc.name} is already booked for the requested time range.`);
+              continue;
+            }
+
+            hallDoc.bookings.push({
+              bookingRequest: null,
+              department: null,
+              event,
+              startDateTime,
+              endDateTime
+            });
+            hallDoc.status = hallDoc.isFilledAt(new Date()) ? 'Filled' : 'Not Filled';
+            await hallDoc.save();
+            successCount += 1;
+          } catch (err) {
+            console.error('AI admin direct booking error:', err);
+            failMessages.push('An unexpected error happened for one admin booking.');
+          }
+        }
+
+        if (successCount === 0) {
+          return res.json({
+            status: 'ERROR',
+            msg: failMessages.join(' ') || 'Admin booking failed.'
+          });
+        }
+
+        const suffix = failMessages.length > 0 ? ` ${failMessages.join(' ')}` : '';
+        return res.json({
+          status: 'DONE',
+          message: `Admin booked ${successCount} hall slot(s) directly.${suffix}`
+        });
+      }
+
+      if (user.type !== 'Department') {
+        return res.json({ status: 'ERROR', msg: 'Booking via AI is allowed only for logged-in admin or faculty/department accounts.' });
       }
 
       let successCount = 0;
@@ -505,7 +676,7 @@ router.post('/execute', async (req, res) => {
             continue;
           }
 
-          const hallDoc = await Hall.findOne({ name: hall });
+          const hallDoc = await findHallByNameLoose(hall);
           if (!hallDoc) {
             failMessages.push(`Hall not found: ${hall}.`);
             continue;
@@ -638,6 +809,71 @@ router.post('/execute', async (req, res) => {
       return res.json({
         status: 'DONE',
         message: `Created ${successCount} booking request(s). Auto-booked: ${autoBookedCount}, pending admin approval: ${pendingApprovalCount}.${suffix}`
+      });
+    }
+
+    if (actionType === 'VACATE_HALL') {
+      if (user.type !== 'Admin') {
+        return res.json({ status: 'ERROR', msg: 'Vacating booked halls via AI is admin-only.' });
+      }
+
+      const targetHall = String(payload.targetHall || payload.hall || '').trim();
+      if (!targetHall) {
+        return res.json({ status: 'ERROR', msg: 'Please specify which hall should be vacated.' });
+      }
+
+      const hallDoc = await findHallByNameLoose(targetHall);
+      if (!hallDoc) {
+        return res.json({
+          status: 'ERROR',
+          msg: `Sorry, but there is no such hall named ${targetHall}. So, I can't vacate the hall.`
+        });
+      }
+
+      const dateRange = parseOptionalDateRange(payload.date);
+      if (payload.date && !dateRange) {
+        return res.json({ status: 'ERROR', msg: 'Invalid date format for hall vacation. Use YYYY-MM-DD.' });
+      }
+
+      const now = new Date();
+      const matchingBookings = (hallDoc.bookings || []).filter((booking) => {
+        if (dateRange) {
+          return overlaps(booking.startDateTime, booking.endDateTime, dateRange.start, dateRange.end);
+        }
+        return new Date(booking.startDateTime) <= now && new Date(booking.endDateTime) > now;
+      });
+
+      if (matchingBookings.length === 0) {
+        return res.json({
+          status: 'ERROR',
+          msg: `Sorry, but ${hallDoc.name} is not booked on ${formatDateLabel(dateRange)}. So, I can't vacate the hall.`
+        });
+      }
+
+      const matchingSubdocIds = new Set(matchingBookings.map((booking) => String(booking._id || '')));
+      const matchingRequestIds = matchingBookings
+        .map((booking) => booking.bookingRequest)
+        .filter(Boolean);
+
+      hallDoc.bookings = (hallDoc.bookings || []).filter((booking) => {
+        const subdocId = String(booking._id || '');
+        return !matchingSubdocIds.has(subdocId);
+      });
+      hallDoc.status = hallDoc.isFilledAt(new Date()) ? 'Filled' : 'Not Filled';
+      hallDoc.department = null;
+      hallDoc.event = '';
+      await hallDoc.save();
+
+      if (matchingRequestIds.length > 0) {
+        await Booking_Requests.updateMany(
+          { _id: { $in: matchingRequestIds } },
+          { $set: { status: 'VACATED', approvalToken: null, tokenExpiry: null } }
+        );
+      }
+
+      return res.json({
+        status: 'DONE',
+        message: `Vacated ${matchingBookings.length} booking(s) from ${hallDoc.name} for ${formatDateLabel(dateRange)}.`
       });
     }
 
@@ -852,6 +1088,100 @@ router.post('/execute', async (req, res) => {
           targetHall: targetHall || null,
           items: filteredItems
         }
+      });
+    }
+
+    if (actionType === 'SEND_SLACK_MESSAGE') {
+      if (!['ADMIN', 'DEVELOPER'].includes(normalizedUserRole)) {
+        return res.json({ status: 'ERROR', msg: 'Slack notification via AI is allowed only for admin or developer users.' });
+      }
+
+      const text = String(payload.text || '').trim();
+      const channel = String(payload.channel || '').trim();
+      const threadTs = String(payload.threadTs || '').trim();
+
+      if (!text) {
+        return res.json({ status: 'ERROR', msg: 'Slack notification text is required.' });
+      }
+
+      await dispatchSlackNotification({
+        text,
+        channel,
+        threadTs
+      });
+
+      return res.json({
+        status: 'DONE',
+        message: channel
+          ? `Slack notification sent to ${channel}.`
+          : 'Slack notification sent using the configured default destination.'
+      });
+    }
+
+    if (actionType === 'SEND_WHATSAPP_MESSAGE') {
+      if (!['ADMIN', 'DEVELOPER'].includes(normalizedUserRole)) {
+        return res.json({ status: 'ERROR', msg: 'WhatsApp message via AI is allowed only for admin or developer users.' });
+      }
+
+      const to = String(payload.to || '').replace(/[^\d+]/g, '').trim();
+      const text = String(payload.text || '').trim();
+      const contextMessageId = String(payload.contextMessageId || '').trim();
+
+      if (!to || !text) {
+        return res.json({ status: 'ERROR', msg: 'Both recipient phone number and message text are required.' });
+      }
+
+      await sendWhatsAppTextMessage({
+        to,
+        text,
+        contextMessageId
+      });
+
+      return res.json({
+        status: 'DONE',
+        message: `WhatsApp message sent to ${to}.`
+      });
+    }
+
+    if (actionType === 'SYNC_CRM_RECORD') {
+      if (!['ADMIN', 'DEVELOPER'].includes(normalizedUserRole)) {
+        return res.json({ status: 'ERROR', msg: 'CRM sync via AI is allowed only for admin or developer users.' });
+      }
+
+      const mode = String(payload.mode || 'SUPPORT_THREAD').trim().toUpperCase();
+      const summary = mode === 'BOOKING_EVENT'
+        ? await syncBookingEventToCrm({
+            bookingId: payload.bookingId || '',
+            department: payload.department || '',
+            email: payload.email || '',
+            hall: payload.hall || '',
+            event: payload.event || '',
+            startDateTime: payload.startDateTime || '',
+            endDateTime: payload.endDateTime || '',
+            status: payload.status || ''
+          })
+        : await syncSupportThreadToCrm({
+            kind: payload.kind || 'SUPPORT',
+            title: payload.title || '',
+            message: payload.message || '',
+            email: payload.email || '',
+            threadId: payload.threadId || req.body?.threadId || '',
+            aiAnswer: payload.aiAnswer || '',
+            source: payload.source || 'BIT-Booking3'
+          });
+
+      if (summary?.skipped) {
+        return res.json({
+          status: 'DONE',
+          message: `CRM sync skipped: ${summary.reason || 'not_configured'}.`
+        });
+      }
+
+      return res.json({
+        status: 'DONE',
+        message: mode === 'BOOKING_EVENT'
+          ? 'CRM booking event synced successfully.'
+          : 'CRM support thread synced successfully.'
       });
     }
 

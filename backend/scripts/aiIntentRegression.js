@@ -269,6 +269,40 @@ const buildAdminExecutionCases = () => {
   }
 };
 
+const buildVacateHallCases = () => {
+  const phrases = [
+    'vacate hall23 for 20 april',
+    'clear hall23 on 2026-04-20',
+    'unbook hall24 tomorrow',
+    'release hall25 booking on 21 april'
+  ];
+
+  for (const message of phrases) {
+    addCase(
+      'admin_vacate_hall',
+      'Admin',
+      message,
+      { type: 'ACTION', action: 'VACATE_HALL', targetHall: message.includes('hall24') ? 'hall24' : message.includes('hall25') ? 'hall25' : 'hall23' }
+    );
+  }
+
+  addCase(
+    'access_control_non_admin_vacate',
+    'Department',
+    'vacate hall23 for 20 april',
+    { type: 'CHAT', messageIncludes: 'requires admin access' }
+  );
+};
+
+const buildGeneralConversationCases = () => {
+  addCase(
+    'general_conversation_offline',
+    'GUEST',
+    'tell 100 words for virat kohli',
+    { type: 'CHAT', messageIncludes: 'Virat Kohli' }
+  );
+};
+
 const buildDepartmentBookingCases = () => {
   const verbs = ['book', 'reserve', 'schedule', 'request'];
   const halls = ['hall23', 'hall24', 'hall25'];
@@ -299,6 +333,22 @@ const buildDepartmentBookingCases = () => {
   }
 };
 
+const buildAdminDirectBookingCases = () => {
+  const messages = [
+    'book hall23 from 1 pm to 2 pm on 20 april for admin meeting',
+    'reserve hall24 10 am to 11 am on 2026-04-20 for inspection'
+  ];
+
+  for (const message of messages) {
+    addCase(
+      'admin_direct_booking',
+      'Admin',
+      message,
+      { type: 'ACTION', action: 'BOOK_REQUEST', requestHallPresent: true }
+    );
+  }
+};
+
 const buildAccessControlCases = () => {
   const bookingMessages = [
     'book hall23 from 1pm to 2pm on 15 feb for latex project',
@@ -311,7 +361,7 @@ const buildAccessControlCases = () => {
       'access_control_guest_booking',
       'GUEST',
       message,
-      { type: 'CHAT', messageIncludes: 'log in as faculty/department' }
+      { type: 'CHAT', messageIncludes: 'admin or faculty/department' }
     );
   }
 
@@ -361,8 +411,11 @@ const buildAccessControlCases = () => {
 buildHallStatusCases();
 buildBookingListCases();
 buildAdminExecutionCases();
+buildVacateHallCases();
 buildDepartmentBookingCases();
+buildAdminDirectBookingCases();
 buildAccessControlCases();
+buildGeneralConversationCases();
 
 const run = async () => {
   console.log(`Running AI intent regression suite with ${cases.length} prompt cases...`);

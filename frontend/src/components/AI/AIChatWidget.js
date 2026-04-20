@@ -267,7 +267,7 @@ const resolveAiWebSocketUrl = () => {
 };
 
 const isLikelyActionPrompt = (text) =>
-  /\b(book|booking|reserve|approve|reject|pending requests|hall status|show halls|export schedule|download schedule)\b/i.test(String(text || ""));
+  /\b(book|booking|reserve|approve|reject|pending requests|hall status|show halls|export schedule|download schedule|slack|whatsapp|crm|hubspot|notify)\b/i.test(String(text || ""));
 
 const downloadBase64Artifact = (artifact) => {
   if (!artifact || !artifact.base64) return;
@@ -1151,7 +1151,116 @@ export default function AIChatWidget({
     };
   };
 
-  const streamConversationViaWebSocket = ({ message, history, language, userRole, abortSignal }) =>
+  const buildAgentMessageData = (meta, extra = {}) => {
+    const normalizedMeta = meta && typeof meta === "object" ? meta : null;
+    if (!normalizedMeta && !extra.actionIntent) return null;
+
+    const resultData = normalizedMeta?.resultData
+      ? formatInfoPayload(normalizedMeta.resultData)
+      : null;
+
+    return {
+      agentMeta: normalizedMeta,
+      agentResult: resultData,
+      actionIntent: extra.actionIntent && typeof extra.actionIntent === "object" ? extra.actionIntent : null
+    };
+  };
+
+  const buildReplyMessageData = (replyData) => {
+    if (!replyData || typeof replyData !== "object") return null;
+    const meta = replyData.meta && typeof replyData.meta === "object" ? replyData.meta : null;
+    const actionIntent = replyData.type === "ACTION"
+      ? {
+          action: replyData.action || "",
+          payload: replyData.payload || {},
+          reply: replyData.reply || ""
+        }
+      : null;
+    return buildAgentMessageData(meta, { actionIntent });
+  };
+
+  const formatAgentLabel = (value) =>
+    String(value || "")
+      .split(/[_:/-]+/g)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(" ");
+
+  const renderAgentMeta = (data) => {
+    const meta = data?.agentMeta || data?.streamMeta || null;
+    if (!meta || typeof meta !== "object") return null;
+
+    const toolCalls = Array.isArray(meta.toolCalls) ? meta.toolCalls.slice(0, 6) : [];
+    const trace = Array.isArray(meta.trace) ? meta.trace.slice(0, 4) : [];
+    const reviewTask = meta.reviewTask && typeof meta.reviewTask === "object" ? meta.reviewTask : null;
+    const actionIntent = data?.actionIntent || meta.actionIntent || null;
+
+    return (
+      <div className="ai-agent-panel">
+        <div className="ai-agent-badges">
+          {meta.mode && <span className="ai-agent-badge">{formatAgentLabel(meta.mode)}</span>}
+          {meta.provider && <span className="ai-agent-badge">{formatAgentLabel(meta.provider)}</span>}
+          {meta.complexity && <span className="ai-agent-badge">{formatAgentLabel(meta.complexity)}</span>}
+          {meta.queryMode && <span className="ai-agent-badge">{formatAgentLabel(meta.queryMode)}</span>}
+          {meta.humanReviewRecommended && (
+            <span className="ai-agent-badge warning">Human Review</span>
+          )}
+        </div>
+
+        {meta.planSummary && <div className="ai-agent-summary">{meta.planSummary}</div>}
+
+        {reviewTask && (
+          <div className="ai-review-card">
+            <div className="ai-review-card-head">
+              <strong>{reviewTask.title || "Review Task Created"}</strong>
+              <span>{reviewTask.status || "PENDING"}</span>
+            </div>
+            <p>{reviewTask.summary || "This action is waiting for human approval before execution."}</p>
+            <div className="ai-review-card-meta">
+              <span>Risk: {reviewTask.riskLevel || "HIGH"}</span>
+              <span>Task ID: {reviewTask.id || "--"}</span>
+            </div>
+          </div>
+        )}
+
+        {!reviewTask && actionIntent?.action && (
+          <div className="ai-review-card autonomous">
+            <div className="ai-review-card-head">
+              <strong>Prepared Action</strong>
+              <span>{actionIntent.action}</span>
+            </div>
+            <p>{actionIntent.reply || "The agent prepared an executable action intent."}</p>
+          </div>
+        )}
+
+        {toolCalls.length > 0 && (
+          <div className="ai-agent-call-list">
+            {toolCalls.map((call, index) => (
+              <div key={`${call.name || "tool"}-${index}`} className="ai-agent-call">
+                <div className="ai-agent-call-head">
+                  <strong>{formatAgentLabel(call.name || "tool")}</strong>
+                  <span>{formatAgentLabel(call.status || "ok")}</span>
+                </div>
+                {call.summary && <p>{call.summary}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {trace.length > 0 && (
+          <div className="ai-agent-trace">
+            {trace.map((step, index) => (
+              <span key={`${step.node || step.agent || "trace"}-${index}`}>
+                {formatAgentLabel(step.node || step.agent || "stage")}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const streamConversationViaWebSocket = ({ message, history, language, userRole, threadId, accountKey, abortSignal }) =>
     new Promise((resolve) => {
       const wsUrl = resolveAiWebSocketUrl();
       if (!wsUrl || typeof window === "undefined" || typeof window.WebSocket === "undefined") {
@@ -1204,7 +1313,9 @@ export default function AIChatWidget({
               message,
               history,
               language,
-              userRole
+              userRole,
+              threadId,
+              accountKey
             }
           })
         );
@@ -1322,6 +1433,8 @@ export default function AIChatWidget({
           history: toServerHistory(historyMessages),
           language: selectedLanguage,
           userRole: roleForStream,
+          threadId: activeThreadId,
+          accountKey,
           abortSignal: requestController.signal
         });
 
@@ -1331,7 +1444,7 @@ export default function AIChatWidget({
           updateActiveThreadMessages((existingMessages) => [
             ...existingMessages,
             createMessage("ai", streamResult.text, {
-              data: streamResult.meta ? { streamMeta: streamResult.meta } : null
+              data: buildAgentMessageData(streamResult.meta)
             })
           ]);
 
@@ -1348,6 +1461,8 @@ export default function AIChatWidget({
         message: composedUserText,
         history: toServerHistory(historyMessages),
         language: selectedLanguage,
+        threadId: activeThreadId,
+        accountKey,
         attachments: requestAttachments
       }, { signal: requestController.signal });
 
@@ -1374,7 +1489,9 @@ export default function AIChatWidget({
       if (aiText) {
         updateActiveThreadMessages((existingMessages) => [
           ...existingMessages,
-          createMessage("ai", aiText)
+          createMessage("ai", aiText, {
+            data: buildReplyMessageData(replyData)
+          })
         ]);
 
         if (isLiveModeRef.current) {
@@ -1383,7 +1500,11 @@ export default function AIChatWidget({
       }
 
       if (isAction && replyData.action) {
-        const exec = await api.post("/ai/execute", { intent: replyData }, { signal: requestController.signal });
+        const exec = await api.post("/ai/execute", {
+          intent: replyData,
+          threadId: activeThreadId,
+          accountKey
+        }, { signal: requestController.signal });
         if (requestController.signal.aborted) return;
 
         let execResultText = "";
@@ -1966,7 +2087,8 @@ export default function AIChatWidget({
                           </pre>
                         ) : null}
 
-                        {renderStructuredData(message.data)}
+                        {renderStructuredData(message.data?.agentResult || message.data)}
+                        {renderAgentMeta(message.data)}
 
                         {Array.isArray(message.attachments) && message.attachments.length > 0 && (
                           <div className="msg-attachment-list">

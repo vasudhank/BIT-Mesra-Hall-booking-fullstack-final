@@ -255,6 +255,7 @@ export default function QueriesPage({ mode = 'public' }) {
                 <Link to="/developer/complaints" className="dev-action-btn">Complaints</Link>
                 <Link to="/developer/queries" className="dev-action-btn">Queries</Link>
                 <Link to="/developer/feedback" className="dev-action-btn">Feedback</Link>
+                <Link to="/developer/monitoring" className="dev-action-btn">Monitoring</Link>
                 <button className="dev-action-btn" onClick={logoutDeveloper}>Logout</button>
                 <QuickPageMenu
                   buttonLabel="Menu"

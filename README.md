@@ -7,7 +7,7 @@ Live frontend: https://hall-booking-frontend-4o04.onrender.com/
 - Hybrid conversational + agentic orchestration for chat and booking workflows.
 - Runtime selector for support graph:
   - `AGENT_GRAPH` (existing)
-  - `LANGGRAPH_COMPAT` (new LangGraph-style DAG runtime with node transitions)
+  - `LANGGRAPH_COMPAT` (real `@langchain/langgraph` `StateGraph` runtime with a safe local fallback)
 - Multi-agent graph-style support pipeline:
   - `StrategistAgent` -> `RetrieverAgent` -> `ResponderAgent` -> `CriticAgent`
 - Provider-resilient LLM gateway:
@@ -15,6 +15,10 @@ Live frontend: https://hall-booking-frontend-4o04.onrender.com/
 - Retrieval stack:
   - keyword retrieval from FAQ/notices
   - vector retrieval via local vector store (with Pinecone/Weaviate adapters)
+- Persistent agent memory:
+  - Mongo-backed conversations, messages, long-term facts/preferences/constraints
+  - memory extraction from user turns with vector-backed recall
+  - thread-aware memory via frontend `threadId` and `accountKey`
 - Realtime channel:
   - WebSocket streaming endpoint at `/api/ai/ws`
   - frontend fallback to HTTP action execution when action intent is detected
@@ -49,6 +53,18 @@ Live frontend: https://hall-booking-frontend-4o04.onrender.com/
 - Metrics endpoint:
   - JSON: `GET /api/ops/metrics`
   - Prometheus text: `GET /api/ops/metrics?format=prom`
+- Developer monitoring dashboard:
+  - SPA route: `/developer/monitoring`
+  - Protected backend overview: `GET /api/ops/monitoring`
+  - Synthetic proof events:
+    - `POST /api/ops/sentry-test`
+    - `POST /api/ops/datadog-test`
+- Production monitoring:
+  - Prometheus metrics via `prom-client`
+  - Grafana provisioning in `monitoring/grafana`
+  - Prometheus alert rules in `monitoring/alert-rules.yml`
+  - optional Sentry error/performance tracing with `SENTRY_DSN`
+  - optional Datadog APM with `DATADOG_ENABLED=true` / `DD_TRACE_ENABLED=true`
 
 ## Deployment
 
@@ -70,6 +86,10 @@ Live frontend: https://hall-booking-frontend-4o04.onrender.com/
 
 - `docker-compose.yml` for local full stack boot.
 - Dockerfiles added for both backend and frontend.
+- Monitoring stack:
+  - `docker compose --profile monitoring up`
+  - Prometheus: `http://localhost:9090`
+  - Grafana: `http://localhost:3001`
 
 ## Environment Examples
 
@@ -81,4 +101,7 @@ Live frontend: https://hall-booking-frontend-4o04.onrender.com/
 Backend:
 - `npm run check`
 - `npm run ai:intent:test`
+- `npm run ai:autonomous:test`
 - `npm run vector:sync`
+
+AI regression coverage now includes deterministic intent routing, admin direct booking, hall vacating, non-admin access control, general conversational fallback, and mocked execution-level mutation checks.

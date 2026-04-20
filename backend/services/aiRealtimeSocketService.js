@@ -2,6 +2,11 @@ const { WebSocketServer } = require('ws');
 const { runSupportWorkflow } = require('./supportWorkflowService');
 const { logger } = require('./loggerService');
 const { beginAiTimer } = require('./metricsService');
+const {
+  getAgentMemoryContext,
+  persistAgentTurn
+} = require('./agentMemoryService');
+const { captureException } = require('./observabilityService');
 
 const chunkText = (text, size = 40) => {
   const clean = String(text || '');
@@ -15,7 +20,7 @@ const chunkText = (text, size = 40) => {
 
 const isLikelyActionRequest = (message) => {
   const lower = String(message || '').toLowerCase();
-  return /\b(book|booking|reserve|request hall|approve|reject|pending requests|show halls|hall status|export schedule|download schedule)\b/.test(lower);
+  return /\b(book|booking|reserve|request hall|approve|reject|vacate|clear hall|unbook|pending requests|show halls|hall status|export schedule|download schedule|slack|whatsapp|crm|hubspot|notify)\b/.test(lower);
 };
 
 const safeSend = (ws, payload) => {
@@ -32,6 +37,8 @@ const handleStreamConversation = async (ws, packet = {}) => {
   const history = Array.isArray(payload.history) ? payload.history : [];
   const preferredLanguage = String(payload.language || 'auto');
   const userRole = String(payload.userRole || 'GUEST').toUpperCase();
+  const threadId = String(payload.threadId || '').trim();
+  const accountKey = String(payload.accountKey || '').trim();
 
   if (!message) {
     safeSend(ws, {
@@ -53,6 +60,15 @@ const handleStreamConversation = async (ws, packet = {}) => {
 
   const finalizeMetric = beginAiTimer('websocket_stream');
   try {
+    const agentMemoryContext = await getAgentMemoryContext({
+      message,
+      history,
+      userRole,
+      threadId,
+      accountKey,
+      channel: 'websocket_stream'
+    });
+
     safeSend(ws, {
       type: 'chat.stream.start',
       requestId,
@@ -63,7 +79,10 @@ const handleStreamConversation = async (ws, packet = {}) => {
       message,
       userRole,
       preferredLanguage,
-      history
+      history,
+      memoryContext: agentMemoryContext?.block || '',
+      ownerKey: agentMemoryContext?.ownerKey || '',
+      threadId: agentMemoryContext?.threadId || ''
     });
     const answer = String(result?.answer || '').trim();
     const chunks = chunkText(answer, 34);
@@ -85,6 +104,20 @@ const handleStreamConversation = async (ws, packet = {}) => {
       requestId,
       text: answer,
       meta: result?.meta || {}
+    });
+    persistAgentTurn({
+      context: agentMemoryContext,
+      userMessage: message,
+      assistantReply: answer,
+      replyType: 'CHAT',
+      status: 'OK',
+      metadata: {
+        userRole,
+        channel: 'websocket_stream',
+        streamMeta: result?.meta || null
+      }
+    }).catch((memoryErr) => {
+      captureException(memoryErr, { area: 'websocket_memory_persist' });
     });
     finalizeMetric({ error: false });
   } catch (err) {
