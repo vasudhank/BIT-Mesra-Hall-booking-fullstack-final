@@ -2,7 +2,7 @@ const express = require('express');
 const nodemailer = require('nodemailer');
 const { hashSync, compareSync } = require('bcrypt');
 const Complaint = require('../models/complaint');
-const { generateProjectSpecificSupportAnswer } = require('../services/supportAiService');
+const { generateProjectSpecificSupportAnswer, buildSupportDeterministicAnswer } = require('../services/supportAiService');
 
 const router = express.Router();
 
@@ -69,6 +69,24 @@ const readLegacyText = (obj, keys = []) => {
     }
   }
   return '';
+};
+
+const LEGACY_AI_LOW_SIGNAL_PATTERNS = [
+  /i could not complete full analysis/i,
+  /unable to complete right now/i,
+  /please wait for trusted/i,
+  /please open the .*thread/i,
+  /expected behavior vs actual behavior/i,
+  /i can help with this based on bit booking workflow/i,
+  /please mention your module clearly/i,
+  /quickpagemenu/i,
+  /\b(across all pages of the|from the|in the|on the|for the)\s*$/i
+];
+
+const isLegacyWeakAiAnswer = (text) => {
+  const clean = String(text || '').trim();
+  if (!clean) return true;
+  return LEGACY_AI_LOW_SIGNAL_PATTERNS.some((pattern) => pattern.test(clean));
 };
 const resolveAuthorRole = (obj = {}) => {
   const role = String(obj.authorRole || obj.role || '').toUpperCase().trim();
@@ -293,13 +311,47 @@ const spawnAutoAiReply = async ({ complaintId, pendingSolutionId, title, message
       if (!complaint) return;
       const target = complaint.solutions.id(pendingSolutionId);
       if (!target) return;
-      target.body = 'AI Generated: Unable to complete right now. Please wait for trusted admin/developer response.';
+      target.body = buildSupportDeterministicAnswer({
+        kind: 'COMPLAINT',
+        threadId: complaintId,
+        title,
+        message,
+        email
+      });
       target.isAIPending = false;
       await complaint.save();
     } catch (_) {
       // ignore
     }
   }
+};
+
+const maybeRefreshLegacyAiReply = async (complaintDoc) => {
+  if (!complaintDoc) return false;
+  const legacyTarget = (complaintDoc.solutions || []).find((solution) => {
+    if (!solution || !solution.isAIGenerated || solution.isAIPending) return false;
+    const body = readLegacyText(solution, ['body', 'content', 'message', 'solution']);
+    return isLegacyWeakAiAnswer(body);
+  });
+
+  if (!legacyTarget) return false;
+
+  legacyTarget.body = 'Thinking...';
+  legacyTarget.isAIPending = true;
+  complaintDoc.lastActivityAt = new Date();
+  await complaintDoc.save();
+
+  setTimeout(() => {
+    spawnAutoAiReply({
+      complaintId: complaintDoc._id,
+      pendingSolutionId: legacyTarget._id,
+      title: readLegacyText(complaintDoc, ['title', 'issueTitle', 'subject']),
+      message: readLegacyText(complaintDoc, ['message', 'description', 'issue', 'body']),
+      email: sanitizeEmail(readLegacyText(complaintDoc, ['email', 'reporterEmail', 'userEmail']))
+    });
+  }, 80);
+
+  return true;
 };
 
 router.get('/', async (req, res) => {
@@ -412,6 +464,7 @@ router.get('/:id', async (req, res) => {
     const voterId = getReactionVoterId(req, req.query.viewerId);
     const complaint = await Complaint.findById(req.params.id);
     if (!complaint) return res.status(404).json({ error: 'Complaint not found' });
+    await maybeRefreshLegacyAiReply(complaint);
     res.json({ complaint: toPublicComplaint(complaint, voterId) });
   } catch (err) {
     res.status(500).json({ error: err.message });

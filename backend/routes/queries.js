@@ -1,6 +1,6 @@
 const express = require('express');
 const Query = require('../models/query');
-const { generateProjectSpecificSupportAnswer } = require('../services/supportAiService');
+const { generateProjectSpecificSupportAnswer, buildSupportDeterministicAnswer } = require('../services/supportAiService');
 
 const router = express.Router();
 
@@ -27,6 +27,24 @@ const readLegacyText = (obj, keys = []) => {
     }
   }
   return '';
+};
+
+const LEGACY_AI_LOW_SIGNAL_PATTERNS = [
+  /i could not complete full analysis/i,
+  /unable to complete right now/i,
+  /please wait for trusted/i,
+  /please open the .*thread/i,
+  /expected behavior vs actual behavior/i,
+  /i can help with this based on bit booking workflow/i,
+  /please mention your module clearly/i,
+  /quickpagemenu/i,
+  /\b(across all pages of the|from the|in the|on the|for the)\s*$/i
+];
+
+const isLegacyWeakAiAnswer = (text) => {
+  const clean = String(text || '').trim();
+  if (!clean) return true;
+  return LEGACY_AI_LOW_SIGNAL_PATTERNS.some((pattern) => pattern.test(clean));
 };
 
 const nodemailer = require('nodemailer');
@@ -240,7 +258,7 @@ const updateReactionBucket = (bucket, voterId, value) => {
   return { likes: bucket.likes, dislikes: bucket.dislikes, userReaction };
 };
 
-const spawnAutoAiReply = async ({ queryId, pendingSolutionId, title, message, email }) => {
+const spawnAutoAiReply = async ({ queryId, pendingSolutionId, title, message, email, sendRaisedAlert = true }) => {
   try {
     const text = await generateProjectSpecificSupportAnswer({
       kind: 'QUERY',
@@ -258,7 +276,9 @@ const spawnAutoAiReply = async ({ queryId, pendingSolutionId, title, message, em
     target.isAIPending = false;
     query.lastActivityAt = new Date();
     await query.save();
-    await sendRaisedNotification(query);
+    if (sendRaisedAlert) {
+      await sendRaisedNotification(query);
+    }
   } catch (err) {
     console.error('[Queries][AI] failed:', err.message);
     try {
@@ -266,13 +286,48 @@ const spawnAutoAiReply = async ({ queryId, pendingSolutionId, title, message, em
       if (!query) return;
       const target = query.solutions.id(pendingSolutionId);
       if (!target) return;
-      target.body = 'AI Generated: Unable to complete right now. Please wait for trusted/community answer.';
+      target.body = buildSupportDeterministicAnswer({
+        kind: 'QUERY',
+        threadId: queryId,
+        title,
+        message,
+        email
+      });
       target.isAIPending = false;
       await query.save();
     } catch (_) {
       // ignore
     }
   }
+};
+
+const maybeRefreshLegacyAiReply = async (queryDoc) => {
+  if (!queryDoc) return false;
+  const legacyTarget = (queryDoc.solutions || []).find((solution) => {
+    if (!solution || !solution.isAIGenerated || solution.isAIPending) return false;
+    const body = readLegacyText(solution, ['body', 'content', 'message', 'solution']);
+    return isLegacyWeakAiAnswer(body);
+  });
+
+  if (!legacyTarget) return false;
+
+  legacyTarget.body = 'Thinking...';
+  legacyTarget.isAIPending = true;
+  queryDoc.lastActivityAt = new Date();
+  await queryDoc.save();
+
+  setTimeout(() => {
+    spawnAutoAiReply({
+      queryId: queryDoc._id,
+      pendingSolutionId: legacyTarget._id,
+      title: readLegacyText(queryDoc, ['title', 'queryTitle', 'subject']),
+      message: readLegacyText(queryDoc, ['message', 'description', 'query', 'body']),
+      email: sanitizeEmail(readLegacyText(queryDoc, ['email', 'reporterEmail', 'userEmail'])),
+      sendRaisedAlert: false
+    });
+  }, 80);
+
+  return true;
 };
 
 router.get('/', async (req, res) => {
@@ -363,7 +418,8 @@ router.post('/', async (req, res) => {
           pendingSolutionId,
           title,
           message,
-          email
+          email,
+          sendRaisedAlert: true
         });
       }, 100);
     }
@@ -379,6 +435,7 @@ router.get('/:id', async (req, res) => {
     const voterId = getReactionVoterId(req, req.query.viewerId);
     const query = await Query.findById(req.params.id);
     if (!query) return res.status(404).json({ error: 'Query not found' });
+    await maybeRefreshLegacyAiReply(query);
     res.json({ query: toPublicQuery(query, voterId) });
   } catch (err) {
     res.status(500).json({ error: err.message });

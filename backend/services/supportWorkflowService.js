@@ -14,6 +14,9 @@ const normalizeRuntime = (runtimeLike) => {
 
 const resolveSupportRuntime = () => normalizeRuntime(process.env.SUPPORT_GRAPH_RUNTIME || 'AGENTIC_MODEL_TOOLS');
 
+const isProviderQuotaOrRateLimitError = (err) =>
+  /(quota|rate limit|too many requests|resource exhausted|\b429\b|insufficient_quota)/i.test(String(err?.message || err || ''));
+
 const runSupportWorkflow = async (input = {}) => {
   const runtime = resolveSupportRuntime();
 
@@ -21,6 +24,7 @@ const runSupportWorkflow = async (input = {}) => {
     try {
       return await runAgenticModelWorkflow(input);
     } catch (err) {
+      if (isProviderQuotaOrRateLimitError(err)) throw err;
       logger.warn('Agentic model-tools workflow failed, falling back to LangGraph-compatible runtime', {
         error: err.message || err
       });
@@ -31,6 +35,7 @@ const runSupportWorkflow = async (input = {}) => {
     try {
       return await runLangGraphCompatibleWorkflow(input);
     } catch (err) {
+      if (isProviderQuotaOrRateLimitError(err)) throw err;
       logger.warn('LangGraph-compatible workflow failed, falling back to agent graph', {
         error: err.message || err
       });
@@ -39,6 +44,7 @@ const runSupportWorkflow = async (input = {}) => {
     try {
       return await runLangGraphCompatibleWorkflow(input);
     } catch (err) {
+      if (isProviderQuotaOrRateLimitError(err)) throw err;
       logger.warn('LangGraph-compatible fallback failed, falling back to agent graph', {
         error: err.message || err
       });
