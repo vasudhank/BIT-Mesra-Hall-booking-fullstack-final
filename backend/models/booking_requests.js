@@ -7,7 +7,8 @@ const bookingrequestSchema = new mongoose.Schema({
   department: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Department',
-    required: true,
+    required: false,
+    default: null
   },
 
   event: { type: String, required: true },

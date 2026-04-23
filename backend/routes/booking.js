@@ -74,6 +74,31 @@ const isVacateDecision = (decision) =>
 const isLeaveDecision = (decision) =>
   ['LEAVE', 'KEEP'].includes(decision);
 
+const notifyDepartmentDecision = (requestDoc, decision) => {
+  const departmentEmail = requestDoc?.department?.email || '';
+  if (departmentEmail) {
+    safeExecute(
+      () => sendDecisionToDepartment({
+        email: departmentEmail,
+        booking: requestDoc,
+        decision
+      }),
+      'DEPARTMENT EMAIL'
+    );
+  }
+
+  const hasDepartment = Boolean(requestDoc?.department);
+  if (hasDepartment) {
+    safeExecute(
+      () => sendDecisionSMSDepartment({
+        booking: requestDoc,
+        decision
+      }),
+      'DEPARTMENT SMS'
+    );
+  }
+};
+
 router.get('/', (req, res) => {
   res.send({ msg: 'Inside Booking Route' });
 });
@@ -318,23 +343,7 @@ router.post('/change_booking_request', async (req, res) => {
         requestDoc.approvalToken = null;
         requestDoc.tokenExpiry = null;
         await requestDoc.save();
-
-        safeExecute(
-          () => sendDecisionToDepartment({
-            email: requestDoc.department.email,
-            booking: requestDoc,
-            decision: 'REJECTED'
-          }),
-          'DEPARTMENT EMAIL'
-        );
-
-        safeExecute(
-          () => sendDecisionSMSDepartment({
-            booking: requestDoc,
-            decision: 'REJECTED'
-          }),
-          'DEPARTMENT SMS'
-        );
+        notifyDepartmentDecision(requestDoc, 'REJECTED');
 
         return res.status(200).json({ status: 'Rejected' });
       }
@@ -368,23 +377,7 @@ router.post('/change_booking_request', async (req, res) => {
         requestDoc.approvalToken = null;
         requestDoc.tokenExpiry = null;
         await requestDoc.save();
-
-        safeExecute(
-          () => sendDecisionToDepartment({
-            email: requestDoc.department.email,
-            booking: requestDoc,
-            decision: 'APPROVED'
-          }),
-          'DEPARTMENT EMAIL'
-        );
-
-        safeExecute(
-          () => sendDecisionSMSDepartment({
-            booking: requestDoc,
-            decision: 'APPROVED'
-          }),
-          'DEPARTMENT SMS'
-        );
+        notifyDepartmentDecision(requestDoc, 'APPROVED');
 
         return res.status(200).json({ status: 'Approved' });
       }
@@ -403,23 +396,7 @@ router.post('/change_booking_request', async (req, res) => {
         requestDoc.approvalToken = null;
         requestDoc.tokenExpiry = null;
         await requestDoc.save();
-
-        safeExecute(
-          () => sendDecisionToDepartment({
-            email: requestDoc.department.email,
-            booking: requestDoc,
-            decision: 'VACATED'
-          }),
-          'DEPARTMENT EMAIL'
-        );
-
-        safeExecute(
-          () => sendDecisionSMSDepartment({
-            booking: requestDoc,
-            decision: 'VACATED'
-          }),
-          'DEPARTMENT SMS'
-        );
+        notifyDepartmentDecision(requestDoc, 'VACATED');
 
         return res.status(200).json({ status: 'Vacated' });
       }

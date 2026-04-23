@@ -9,10 +9,12 @@ const developerSchema = new mongoose.Schema(
     type: { type: String, default: 'Developer', immutable: true },
     otp: { type: String, default: null },
     otpExpiry: { type: Date, default: null },
-    pendingEmail: { type: String, default: null }
+    pendingEmail: { type: String, default: null },
+
+    // Optional per-account session duration preference (in milliseconds).
+    sessionTimeoutMs: { type: Number, default: null }
   },
   { timestamps: true }
 );
 
 module.exports = mongoose.model('Developer', developerSchema);
-

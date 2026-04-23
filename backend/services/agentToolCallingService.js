@@ -10,6 +10,11 @@ const {
   captureException,
   withDatadogSpan
 } = require('./observabilityService');
+const {
+  getRotatedOpenAIApiKeys,
+  hasOpenAIApiKeyConfigured,
+  shouldRetryWithAnotherOpenAIKey
+} = require('./openaiKeyPoolService');
 const { logger } = require('./loggerService');
 const {
   getAgentToolCatalog,
@@ -88,7 +93,7 @@ const withTimeout = async (url, requestOptions, timeoutMs = DEFAULT_TIMEOUT_MS) 
 };
 
 const isProviderConfigured = (provider) => {
-  if (provider === 'openai') return Boolean(String(process.env.OPENAI_API_KEY || '').trim());
+  if (provider === 'openai') return hasOpenAIApiKeyConfigured();
   if (provider === 'anthropic') return Boolean(String(process.env.ANTHROPIC_API_KEY || '').trim());
   return false;
 };
@@ -209,41 +214,65 @@ const parseOpenAIMessageText = (message) => {
 };
 
 const callOpenAIToolTurn = async ({ messages, tools, temperature = 0.2, maxTokens = 1000 }) => {
-  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
-  if (!apiKey) throw new Error('OPENAI_API_KEY is not configured.');
+  const apiKeys = getRotatedOpenAIApiKeys();
+  if (apiKeys.length === 0) throw new Error('OPENAI_API_KEY/OPENAI_API_KEYS is not configured.');
 
-  const response = await withDatadogSpan(
-    'ai.llm.tools.openai',
-    { provider: 'openai', model: OPENAI_MODEL },
-    async () =>
-      withTimeout(
-        `${OPENAI_BASE_URL}/chat/completions`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            model: OPENAI_MODEL,
-            messages,
-            tools,
-            tool_choice: 'auto',
-            temperature,
-            max_tokens: maxTokens
-          })
+  const requestBody = {
+    model: OPENAI_MODEL,
+    messages,
+    tools,
+    tool_choice: 'auto',
+    temperature,
+    max_tokens: maxTokens
+  };
+
+  const failures = [];
+  for (let idx = 0; idx < apiKeys.length; idx += 1) {
+    const apiKey = apiKeys[idx];
+    try {
+      const response = await withDatadogSpan(
+        'ai.llm.tools.openai',
+        { provider: 'openai', model: OPENAI_MODEL },
+        async () =>
+          withTimeout(
+            `${OPENAI_BASE_URL}/chat/completions`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${apiKey}`
+              },
+              body: JSON.stringify(requestBody)
+            }
+          )
+      );
+
+      if (!response.ok) {
+        const details = await response.text().catch(() => '');
+        const status = Number(response.status || 0);
+        failures.push(`key${idx + 1}:${status} ${details.slice(0, 120)}`.trim());
+
+        const canRetry = idx < (apiKeys.length - 1)
+          && shouldRetryWithAnotherOpenAIKey({ status, details });
+
+        if (!canRetry) {
+          throw new Error(`OpenAI tool call failed (${status}) ${details.slice(0, 260)}`.trim());
         }
-      )
-  );
+        continue;
+      }
 
-  if (!response.ok) {
-    const details = await response.text().catch(() => '');
-    throw new Error(`OpenAI tool call failed (${response.status}) ${details.slice(0, 260)}`.trim());
+      const data = await response.json();
+      observeLlmProviderCall({ provider: 'openai', model: OPENAI_MODEL, error: false });
+      return data;
+    } catch (err) {
+      const canRetry = idx < (apiKeys.length - 1)
+        && shouldRetryWithAnotherOpenAIKey({ status: 0, error: err });
+      failures.push(`key${idx + 1}:0 ${String(err?.message || err).slice(0, 120)}`.trim());
+      if (!canRetry) throw err;
+    }
   }
 
-  const data = await response.json();
-  observeLlmProviderCall({ provider: 'openai', model: OPENAI_MODEL, error: false });
-  return data;
+  throw new Error(`OpenAI tool call failed for all configured API keys. ${failures.join(' | ')}`.trim());
 };
 
 const extractAnthropicText = (content = []) =>

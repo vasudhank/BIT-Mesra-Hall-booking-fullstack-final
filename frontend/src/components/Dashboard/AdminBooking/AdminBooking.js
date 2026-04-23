@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Appbar from '../AppBar/AppBar';
 import "./AdminBooking.css";
 import Grid from '@mui/material/Grid';
@@ -76,7 +76,7 @@ export default function AdminBooking() {
   const [bulkStripHeight, setBulkStripHeight] = useState(0);
   const [pinBulkStrip, setPinBulkStrip] = useState(false);
 
-  const sortRequests = (requests, mode) => {
+  const sortRequests = useCallback((requests, mode) => {
     const cloned = [...requests];
     return cloned.sort((a, b) => {
       const hallA = String(a.hall || '');
@@ -100,9 +100,9 @@ export default function AdminBooking() {
       if (mode === 'TIME_DESC') return timeB - timeA;
       return timeA - timeB;
     });
-  };
+  }, []);
 
-  const applySearchAndSort = (requests, searchTerm, mode) => {
+  const applySearchAndSort = useCallback((requests, searchTerm, mode) => {
     const term = String(searchTerm || '').trim();
     const searched = !term
       ? [...requests]
@@ -119,10 +119,112 @@ export default function AdminBooking() {
           { threshold: 0.46 }
         );
     return sortRequests(searched, mode);
-  };
+  }, [sortRequests]);
+
+  const processCategorization = useCallback((requests) => {
+    // 1. Initialize Buckets
+    const buckets = {
+      timeConflicts: {},
+      dateConflicts: {},
+      noConflicts: {}
+    };
+
+    // Sets to track IDs so we don't duplicate logic
+    // (Priority: Time Conflict > Date Conflict > No Conflict)
+    const timeConflictIds = new Set();
+    const dateConflictIds = new Set();
+
+    // 2. Group by Hall
+    const byHall = requests.reduce((acc, req) => {
+      const h = req.hall;
+      if (!acc[h]) acc[h] = [];
+      acc[h].push(req);
+      return acc;
+    }, {});
+
+    // 3. Helper: Convert "HH:MM:SS" or "HH:MM" to minutes for comparison
+    const getMinutes = (timeStr) => {
+      if (!timeStr) return 0;
+      const [h, m] = timeStr.split(':').map(Number);
+      return h * 60 + m;
+    };
+
+    // 4. Analyze overlaps
+    Object.keys(byHall).forEach((hall) => {
+      const hallReqs = byHall[hall];
+
+      hallReqs.forEach((reqA) => {
+        let hasCriticalTimeConflict = false;
+        let hasDateOnlyConflict = false;
+
+        const startA = new Date(reqA.startDateTime).getTime();
+        const endA = new Date(reqA.endDateTime).getTime();
+
+        // Time of day in minutes (for partial overlap check)
+        const timeStartA = getMinutes(reqA.startTime24);
+        const timeEndA = getMinutes(reqA.endTime24);
+
+        for (const reqB of hallReqs) {
+          if (reqA._id === reqB._id) continue;
+
+          const startB = new Date(reqB.startDateTime).getTime();
+          const endB = new Date(reqB.endDateTime).getTime();
+
+          // --- LOGIC A: CRITICAL TIME CONFLICT ---
+          // Do the actual physical time ranges overlap?
+          // Logic: (StartA < EndB) AND (StartB < EndA)
+          // This handles same day overlap, multi-day overlap, wrapping, etc.
+          const isFullOverlap = (startA < endB && startB < endA);
+
+          if (isFullOverlap) {
+            hasCriticalTimeConflict = true;
+            break;
+          }
+
+          // --- LOGIC B: DATE OVERLAP BUT DIFFERENT TIME ---
+          if (!hasCriticalTimeConflict) {
+            const timeStartB = getMinutes(reqB.startTime24);
+            const timeEndB = getMinutes(reqB.endTime24);
+
+            const dateStartA = new Date(reqA.startDate).getTime();
+            const dateEndA = new Date(reqA.endDate).getTime();
+            const dateStartB = new Date(reqB.startDate).getTime();
+            const dateEndB = new Date(reqB.endDate).getTime();
+
+            const datesOverlap = (dateStartA <= dateEndB && dateStartB <= dateEndA);
+            const timesOverlap = (timeStartA < timeEndB && timeStartB < timeEndA);
+
+            if (datesOverlap && !timesOverlap) {
+              hasDateOnlyConflict = true;
+            }
+          }
+        }
+
+        if (hasCriticalTimeConflict) {
+          timeConflictIds.add(reqA._id);
+          if (!buckets.timeConflicts[hall]) buckets.timeConflicts[hall] = [];
+          buckets.timeConflicts[hall].push(reqA);
+        } else if (hasDateOnlyConflict) {
+          dateConflictIds.add(reqA._id);
+          if (!buckets.dateConflicts[hall]) buckets.dateConflicts[hall] = [];
+          buckets.dateConflicts[hall].push(reqA);
+        } else {
+          if (!buckets.noConflicts[hall]) buckets.noConflicts[hall] = [];
+          buckets.noConflicts[hall].push(reqA);
+        }
+      });
+    });
+
+    setCategorizedData(buckets);
+    setCounts({
+      time: Object.values(buckets.timeConflicts).reduce((acc, arr) => acc + arr.length, 0),
+      date: Object.values(buckets.dateConflicts).reduce((acc, arr) => acc + arr.length, 0),
+      safe: Object.values(buckets.noConflicts).reduce((acc, arr) => acc + arr.length, 0)
+    });
+  }, []);
 
   // --- 1. DATA FETCHING ---
-  const get_booking_requests = async () => {
+  const get_booking_requests = useCallback(async () => {
     setOpen(true);
     try {
       const response = await api.get('/booking/show_booking_requests', {
@@ -130,18 +232,16 @@ export default function AdminBooking() {
       });
       const data = response.data.booking_requests || [];
       setBookingRequests(data);
-      setFilteredRequests(applySearchAndSort(data, search, sortMode));
-      processCategorization(data); 
       setOpen(false);
     } catch (err) {
       console.log(err);
       setOpen(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     get_booking_requests();
-  }, []);
+  }, [get_booking_requests]);
 
   useEffect(() => {
     const validIds = new Set(bookingRequests.map((req) => req._id));
@@ -150,7 +250,11 @@ export default function AdminBooking() {
 
   useEffect(() => {
     setFilteredRequests(applySearchAndSort(bookingRequests, search, sortMode));
-  }, [bookingRequests, search, sortMode]);
+  }, [applySearchAndSort, bookingRequests, search, sortMode]);
+
+  useEffect(() => {
+    processCategorization(bookingRequests);
+  }, [bookingRequests, processCategorization]);
 
   useEffect(() => {
     if (!showAppbar) return;
@@ -180,118 +284,6 @@ export default function AdminBooking() {
     window.addEventListener('resize', measureViewportStrip);
     return () => window.removeEventListener('resize', measureViewportStrip);
   }, [showViewportStrip, showAppbar, isMobile, sortMode]);
-
-  // --- 2. ROBUST CONFLICT LOGIC ---
-  const processCategorization = (requests) => {
-    // 1. Initialize Buckets
-    const buckets = {
-      timeConflicts: {}, 
-      dateConflicts: {},
-      noConflicts: {}
-    };
-
-    // Sets to track IDs so we don't duplicate logic 
-    // (Priority: Time Conflict > Date Conflict > No Conflict)
-    const timeConflictIds = new Set();
-    const dateConflictIds = new Set();
-
-    // 2. Group by Hall
-    const byHall = requests.reduce((acc, req) => {
-      const h = req.hall;
-      if (!acc[h]) acc[h] = [];
-      acc[h].push(req);
-      return acc;
-    }, {});
-
-    // 3. Helper: Convert "HH:MM:SS" or "HH:MM" to minutes for comparison
-    const getMinutes = (timeStr) => {
-        if (!timeStr) return 0;
-        const [h, m] = timeStr.split(':').map(Number);
-        return h * 60 + m;
-    };
-
-    // 4. Analyze overlaps
-    Object.keys(byHall).forEach(hall => {
-      const hallReqs = byHall[hall];
-      
-      hallReqs.forEach(reqA => {
-        let hasCriticalTimeConflict = false;
-        let hasDateOnlyConflict = false;
-
-        const startA = new Date(reqA.startDateTime).getTime();
-        const endA = new Date(reqA.endDateTime).getTime();
-        
-        // Time of day in minutes (for partial overlap check)
-        const timeStartA = getMinutes(reqA.startTime24);
-        const timeEndA = getMinutes(reqA.endTime24);
-
-        for (let reqB of hallReqs) {
-          if (reqA._id === reqB._id) continue; 
-
-          const startB = new Date(reqB.startDateTime).getTime();
-          const endB = new Date(reqB.endDateTime).getTime();
-
-          // --- LOGIC A: CRITICAL TIME CONFLICT ---
-          // Do the actual physical time ranges overlap?
-          // Logic: (StartA < EndB) AND (StartB < EndA)
-          // This handles same day overlap, multi-day overlap, wrapping, etc.
-          const isFullOverlap = (startA < endB && startB < endA);
-
-          if (isFullOverlap) {
-            hasCriticalTimeConflict = true;
-            break; // Stop checking, this is already critical
-          }
-
-          // --- LOGIC B: DATE OVERLAP BUT DIFFERENT TIME ---
-          // Only check if not critical
-          if (!hasCriticalTimeConflict) {
-             const timeStartB = getMinutes(reqB.startTime24);
-             const timeEndB = getMinutes(reqB.endTime24);
-
-             // 1. Do Dates Overlap? (Using String comparison or Date objects at 00:00:00)
-             const dateStartA = new Date(reqA.startDate).getTime();
-             const dateEndA = new Date(reqA.endDate).getTime();
-             const dateStartB = new Date(reqB.startDate).getTime();
-             const dateEndB = new Date(reqB.endDate).getTime();
-             
-             const datesOverlap = (dateStartA <= dateEndB && dateStartB <= dateEndA);
-
-             // 2. Do Times of Day Overlap?
-             // e.g. 10:00-11:00 vs 14:00-15:00
-             const timesOverlap = (timeStartA < timeEndB && timeStartB < timeEndA);
-
-             if (datesOverlap && !timesOverlap) {
-                hasDateOnlyConflict = true;
-             }
-          }
-        }
-
-        // --- BUCKET ASSIGNMENT (Priority Based) ---
-        if (hasCriticalTimeConflict) {
-          timeConflictIds.add(reqA._id);
-          if (!buckets.timeConflicts[hall]) buckets.timeConflicts[hall] = [];
-          buckets.timeConflicts[hall].push(reqA);
-        } else if (hasDateOnlyConflict) {
-          dateConflictIds.add(reqA._id);
-          if (!buckets.dateConflicts[hall]) buckets.dateConflicts[hall] = [];
-          buckets.dateConflicts[hall].push(reqA);
-        } else {
-          if (!buckets.noConflicts[hall]) buckets.noConflicts[hall] = [];
-          buckets.noConflicts[hall].push(reqA);
-        }
-      });
-    });
-
-    // 5. Update State
-    setCategorizedData(buckets);
-    
-    // 6. Calculate Counts for Badges (Sum of all arrays in the maps)
-    setCounts({
-        time: Object.values(buckets.timeConflicts).reduce((acc, arr) => acc + arr.length, 0),
-        date: Object.values(buckets.dateConflicts).reduce((acc, arr) => acc + arr.length, 0),
-        safe: Object.values(buckets.noConflicts).reduce((acc, arr) => acc + arr.length, 0)
-    });
-  };
 
   // --- 3. NAVIGATION HANDLERS ---
   const handleFilterClick = (category) => {

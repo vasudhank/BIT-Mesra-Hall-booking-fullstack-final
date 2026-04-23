@@ -2,14 +2,17 @@ const fetch = require('node-fetch');
 const mongoose = require('mongoose');
 const VectorDocument = require('../models/vectorDocument');
 const { embedText, embedTexts, cosineSimilarity } = require('./embeddingService');
+const { hasOpenAIApiKeyConfigured } = require('./openaiKeyPoolService');
 
 const VECTOR_PROVIDER_ENV = String(process.env.VECTOR_DB_PROVIDER || 'local').trim().toLowerCase();
 const LOCAL_SCAN_LIMIT = Math.max(Number(process.env.VECTOR_LOCAL_SCAN_LIMIT || 1800), 200);
 const DEFAULT_NAMESPACE = process.env.VECTOR_DEFAULT_NAMESPACE || 'support_knowledge';
+const VECTOR_PROBE_TIMEOUT_MS = Math.max(Number(process.env.VECTOR_PROBE_TIMEOUT_MS || 5000), 1500);
+const VECTOR_STATUS_CACHE_MS = Math.max(Number(process.env.VECTOR_STATUS_CACHE_MS || 30000), 3000);
 
 const pineconeConfig = {
   apiKey: String(process.env.PINECONE_API_KEY || '').trim(),
-  indexUrl: String(process.env.PINECONE_INDEX_URL || '').trim()
+  indexUrl: String(process.env.PINECONE_INDEX_URL || '').trim().replace(/\/+$/, '')
 };
 
 const weaviateConfig = {
@@ -19,11 +22,32 @@ const weaviateConfig = {
 };
 
 const isMongoReady = () => Number(mongoose?.connection?.readyState || 0) === 1;
+const nowIso = () => new Date().toISOString();
 
 const resolveProvider = () => {
   if (VECTOR_PROVIDER_ENV === 'pinecone' && pineconeConfig.apiKey && pineconeConfig.indexUrl) return 'pinecone';
   if (VECTOR_PROVIDER_ENV === 'weaviate' && weaviateConfig.baseUrl) return 'weaviate';
   return 'local';
+};
+
+const isRemoteProvider = (provider) => provider === 'pinecone' || provider === 'weaviate';
+const resolveEmbeddingProvider = () =>
+  hasOpenAIApiKeyConfigured() ? 'openai' : 'local';
+
+const providerIsConfigured = (provider) => {
+  if (provider === 'pinecone') {
+    return Boolean(pineconeConfig.apiKey && pineconeConfig.indexUrl);
+  }
+  if (provider === 'weaviate') {
+    return Boolean(weaviateConfig.baseUrl);
+  }
+  return true;
+};
+
+const resolveDeploymentMode = (provider) => {
+  if (provider === 'pinecone') return 'managed_remote';
+  if (provider === 'weaviate') return 'remote_or_self_hosted';
+  return 'embedded_local';
 };
 
 const sanitizeNamespace = (namespaceLike) =>
@@ -46,6 +70,152 @@ const buildMetadata = (metadataLike = {}, text = '') => {
     ...base,
     text: String(text || '').slice(0, 6000)
   };
+};
+
+const safeUrlPreview = (value = '') => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+
+  try {
+    const parsed = new URL(raw);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch (err) {
+    return raw.replace(/\/+$/, '');
+  }
+};
+
+let runtimeCache = {
+  checkedAt: null,
+  lastSuccessAt: null,
+  connected: false,
+  live: false,
+  health: 'unknown',
+  detail: '',
+  stats: {}
+};
+
+const buildProviderConfigSummary = (provider) => {
+  if (provider === 'pinecone') {
+    return {
+      endpoint: safeUrlPreview(pineconeConfig.indexUrl),
+      apiKeyConfigured: Boolean(pineconeConfig.apiKey),
+      remoteManaged: true
+    };
+  }
+
+  if (provider === 'weaviate') {
+    return {
+      endpoint: safeUrlPreview(weaviateConfig.baseUrl),
+      className: weaviateConfig.className,
+      apiKeyConfigured: Boolean(weaviateConfig.apiKey),
+      remoteManaged: false
+    };
+  }
+
+  return {
+    endpoint: 'mongodb',
+    mongoReady: isMongoReady(),
+    remoteManaged: false
+  };
+};
+
+const buildDefaultStatus = () => {
+  const provider = resolveProvider();
+  const configured = providerIsConfigured(provider);
+  const connected = provider === 'local' ? isMongoReady() : false;
+  const live = provider === 'local' ? connected : false;
+  const health = provider === 'local'
+    ? (connected ? 'live' : 'degraded')
+    : (configured ? 'degraded' : 'setup_required');
+
+  return {
+    provider,
+    namespace: DEFAULT_NAMESPACE,
+    configured,
+    remote: isRemoteProvider(provider),
+    deployment: resolveDeploymentMode(provider),
+    embeddingProvider: resolveEmbeddingProvider(),
+    connected,
+    live,
+    health,
+    checkedAt: runtimeCache.checkedAt,
+    lastSuccessAt: runtimeCache.lastSuccessAt,
+    detail: provider === 'local'
+      ? (connected
+        ? 'Mongo-backed local vector store is ready.'
+        : 'Mongo-backed local vector store is waiting for MongoDB.')
+      : configured
+        ? 'Remote vector store is configured and waiting for a live probe.'
+        : 'Remote vector store credentials are not configured.',
+    config: buildProviderConfigSummary(provider),
+    stats: runtimeCache.stats || {}
+  };
+};
+
+const updateRuntimeCache = (overrides = {}) => {
+  runtimeCache = {
+    ...runtimeCache,
+    ...overrides
+  };
+  return getCachedVectorStoreRuntimeStatus();
+};
+
+const getCachedVectorStoreRuntimeStatus = () => ({
+  ...buildDefaultStatus(),
+  ...runtimeCache,
+  provider: resolveProvider(),
+  namespace: DEFAULT_NAMESPACE,
+  configured: providerIsConfigured(resolveProvider()),
+  remote: isRemoteProvider(resolveProvider()),
+  deployment: resolveDeploymentMode(resolveProvider()),
+  embeddingProvider: resolveEmbeddingProvider(),
+  config: buildProviderConfigSummary(resolveProvider())
+});
+
+const withTimeout = async (url, options = {}, timeoutMs = VECTOR_PROBE_TIMEOUT_MS) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+const parseJsonSafely = async (response) => {
+  try {
+    return await response.json();
+  } catch (err) {
+    return null;
+  }
+};
+
+const executeVectorOperation = async (provider, action, work) => {
+  try {
+    const result = await work();
+    const successAt = nowIso();
+    updateRuntimeCache({
+      checkedAt: successAt,
+      lastSuccessAt: successAt,
+      connected: provider === 'local' ? isMongoReady() : true,
+      live: provider === 'local' ? isMongoReady() : true,
+      health: provider === 'local'
+        ? (isMongoReady() ? 'live' : 'degraded')
+        : 'live',
+      detail: `${provider.toUpperCase()} ${action} completed successfully.`
+    });
+    return result;
+  } catch (err) {
+    updateRuntimeCache({
+      checkedAt: nowIso(),
+      connected: provider === 'local' ? isMongoReady() : false,
+      live: false,
+      health: providerIsConfigured(provider) ? 'degraded' : 'setup_required',
+      detail: `${provider.toUpperCase()} ${action} failed: ${err.message || err}`
+    });
+    throw err;
+  }
 };
 
 const upsertLocal = async ({ namespace, documents }) => {
@@ -116,7 +286,7 @@ const upsertPinecone = async ({ namespace, documents }) => {
     };
   });
 
-  const response = await fetch(`${pineconeConfig.indexUrl.replace(/\/+$/, '')}/vectors/upsert`, {
+  const response = await fetch(`${pineconeConfig.indexUrl}/vectors/upsert`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -138,7 +308,7 @@ const upsertPinecone = async ({ namespace, documents }) => {
 
 const queryPinecone = async ({ namespace, queryText, topK }) => {
   const queryEmbedding = await embedText(queryText);
-  const response = await fetch(`${pineconeConfig.indexUrl.replace(/\/+$/, '')}/query`, {
+  const response = await fetch(`${pineconeConfig.indexUrl}/query`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -176,7 +346,45 @@ const weaviateHeaders = () => {
   return headers;
 };
 
+const ensureWeaviateClass = async () => {
+  const schemaUrl = `${weaviateConfig.baseUrl}/v1/schema/${encodeURIComponent(weaviateConfig.className)}`;
+  const existing = await fetch(schemaUrl, {
+    method: 'GET',
+    headers: weaviateHeaders()
+  });
+
+  if (existing.ok) return { created: false };
+  if (existing.status !== 404) {
+    const details = await existing.text().catch(() => '');
+    throw new Error(`Weaviate schema check failed (${existing.status}) ${details.slice(0, 200)}`);
+  }
+
+  const response = await fetch(`${weaviateConfig.baseUrl}/v1/schema`, {
+    method: 'POST',
+    headers: weaviateHeaders(),
+    body: JSON.stringify({
+      class: weaviateConfig.className,
+      description: 'BIT Booking support knowledge vectors',
+      vectorizer: 'none',
+      properties: [
+        { name: 'namespace', dataType: ['text'] },
+        { name: 'externalId', dataType: ['text'] },
+        { name: 'text', dataType: ['text'] },
+        { name: 'metadata', dataType: ['text'] }
+      ]
+    })
+  });
+
+  if (!response.ok && response.status !== 422) {
+    const details = await response.text().catch(() => '');
+    throw new Error(`Weaviate schema create failed (${response.status}) ${details.slice(0, 200)}`);
+  }
+
+  return { created: response.ok };
+};
+
 const upsertWeaviate = async ({ namespace, documents }) => {
+  await ensureWeaviateClass();
   const embeddings = await embedTexts(documents.map((item) => item.text));
 
   for (let i = 0; i < documents.length; i += 1) {
@@ -270,19 +478,184 @@ const normalizeDocuments = (documents = []) =>
     })
     .filter(Boolean);
 
+const probeLocalProvider = async () => {
+  const connected = isMongoReady();
+  const docCount = connected
+    ? await VectorDocument.countDocuments({ namespace: DEFAULT_NAMESPACE }).catch(() => 0)
+    : 0;
+  const checkedAt = nowIso();
+
+  return updateRuntimeCache({
+    checkedAt,
+    lastSuccessAt: connected ? checkedAt : runtimeCache.lastSuccessAt,
+    connected,
+    live: connected,
+    health: connected ? 'live' : 'degraded',
+    detail: connected
+      ? 'Mongo-backed local vector store is serving live reads and writes.'
+      : 'Mongo-backed local vector store is unavailable because MongoDB is not connected.',
+    stats: {
+      namespaceDocumentCount: Number(docCount || 0)
+    }
+  });
+};
+
+const describePineconeIndexStats = async () => {
+  const methods = ['POST', 'GET'];
+
+  for (const method of methods) {
+    const response = await withTimeout(
+      `${pineconeConfig.indexUrl}/describe_index_stats`,
+      {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Api-Key': pineconeConfig.apiKey
+        },
+        body: method === 'POST' ? JSON.stringify({}) : undefined
+      }
+    );
+
+    if (response.ok) {
+      return parseJsonSafely(response);
+    }
+
+    if (response.status !== 404 && response.status !== 405) {
+      const details = await response.text().catch(() => '');
+      throw new Error(`Pinecone probe failed (${response.status}) ${details.slice(0, 200)}`);
+    }
+  }
+
+  throw new Error('Pinecone describe_index_stats endpoint was not available.');
+};
+
+const probePineconeProvider = async () => {
+  const checkedAt = nowIso();
+  if (!providerIsConfigured('pinecone')) {
+    return updateRuntimeCache({
+      checkedAt,
+      connected: false,
+      live: false,
+      health: 'setup_required',
+      detail: 'Set PINECONE_API_KEY and PINECONE_INDEX_URL to enable the live Pinecone deployment.',
+      stats: {}
+    });
+  }
+
+  const stats = await describePineconeIndexStats();
+  const namespaces = stats?.namespaces && typeof stats.namespaces === 'object'
+    ? Object.keys(stats.namespaces)
+    : [];
+
+  return updateRuntimeCache({
+    checkedAt,
+    lastSuccessAt: checkedAt,
+    connected: true,
+    live: true,
+    health: 'live',
+    detail: 'Managed Pinecone index is connected and ready for live retrieval.',
+    stats: {
+      totalVectorCount: Number(stats?.totalVectorCount || stats?.total_vector_count || 0),
+      namespaceCount: namespaces.length,
+      namespaces: namespaces.slice(0, 10)
+    }
+  });
+};
+
+const probeWeaviateProvider = async () => {
+  const checkedAt = nowIso();
+  if (!providerIsConfigured('weaviate')) {
+    return updateRuntimeCache({
+      checkedAt,
+      connected: false,
+      live: false,
+      health: 'setup_required',
+      detail: 'Set WEAVIATE_URL to enable the live Weaviate deployment.',
+      stats: {}
+    });
+  }
+
+  const readyResponse = await withTimeout(`${weaviateConfig.baseUrl}/v1/.well-known/ready`, {
+    method: 'GET',
+    headers: weaviateHeaders()
+  });
+
+  if (!readyResponse.ok) {
+    const details = await readyResponse.text().catch(() => '');
+    throw new Error(`Weaviate readiness probe failed (${readyResponse.status}) ${details.slice(0, 200)}`);
+  }
+
+  const schemaResponse = await withTimeout(
+    `${weaviateConfig.baseUrl}/v1/schema/${encodeURIComponent(weaviateConfig.className)}`,
+    {
+      method: 'GET',
+      headers: weaviateHeaders()
+    }
+  );
+
+  if (schemaResponse.ok) {
+    return updateRuntimeCache({
+      checkedAt,
+      lastSuccessAt: checkedAt,
+      connected: true,
+      live: true,
+      health: 'live',
+      detail: 'Weaviate cluster is connected and the vector class is ready for live retrieval.',
+      stats: {
+        classReady: true,
+        className: weaviateConfig.className
+      }
+    });
+  }
+
+  if (schemaResponse.status === 404) {
+    return updateRuntimeCache({
+      checkedAt,
+      connected: true,
+      live: false,
+      health: 'degraded',
+      detail: 'Weaviate is reachable, but the vector class has not been created yet. The next vector sync will create it automatically.',
+      stats: {
+        classReady: false,
+        className: weaviateConfig.className
+      }
+    });
+  }
+
+  const details = await schemaResponse.text().catch(() => '');
+  throw new Error(`Weaviate schema probe failed (${schemaResponse.status}) ${details.slice(0, 200)}`);
+};
+
+const getVectorStoreRuntimeStatus = async ({ force = false } = {}) => {
+  const checkedAtMs = runtimeCache.checkedAt ? new Date(runtimeCache.checkedAt).getTime() : 0;
+  if (!force && checkedAtMs && Date.now() - checkedAtMs < VECTOR_STATUS_CACHE_MS) {
+    return getCachedVectorStoreRuntimeStatus();
+  }
+
+  const provider = resolveProvider();
+  if (provider === 'pinecone') return probePineconeProvider();
+  if (provider === 'weaviate') return probeWeaviateProvider();
+  return probeLocalProvider();
+};
+
 const upsertVectorDocuments = async ({ namespace = DEFAULT_NAMESPACE, documents = [] } = {}) => {
   const normalizedNamespace = sanitizeNamespace(namespace);
   const normalizedDocs = normalizeDocuments(documents);
-  if (normalizedDocs.length === 0) return { provider: resolveProvider(), upserted: 0, skipped: 0 };
-
   const provider = resolveProvider();
-  if (provider === 'pinecone') {
-    return upsertPinecone({ namespace: normalizedNamespace, documents: normalizedDocs });
+
+  if (normalizedDocs.length === 0) {
+    return { provider, upserted: 0, skipped: 0 };
   }
-  if (provider === 'weaviate') {
-    return upsertWeaviate({ namespace: normalizedNamespace, documents: normalizedDocs });
-  }
-  return upsertLocal({ namespace: normalizedNamespace, documents: normalizedDocs });
+
+  return executeVectorOperation(provider, 'upsert', async () => {
+    if (provider === 'pinecone') {
+      return upsertPinecone({ namespace: normalizedNamespace, documents: normalizedDocs });
+    }
+    if (provider === 'weaviate') {
+      return upsertWeaviate({ namespace: normalizedNamespace, documents: normalizedDocs });
+    }
+    return upsertLocal({ namespace: normalizedNamespace, documents: normalizedDocs });
+  });
 };
 
 const querySimilarVectors = async ({
@@ -294,20 +667,24 @@ const querySimilarVectors = async ({
   const cleanQuery = String(queryText || '').trim();
   if (!cleanQuery) return [];
   const size = Math.max(Math.min(Number(topK) || 5, 20), 1);
-
   const provider = resolveProvider();
-  if (provider === 'pinecone') {
-    return queryPinecone({ namespace: normalizedNamespace, queryText: cleanQuery, topK: size });
-  }
-  if (provider === 'weaviate') {
-    return queryWeaviate({ namespace: normalizedNamespace, queryText: cleanQuery, topK: size });
-  }
-  return queryLocal({ namespace: normalizedNamespace, queryText: cleanQuery, topK: size });
+
+  return executeVectorOperation(provider, 'query', async () => {
+    if (provider === 'pinecone') {
+      return queryPinecone({ namespace: normalizedNamespace, queryText: cleanQuery, topK: size });
+    }
+    if (provider === 'weaviate') {
+      return queryWeaviate({ namespace: normalizedNamespace, queryText: cleanQuery, topK: size });
+    }
+    return queryLocal({ namespace: normalizedNamespace, queryText: cleanQuery, topK: size });
+  });
 };
 
 module.exports = {
   upsertVectorDocuments,
   querySimilarVectors,
+  getVectorStoreRuntimeStatus,
+  getCachedVectorStoreRuntimeStatus,
   resolveVectorProvider: resolveProvider,
   DEFAULT_VECTOR_NAMESPACE: DEFAULT_NAMESPACE
 };

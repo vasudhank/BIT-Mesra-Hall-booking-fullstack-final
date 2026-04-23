@@ -17,6 +17,18 @@ const details = require('./routes/constants');
 
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
+// Session timeout presets: the backend stores per-account duration in ms (optional).
+// We treat "month" as 30 days and "year" as 365 days for consistent duration math.
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+const WEEK_MS = 7 * DAY_MS;
+const MONTH_MS = 30 * DAY_MS;
+const YEAR_MS = 365 * DAY_MS;
+
+const DEFAULT_SESSION_TIMEOUT_MS = DAY_MS;
+const MIN_SESSION_TIMEOUT_MS = HOUR_MS;
+const MAX_SESSION_TIMEOUT_MS = YEAR_MS;
+
 const createTransporter = () =>
   nodemailer.createTransport({
     host: 'smtp.gmail.com',
@@ -50,6 +62,105 @@ const isAuthenticatedRole = (req, role) =>
   req.isAuthenticated() &&
   String(req.user?.type || '').toLowerCase() === String(role || '').toLowerCase();
 
+const toInt = (value, fallback = 0) => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.max(0, Math.floor(num));
+};
+
+const normalizePresetKey = (value = '') =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '');
+
+const parseDurationParts = (payload = {}) => {
+  const years = toInt(payload.years ?? payload.yy ?? payload.year ?? payload.y, 0);
+  const months = toInt(payload.months ?? payload.mm ?? payload.month ?? payload.mo ?? payload.m, 0);
+  const days = toInt(payload.days ?? payload.dd ?? payload.day ?? payload.d, 0);
+  const hours = toInt(payload.hours ?? payload.hh ?? payload.hour ?? payload.h, 0);
+  return { years, months, days, hours };
+};
+
+const parseDurationString = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  const parts = raw.split(':').map((x) => x.trim());
+  if (parts.length !== 4) return null;
+  const [yy, mm, dd, hh] = parts.map((x) => (x === '' ? 0 : Number(x)));
+  if (![yy, mm, dd, hh].every((n) => Number.isFinite(n) && n >= 0)) return null;
+  return {
+    years: Math.floor(yy),
+    months: Math.floor(mm),
+    days: Math.floor(dd),
+    hours: Math.floor(hh)
+  };
+};
+
+const resolveSessionTimeoutMs = (body = {}) => {
+  const preset = normalizePresetKey(body.preset ?? body.option ?? body.value ?? body.key ?? '');
+
+  const presetMap = new Map([
+    ['default', null],
+    ['1d', DAY_MS],
+    ['day', DAY_MS],
+    ['1day', DAY_MS],
+    ['24h', DAY_MS],
+    ['1w', WEEK_MS],
+    ['week', WEEK_MS],
+    ['1week', WEEK_MS],
+    ['7d', WEEK_MS],
+    ['1m', MONTH_MS],
+    ['1mo', MONTH_MS],
+    ['month', MONTH_MS],
+    ['30d', MONTH_MS],
+    ['1y', YEAR_MS],
+    ['year', YEAR_MS],
+    ['1year', YEAR_MS],
+    ['365d', YEAR_MS],
+    ['custom', 'custom']
+  ]);
+
+  if (presetMap.has(preset)) {
+    const value = presetMap.get(preset);
+    if (value === null) return null;
+    if (value !== 'custom') return value;
+  }
+
+  const fromString = parseDurationString(body.duration || body.customDuration || body.timeout || '');
+  const partsSource = body.custom && typeof body.custom === 'object'
+    ? body.custom
+    : body.duration && typeof body.duration === 'object'
+      ? body.duration
+      : (fromString || body);
+
+  const parts = parseDurationParts(partsSource || {});
+  const totalMs =
+    parts.years * YEAR_MS +
+    parts.months * MONTH_MS +
+    parts.days * DAY_MS +
+    parts.hours * HOUR_MS;
+
+  if (!totalMs) return null;
+  return totalMs;
+};
+
+const clampSessionTimeoutMs = (valueMs) => {
+  if (valueMs === null) return null;
+  const ms = Number(valueMs);
+  if (!Number.isFinite(ms)) return null;
+  if (ms < MIN_SESSION_TIMEOUT_MS) return NaN;
+  if (ms > MAX_SESSION_TIMEOUT_MS) return NaN;
+  return Math.floor(ms);
+};
+
+const applySessionTimeoutToReq = async (req, timeoutMs) => {
+  if (!req?.session?.cookie) return;
+  const resolved = timeoutMs && timeoutMs > 0 ? timeoutMs : DEFAULT_SESSION_TIMEOUT_MS;
+  req.session.cookie.maxAge = resolved;
+  await new Promise((resolve) => req.session.save(() => resolve()));
+};
+
 /* ---------------- BASIC TEST ROUTE ---------------- */
 router.get('/', (req, res) => {
   res.send({ "HELLO WORLD": "SERVER STARTED" });
@@ -79,9 +190,16 @@ router.post('/admin_login', (req, res, next) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    req.logIn(user, err => {
+    req.logIn(user, async (err) => {
       if (err) {
         return res.status(500).json({ error: 'Login failed', details: err });
+      }
+
+      try {
+        const account = await Admin.findById(user.id).select('sessionTimeoutMs').lean();
+        await applySessionTimeoutToReq(req, account?.sessionTimeoutMs);
+      } catch (_) {
+        // Non-blocking: login should still succeed even if preference fetch fails.
       }
 
       res.status(200).json({ msg: 'Successfully Logged In', admin: user });
@@ -227,9 +345,16 @@ router.post('/department_login', (req, res, next) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    req.logIn(user, err => {
+    req.logIn(user, async (err) => {
       if (err) {
         return res.status(500).json({ error: 'Login failed', details: err });
+      }
+
+      try {
+        const account = await Department.findById(user.id).select('sessionTimeoutMs').lean();
+        await applySessionTimeoutToReq(req, account?.sessionTimeoutMs);
+      } catch (_) {
+        // Non-blocking
       }
 
       res.status(200).json({ msg: 'Successfully Logged In', department: user });
@@ -248,9 +373,16 @@ router.post('/developer_login', (req, res, next) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    req.logIn(user, (loginErr) => {
+    req.logIn(user, async (loginErr) => {
       if (loginErr) {
         return res.status(500).json({ error: 'Login failed', details: loginErr });
+      }
+
+      try {
+        const account = await Developer.findById(user.id).select('sessionTimeoutMs').lean();
+        await applySessionTimeoutToReq(req, account?.sessionTimeoutMs);
+      } catch (_) {
+        // Non-blocking
       }
       res.status(200).json({ msg: 'Successfully Logged In', developer: user });
     });
@@ -378,7 +510,11 @@ const toAccountPayload = (cfg, account, fallbackName = '') => ({
   department: String(account?.department || '').trim(),
   email: account?.email || '',
   phone: account?.phone || '',
-  type: account?.type || cfg?.defaultName || ''
+  type: account?.type || cfg?.defaultName || '',
+  sessionTimeoutMs: (() => {
+    const raw = Number(account?.sessionTimeoutMs || 0);
+    return Number.isFinite(raw) && raw > 0 ? raw : null;
+  })()
 });
 
 router.get('/account/:role', async (req, res) => {
@@ -432,6 +568,49 @@ router.patch('/account/:role/profile', async (req, res) => {
     res.json({ account: toAccountPayload(cfg, account) });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch('/account/:role/session_timeout', async (req, res) => {
+  try {
+    const cfg = getAccountRoleConfig(req.params.role);
+    if (!cfg) return res.status(404).json({ error: 'Invalid account role' });
+    if (!isAuthenticatedRole(req, cfg.roleName)) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    const body = req.body || {};
+    const presetKey = normalizePresetKey(body.preset ?? body.option ?? body.key ?? body.value ?? '');
+    const rawMs = resolveSessionTimeoutMs(body);
+
+    if (rawMs === null && presetKey !== 'default') {
+      return res.status(400).json({
+        error: 'Select a preset (1 day/week/month/year) or choose Custom and enter a duration.'
+      });
+    }
+
+    const timeoutMs = clampSessionTimeoutMs(rawMs);
+    if (Number.isNaN(timeoutMs)) {
+      return res.status(400).json({
+        error: 'Session timeout must be between 1 hour and 1 year.'
+      });
+    }
+
+    const account = await cfg.model.findByIdAndUpdate(
+      req.user.id,
+      { $set: { sessionTimeoutMs: timeoutMs } },
+      { new: true }
+    );
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+
+    await applySessionTimeoutToReq(req, timeoutMs);
+
+    return res.json({
+      success: true,
+      account: toAccountPayload(cfg, account)
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 

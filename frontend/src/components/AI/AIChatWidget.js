@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import api from "../../api/axiosInstance";
 import "./AIChatWidget.css";
 import { IconButton, Tooltip } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import { exportPdfFromPrintHtml } from "../../utils/exportPdfFromPrintHtml";
 
 import MicIcon from "@mui/icons-material/Mic";
 import StopIcon from "@mui/icons-material/Stop";
@@ -21,6 +22,7 @@ import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import TranslateRoundedIcon from "@mui/icons-material/TranslateRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
 import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
@@ -72,6 +74,7 @@ const getThreadTitleFromMessages = (messages) => {
 const createThread = () => ({
   id: createId(),
   title: "New chat",
+  isTitleManuallySet: false,
   createdAt: Date.now(),
   updatedAt: Date.now(),
   messages: []
@@ -112,6 +115,7 @@ const sanitizeStoredThreads = (rawThreads) => {
       return {
         id: thread.id || createId(),
         title: thread.title || getThreadTitleFromMessages(messages),
+        isTitleManuallySet: Boolean(thread.isTitleManuallySet),
         createdAt: Number(thread.createdAt) || Date.now(),
         updatedAt: Number(thread.updatedAt) || Date.now(),
         messages
@@ -126,7 +130,7 @@ const getStorageKey = (accountKey) => `${STORAGE_PREFIX}:${accountKey}`;
 const toServerHistory = (messages) =>
   (messages || [])
     .filter((msg) => msg && (msg.role === "user" || msg.role === "ai") && msg.text)
-    .slice(-14)
+    .slice(-24)
     .map((msg) => ({ role: msg.role, text: msg.text }));
 
 const formatThreadTime = (timestamp) => {
@@ -266,8 +270,79 @@ const resolveAiWebSocketUrl = () => {
   return "";
 };
 
-const isLikelyActionPrompt = (text) =>
-  /\b(book|booking|reserve|approve|reject|pending requests|hall status|show halls|export schedule|download schedule|slack|whatsapp|crm|hubspot|notify)\b/i.test(String(text || ""));
+const isLikelyActionPrompt = (text) => {
+  const lower = String(text || "").toLowerCase();
+  const directAction =
+    /\b(book|booking|reserve|approve|reject|pending requests|hall status|show halls|show rooms|which rooms|open halls|closed halls|public task|calendar task|public event|create notice|post notice|notice|send email|send mail|email|mail|export schedule|download schedule|slack|whatsapp|crm|hubspot|notify)\b/i.test(lower);
+  const hallContinuation =
+    /\bhall\s*[-:]?\s*[a-z0-9]+\b/i.test(lower)
+    && /\b(also|too|add|book|reserve|request|from|to|today|tomorrow|next|this)\b/i.test(lower);
+
+  return directAction || hallContinuation;
+};
+
+const extractFirstJSONObject = (text) => {
+  const raw = String(text || "");
+  const start = raw.indexOf("{");
+  if (start < 0) return null;
+
+  let balance = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < raw.length; index += 1) {
+    const ch = raw[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === "\\") {
+        escaped = true;
+      } else if (ch === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === "\"") {
+      inString = true;
+      continue;
+    }
+
+    if (ch === "{") balance += 1;
+    if (ch === "}") balance -= 1;
+
+    if (balance === 0) {
+      try {
+        return JSON.parse(raw.slice(start, index + 1));
+      } catch (err) {
+        return null;
+      }
+    }
+  }
+
+  return null;
+};
+
+const extractActionIntentFromText = (text) => {
+  const parsed = extractFirstJSONObject(text);
+  if (!parsed || typeof parsed !== "object") return null;
+
+  const type = String(parsed?.type || "").toUpperCase();
+  const action = String(parsed?.action || parsed?.actionType || "").toUpperCase().trim();
+  const payload = parsed?.payload && typeof parsed.payload === "object" ? parsed.payload : {};
+  const reply = String(parsed?.reply || parsed?.message || "").trim();
+
+  if (type !== "ACTION" && !action) return null;
+  if (!action) return null;
+  return { action, payload, reply };
+};
+
+const looksLikeActionJsonLeak = (text) => {
+  const raw = String(text || "").trim();
+  if (!raw) return false;
+  return /"type"\s*:\s*"ACTION"|"\s*action\s*"\s*:|"payload"\s*:/.test(raw);
+};
 
 const downloadBase64Artifact = (artifact) => {
   if (!artifact || !artifact.base64) return;
@@ -289,6 +364,122 @@ const downloadBase64Artifact = (artifact) => {
   } catch (err) {
     // Ignore download errors.
   }
+};
+
+const escapeHtml = (value) =>
+  String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const buildConfirmationEditDraft = (data) => {
+  const fields = Array.isArray(data?.editForm?.fields) ? data.editForm.fields : [];
+  return fields.reduce((draft, field) => {
+    const key = String(field?.key || "").trim();
+    if (!key) return draft;
+
+    if (field.input === "checkbox_list") {
+      draft[key] = Array.isArray(field.options)
+        ? field.options.filter((option) => option?.checked).map((option) => String(option.value || ""))
+        : [];
+      return draft;
+    }
+
+    draft[key] = field?.value ?? "";
+    return draft;
+  }, {});
+};
+
+const buildNoticePdfDocument = (notice) => {
+  const title = String(notice?.title || notice?.subject || "Notice").trim() || "Notice";
+  const body = String(notice?.content || notice?.body || notice?.summary || "").trim();
+  const start = notice?.startDateTime
+    ? new Date(notice.startDateTime).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
+    : "N/A";
+  const end = notice?.endDateTime
+    ? new Date(notice.endDateTime).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
+    : "N/A";
+  const kind = String(notice?.kind || "GENERAL").trim() || "GENERAL";
+  const rooms = Array.isArray(notice?.rooms) && notice.rooms.length > 0
+    ? notice.rooms.join(", ")
+    : (notice?.closureAllHalls ? "All halls" : "Not specified");
+  const bodyHtml = body
+    ? body
+      .split(/\n{2,}/)
+      .map((chunk) => `<p>${escapeHtml(chunk.trim())}</p>`)
+      .join("")
+    : "<p>No notice body provided.</p>";
+
+  return {
+    title,
+    html: `
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>${escapeHtml(title)}</title>
+          <style>
+            body {
+              font-family: "Segoe UI", Arial, sans-serif;
+              margin: 0;
+              color: #111827;
+              background: #ffffff;
+            }
+            .page {
+              max-width: 760px;
+              margin: 0 auto;
+              padding: 32px;
+            }
+            h1 {
+              margin: 0 0 12px;
+              font-size: 30px;
+              line-height: 1.2;
+            }
+            .meta {
+              margin-bottom: 18px;
+              border: 1px solid #d1d5db;
+              border-radius: 12px;
+              overflow: hidden;
+            }
+            .row {
+              display: grid;
+              grid-template-columns: 180px 1fr;
+            }
+            .row + .row {
+              border-top: 1px solid #d1d5db;
+            }
+            .label, .value {
+              padding: 10px 12px;
+              font-size: 14px;
+            }
+            .label {
+              font-weight: 700;
+              background: #f8fafc;
+            }
+            .body p {
+              margin: 0 0 12px;
+              font-size: 15px;
+              line-height: 1.65;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="page">
+            <h1>${escapeHtml(title)}</h1>
+            <div class="meta">
+              <div class="row"><div class="label">Type</div><div class="value">${escapeHtml(kind)}</div></div>
+              <div class="row"><div class="label">From</div><div class="value">${escapeHtml(start)}</div></div>
+              <div class="row"><div class="label">To</div><div class="value">${escapeHtml(end)}</div></div>
+              <div class="row"><div class="label">Rooms</div><div class="value">${escapeHtml(rooms)}</div></div>
+            </div>
+            <div class="body">${bodyHtml}</div>
+          </div>
+        </body>
+      </html>
+    `
+  };
 };
 
 const SidebarCollapseArrowIcon = ({ direction = "right" }) => (
@@ -348,6 +539,14 @@ export default function AIChatWidget({
   const [pendingSearchJump, setPendingSearchJump] = useState(null);
   const [searchHighlight, setSearchHighlight] = useState(null);
   const [pendingAttachments, setPendingAttachments] = useState([]);
+  const [editingConfirmationMessageId, setEditingConfirmationMessageId] = useState("");
+  const [editingConfirmationDraft, setEditingConfirmationDraft] = useState({});
+  const [confirmationSaveBusy, setConfirmationSaveBusy] = useState(false);
+  const [confirmationEditError, setConfirmationEditError] = useState("");
+  const [openThreadMenuId, setOpenThreadMenuId] = useState("");
+  const [renamingThreadId, setRenamingThreadId] = useState("");
+  const [threadTitleDraft, setThreadTitleDraft] = useState("");
+  const [deleteConfirmThreadId, setDeleteConfirmThreadId] = useState("");
 
   const chatShellRef = useRef(null);
   const sidebarRef = useRef(null);
@@ -359,8 +558,10 @@ export default function AIChatWidget({
   const activeChatRequestRef = useRef(null);
   const messageRowRefs = useRef(new Map());
   const sidebarResizeMetaRef = useRef({ dragging: false, startX: 0, startWidth: 250 });
+  const threadMenuRefs = useRef(new Map());
 
   const storageKey = useMemo(() => getStorageKey(accountKey), [accountKey]);
+  const thinkingStarGradientId = useId();
 
   useEffect(() => {
     isLiveModeRef.current = isLiveMode;
@@ -454,6 +655,9 @@ export default function AIChatWidget({
     if (sidebarOpen) return;
     setShowSidebarSearch(false);
     setSidebarSearchTerm("");
+    setOpenThreadMenuId("");
+    setRenamingThreadId("");
+    setThreadTitleDraft("");
   }, [sidebarOpen]);
 
   const sortedThreads = useMemo(
@@ -488,9 +692,95 @@ export default function AIChatWidget({
       .filter(Boolean);
   }, [normalizedSidebarSearch, sortedThreads]);
 
+  const selectThreadFromSidebar = useCallback(
+    (threadId, matchedMessageId = "") => {
+      if (!threadId) return;
+      setActiveThreadId(threadId);
+      setEditingMessageId(null);
+      setEditingDraft("");
+      setOpenThreadMenuId("");
+      setRenamingThreadId("");
+      setThreadTitleDraft("");
+
+      if (normalizedSidebarSearch && matchedMessageId) {
+        setPendingSearchJump({
+          threadId,
+          messageId: matchedMessageId,
+          query: sidebarSearchTerm
+        });
+      } else {
+        setPendingSearchJump(null);
+        setSearchHighlight(null);
+      }
+    },
+    [normalizedSidebarSearch, sidebarSearchTerm]
+  );
+
+  const beginThreadRename = useCallback((thread) => {
+    if (!thread?.id) return;
+    setOpenThreadMenuId("");
+    setRenamingThreadId(thread.id);
+    setThreadTitleDraft(thread.title || "");
+  }, []);
+
+  const cancelThreadRename = useCallback(() => {
+    setRenamingThreadId("");
+    setThreadTitleDraft("");
+  }, []);
+
+  const saveThreadRename = useCallback(
+    (threadId) => {
+      const normalizedTitle = String(threadTitleDraft || "").replace(/\s+/g, " ").trim();
+      if (!threadId || !normalizedTitle) {
+        cancelThreadRename();
+        return;
+      }
+
+      setThreads((prevThreads) =>
+        prevThreads.map((thread) =>
+          thread.id === threadId
+            ? {
+              ...thread,
+              title: truncateText(normalizedTitle, 62),
+              isTitleManuallySet: true
+            }
+            : thread
+        )
+      );
+
+      cancelThreadRename();
+    },
+    [cancelThreadRename, threadTitleDraft]
+  );
+
+  const requestThreadDelete = useCallback((threadId) => {
+    if (!threadId) return;
+    setOpenThreadMenuId("");
+    setDeleteConfirmThreadId(threadId);
+  }, []);
+
+  const cancelThreadDelete = useCallback(() => {
+    setDeleteConfirmThreadId("");
+  }, []);
+
+  const confirmThreadDelete = useCallback(() => {
+    if (!deleteConfirmThreadId) return;
+    setThreads((prevThreads) => prevThreads.filter((thread) => thread.id !== deleteConfirmThreadId));
+    setDeleteConfirmThreadId("");
+    setOpenThreadMenuId("");
+    if (renamingThreadId === deleteConfirmThreadId) {
+      setRenamingThreadId("");
+      setThreadTitleDraft("");
+    }
+  }, [deleteConfirmThreadId, renamingThreadId]);
+
   const activeThread = useMemo(
     () => threads.find((thread) => thread.id === activeThreadId) || null,
     [threads, activeThreadId]
+  );
+  const threadPendingDelete = useMemo(
+    () => threads.find((thread) => thread.id === deleteConfirmThreadId) || null,
+    [threads, deleteConfirmThreadId]
   );
 
   const messages = useMemo(() => activeThread?.messages || [], [activeThread]);
@@ -606,10 +896,11 @@ export default function AIChatWidget({
 
   const applyMessagesToThread = (thread, nextMessages) => {
     const clippedMessages = (nextMessages || []).slice(-MAX_MESSAGES_PER_THREAD);
+    const autoTitle = getThreadTitleFromMessages(clippedMessages);
     return {
       ...thread,
       messages: clippedMessages,
-      title: getThreadTitleFromMessages(clippedMessages),
+      title: thread.isTitleManuallySet ? (thread.title || autoTitle) : autoTitle,
       updatedAt: Date.now()
     };
   };
@@ -628,11 +919,124 @@ export default function AIChatWidget({
     );
   };
 
+  const updateActiveMessageById = (messageId, updater) => {
+    if (!messageId) return;
+    updateActiveThreadMessages((existingMessages) =>
+      existingMessages.map((message) => {
+        if (message.id !== messageId) return message;
+        return typeof updater === "function" ? updater(message) : message;
+      })
+    );
+  };
+
   const appendAiMessage = (text) => {
     updateActiveThreadMessages((existingMessages) => [
       ...existingMessages,
       createMessage("ai", text)
     ]);
+  };
+
+  const isAwaitingConfirmationMessage = (message) => {
+    if (!message?.id || message?.role !== "ai") return false;
+    if (message?.data?.agentResult?.kind !== "CONFIRMATION") return false;
+    if (!message?.data?.agentMeta?.awaitingConfirmation) return false;
+
+    const latestAiMessage = [...(activeThread?.messages || [])]
+      .reverse()
+      .find((item) => item?.role === "ai");
+
+    return latestAiMessage?.id === message.id;
+  };
+
+  const updateConfirmationDraftValue = (key, value) => {
+    setEditingConfirmationDraft((prev) => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  const saveConfirmationEdit = async (message) => {
+    const messageId = message?.id || "";
+    if (!messageId || confirmationSaveBusy) return;
+
+    setConfirmationSaveBusy(true);
+    setConfirmationEditError("");
+    try {
+      const res = await api.post("/ai/pending-action/update", {
+        threadId: activeThreadId,
+        accountKey,
+        patch: editingConfirmationDraft
+      });
+
+      const nextConfirmation = formatInfoPayload(res?.data?.confirmation || null);
+      if (nextConfirmation?.kind === "CONFIRMATION") {
+        updateActiveMessageById(messageId, (currentMessage) => ({
+          ...currentMessage,
+          data: {
+            ...(currentMessage.data && typeof currentMessage.data === "object" ? currentMessage.data : {}),
+            agentResult: nextConfirmation
+          }
+        }));
+      }
+
+      closeConfirmationEditor();
+    } catch (err) {
+      setConfirmationEditError(
+        err?.response?.data?.error
+        || err?.message
+        || "Unable to update the confirmation draft right now."
+      );
+    } finally {
+      setConfirmationSaveBusy(false);
+    }
+  };
+
+  const handleArtifactAction = async (artifact) => {
+    if (!artifact || typeof artifact !== "object") return;
+
+    if (artifact.base64) {
+      downloadBase64Artifact(artifact);
+      return;
+    }
+
+    if (artifact.type === "NOTICE_OPEN" && artifact.noticeId) {
+      navigate(`/notices/${artifact.noticeId}`);
+      return;
+    }
+
+    if (artifact.type === "NOTICE_PDF" && artifact.noticeId) {
+      try {
+        const res = await api.get(`/notices/${artifact.noticeId}`);
+        const notice = res?.data?.notice;
+        if (!notice) {
+          appendAiMessage("I could not find that notice to prepare the PDF.");
+          return;
+        }
+
+        const pdfDoc = buildNoticePdfDocument(notice);
+        await exportPdfFromPrintHtml({
+          html: pdfDoc.html,
+          title: pdfDoc.title,
+          marginMm: 14
+        });
+      } catch (err) {
+        appendAiMessage("I could not download that notice PDF right now.");
+      }
+    }
+  };
+
+  const closeConfirmationEditor = useCallback(() => {
+    setEditingConfirmationMessageId("");
+    setEditingConfirmationDraft({});
+    setConfirmationEditError("");
+  }, []);
+
+  const openConfirmationEditor = (message) => {
+    const confirmationData = message?.data?.agentResult;
+    if (!confirmationData || confirmationData.kind !== "CONFIRMATION") return;
+    setEditingConfirmationMessageId(message.id || "");
+    setEditingConfirmationDraft(buildConfirmationEditDraft(confirmationData));
+    setConfirmationEditError("");
   };
 
   const stopThinking = useCallback(() => {
@@ -700,8 +1104,13 @@ export default function AIChatWidget({
     setActiveThreadId(loadedActiveId);
     setEditingMessageId(null);
     setEditingDraft("");
+    setOpenThreadMenuId("");
+    setRenamingThreadId("");
+    setThreadTitleDraft("");
+    setDeleteConfirmThreadId("");
+    closeConfirmationEditor();
     setHistoryReady(true);
-  }, [identityReady, storageKey]);
+  }, [closeConfirmationEditor, identityReady, storageKey]);
 
   useEffect(() => {
     if (!historyReady || !identityReady) return;
@@ -734,6 +1143,66 @@ export default function AIChatWidget({
       setActiveThreadId(threads[0].id);
     }
   }, [threads, activeThreadId]);
+
+  useEffect(() => {
+    if (openThreadMenuId && !threads.some((thread) => thread.id === openThreadMenuId)) {
+      setOpenThreadMenuId("");
+    }
+    if (renamingThreadId && !threads.some((thread) => thread.id === renamingThreadId)) {
+      setRenamingThreadId("");
+      setThreadTitleDraft("");
+    }
+    if (deleteConfirmThreadId && !threads.some((thread) => thread.id === deleteConfirmThreadId)) {
+      setDeleteConfirmThreadId("");
+    }
+  }, [threads, openThreadMenuId, renamingThreadId, deleteConfirmThreadId]);
+
+  useEffect(() => {
+    if (!openThreadMenuId) return undefined;
+
+    const handleOutsideClick = (event) => {
+      const menuNode = threadMenuRefs.current.get(openThreadMenuId);
+      if (!menuNode) {
+        setOpenThreadMenuId("");
+        return;
+      }
+      if (menuNode.contains(event.target)) return;
+      setOpenThreadMenuId("");
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") {
+        setOpenThreadMenuId("");
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [openThreadMenuId]);
+
+  useEffect(() => {
+    if (!renamingThreadId && !deleteConfirmThreadId) return undefined;
+
+    const handleEscape = (event) => {
+      if (event.key !== "Escape") return;
+      if (deleteConfirmThreadId) {
+        setDeleteConfirmThreadId("");
+        return;
+      }
+      cancelThreadRename();
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [cancelThreadRename, renamingThreadId, deleteConfirmThreadId]);
+
+  useEffect(() => {
+    closeConfirmationEditor();
+  }, [activeThreadId, closeConfirmationEditor]);
 
   useEffect(() => {
     if (pendingSearchJump && pendingSearchJump.threadId === activeThreadId) return;
@@ -927,6 +1396,11 @@ export default function AIChatWidget({
     setInput("");
     setEditingMessageId(null);
     setEditingDraft("");
+    setOpenThreadMenuId("");
+    setRenamingThreadId("");
+    setThreadTitleDraft("");
+    setDeleteConfirmThreadId("");
+    closeConfirmationEditor();
   };
 
   const copyToClipboard = async (text, messageId) => {
@@ -1005,19 +1479,22 @@ export default function AIChatWidget({
 
   const formatInfoPayload = (data) => {
     if (Array.isArray(data)) {
-      const sorted = [...data].sort((a, b) => (a.status === "FREE" ? -1 : 1));
+      const sorted = [...data].sort((a, b) => (String(a.status || "").toUpperCase() === "FREE" ? -1 : 1));
       return {
         kind: "TABLE",
         title: "Hall Status Report",
         summary: `Total halls: ${sorted.length}`,
-        columns: ["Hall", "Status", "Event"],
+        columns: ["Hall", "Status", "Booked", "Closed", "Event", "Closure Reason"],
         rows: sorted.map((hall) => {
           const normalized = String(hall.status || "").toUpperCase();
           const status = normalized === "FREE" || normalized === "AVAILABLE" ? "AVAILABLE" : "FILLED";
           return [
             hall.hall || "",
             status,
-            status === "AVAILABLE" ? "-" : (hall.currentEvent || "None")
+            status === "AVAILABLE" ? "NOT BOOKED" : "BOOKED",
+            status === "AVAILABLE" ? "OPEN" : "OPEN",
+            status === "AVAILABLE" ? "-" : (hall.currentEvent || "None"),
+            "-"
           ];
         }),
         plainText: sorted
@@ -1040,87 +1517,149 @@ export default function AIChatWidget({
       };
     }
 
+    if (data.kind === "CONFIRMATION") {
+      const rows = Array.isArray(data.rows) ? data.rows : [];
+      return {
+        kind: "CONFIRMATION",
+        confirmationType: data.confirmationType || "",
+        title: data.title || "Please Confirm",
+        summary: data.summary || "",
+        prompt: data.prompt || "Please confirm whether this is correct.",
+        columns: Array.isArray(data.columns) ? data.columns : ["Field", "Value"],
+        rows,
+        editForm: data.editForm && typeof data.editForm === "object" ? data.editForm : null,
+        plainText: data.plainText || rows.map((row) => (Array.isArray(row) ? row.join(" - ") : "")).join("\n")
+      };
+    }
+
     if (data.kind === "HALL_STATUS") {
       const items = Array.isArray(data.items) ? data.items : [];
-      const dateTitle = data.date ? ` (${data.date})` : "";
+      const dateLabel = data.date
+        ? data.date
+        : (data.dateFrom && data.dateTo ? `${data.dateFrom} to ${data.dateTo}` : (data.dateFrom || data.dateTo || ""));
+      const dateTitle = dateLabel ? ` (${dateLabel})` : "";
       const modeLine = data.mode && data.mode !== "ALL" ? `Filter: ${data.mode}\n` : "";
       const hallLine = data.targetHall ? `Hall: ${data.targetHall}\n` : "";
-      const header = `Hall Status${dateTitle}\n${modeLine}${hallLine}`.trim();
 
       if (items.length === 0) {
         return {
           kind: "TABLE",
           title: `Hall Status${dateTitle}`,
           summary: `${modeLine}${hallLine}`.trim(),
-          columns: ["Hall", "Status", "Event"],
+          columns: ["Hall", "Overall Status", "Booked", "Closed", "Event", "Timings", "Closure Reason"],
           rows: [],
-          plainText: `${header}\n\nNo halls matched this query.`
+          plainText: ""
         };
       }
-
-      const lines = items.map((item) => {
-        const isAvailable = String(item.status || "").toUpperCase() === "AVAILABLE";
-        const suffix = isAvailable ? "Available" : `Filled (${item.currentEvent || "None"})`;
-        return `- ${item.hall}: ${suffix}`;
-      });
 
       return {
         kind: "TABLE",
         title: `Hall Status${dateTitle}`,
         summary: `${modeLine}${hallLine}`.trim(),
-        columns: ["Hall", "Status", "Event"],
-        rows: items.map((item) => {
-          const isAvailable = String(item.status || "").toUpperCase() === "AVAILABLE";
-          return [
-            item.hall || "",
-            isAvailable ? "AVAILABLE" : "FILLED",
-            isAvailable ? "-" : (item.currentEvent || "None")
-          ];
-        }),
-        plainText: `${header}\n\n${lines.join("\n")}`
+        columns: ["Hall", "Overall Status", "Booked", "Closed", "Event", "Timings", "Closure Reason"],
+        rows: items.map((item) => [
+          item.hall || "",
+          item.status || "",
+          item.bookingStatus || "",
+          item.closureStatus || "",
+          item.currentEvent || "-",
+          item.bookingTimingsText || (
+            Array.isArray(item.bookingTimings) && item.bookingTimings.length > 0
+              ? item.bookingTimings.join(", ")
+              : "-"
+          ),
+          item.closureReason || "-"
+        ]),
+        plainText: ""
       };
     }
 
     if (data.kind === "BOOKING_REQUESTS") {
       const items = Array.isArray(data.items) ? data.items : [];
       const summary = data.summary || {};
-      const dateTitle = data.date ? ` (${data.date})` : "";
+      const dateLabel = data.date
+        ? data.date
+        : (data.dateFrom && data.dateTo ? `${data.dateFrom} to ${data.dateTo}` : (data.dateFrom || data.dateTo || ""));
+      const dateTitle = dateLabel ? ` (${dateLabel})` : "";
       const filterLine = `Filter: ${data.filter || "ALL"}`;
       const hallLine = data.targetHall ? ` | Hall: ${data.targetHall}` : "";
 
       let text = `Pending Booking Requests${dateTitle}\n${filterLine}${hallLine}\n`;
-      text += `Total: ${summary.total || 0}, Conflicting: ${summary.conflicting || 0}, Non-conflicting: ${summary.nonConflicting || 0}`;
+      text += `Total: ${summary.total || 0}, Conflicting: ${summary.conflicting || 0}, Non-conflicting: ${summary.nonConflicting || 0}, Time conflicts: ${summary.timeConflicts || 0}, Date conflicts: ${summary.dateConflicts || 0}, Closures: ${summary.closureConflicts || 0}`;
 
       if (items.length === 0) {
         return {
           kind: "TABLE",
           title: `Pending Booking Requests${dateTitle}`,
           summary: `${filterLine}${hallLine} | Total: ${summary.total || 0}, Conflicting: ${summary.conflicting || 0}, Non-conflicting: ${summary.nonConflicting || 0}`,
-          columns: ["Hall", "Date", "Time", "Event", "Requested By", "Conflict"],
+          columns: ["Hall", "Date", "Time", "Event", "Requested By", "Conflict", "Detail"],
           rows: [],
           plainText: `${text}\n\nNo requests matched this query.`
         };
       }
 
       const lines = items.map((item, idx) => {
-        const label = item.conflict === "CONFLICTING" ? "CONFLICTING" : "NON-CONFLICTING";
-        return `${idx + 1}. [${label}] ${item.hall} | ${item.date} ${item.start} - ${item.end}\n   Event: ${item.event}\n   By: ${item.requestedBy} (${item.requestedEmail})`;
+        const label = item.conflict === "CONFLICTING" ? (item.conflictType || "CONFLICTING") : "NON-CONFLICTING";
+        return `${idx + 1}. [${label}] ${item.hall} | ${item.date} ${item.start} - ${item.end}\n   Event: ${item.event}\n   By: ${item.requestedBy} (${item.requestedEmail})\n   Detail: ${item.conflictDetail || "No conflict detected."}`;
       });
 
       return {
         kind: "TABLE",
         title: `Pending Booking Requests${dateTitle}`,
         summary: `${filterLine}${hallLine} | Total: ${summary.total || 0}, Conflicting: ${summary.conflicting || 0}, Non-conflicting: ${summary.nonConflicting || 0}`,
-        columns: ["Hall", "Date", "Time", "Event", "Requested By", "Conflict"],
+        columns: ["Hall", "Date", "Time", "Event", "Requested By", "Conflict", "Detail"],
         rows: items.map((item) => [
           item.hall || "",
           item.date || "",
           `${item.start || ""} - ${item.end || ""}`.trim(),
           item.event || "",
           `${item.requestedBy || ""} (${item.requestedEmail || ""})`.trim(),
-          item.conflict === "CONFLICTING" ? "CONFLICTING" : "NON-CONFLICTING"
+          item.conflict === "CONFLICTING" ? (item.conflictType || "CONFLICTING") : "NON-CONFLICTING",
+          item.conflictDetail || (item.conflict === "CONFLICTING" ? "Conflict detected." : "No conflict")
         ]),
         plainText: `${text}\n\n${lines.join("\n")}`
+      };
+    }
+
+    if (data.kind === "CALENDAR_TASK") {
+      const rows = Array.isArray(data.rows) ? data.rows : [];
+      return {
+        kind: "TABLE",
+        title: data.title || "Calendar Task",
+        summary: data.summary || "Public calendar task created successfully.",
+        columns: Array.isArray(data.columns) ? data.columns : ["Field", "Value"],
+        rows,
+        plainText: rows.map((row) => (Array.isArray(row) ? row.join(" - ") : "")).join("\n")
+      };
+    }
+
+    if (data.kind === "NOTICE_RESULT") {
+      const rows = Array.isArray(data.rows) ? data.rows : [];
+      return {
+        kind: "TABLE",
+        title: data.title || "Notice Posted",
+        summary: data.summary || "Notice posted successfully.",
+        columns: Array.isArray(data.columns) ? data.columns : ["Field", "Value"],
+        rows,
+        artifacts: data.noticeId
+          ? [
+              { type: "NOTICE_OPEN", name: "Open Notice", noticeId: data.noticeId },
+              { type: "NOTICE_PDF", name: "Download Notice PDF", noticeId: data.noticeId }
+            ]
+          : [],
+        plainText: [data.summary, data.content].filter(Boolean).join("\n\n") || rows.map((row) => (Array.isArray(row) ? row.join(" - ") : "")).join("\n")
+      };
+    }
+
+    if (data.kind === "EMAIL_RESULT") {
+      const rows = Array.isArray(data.rows) ? data.rows : [];
+      return {
+        kind: "TABLE",
+        title: data.title || "Email Sent",
+        summary: data.summary || "",
+        columns: Array.isArray(data.columns) ? data.columns : ["Field", "Value"],
+        rows,
+        plainText: [data.title, data.summary].filter(Boolean).join("\n") || rows.map((row) => (Array.isArray(row) ? row.join(" - ") : "")).join("\n")
       };
     }
 
@@ -1144,6 +1683,18 @@ export default function AIChatWidget({
       };
     }
 
+    if (Array.isArray(data.rows) && Array.isArray(data.columns)) {
+      return {
+        kind: "TABLE",
+        title: data.title || "AI Result",
+        summary: data.summary || "",
+        columns: data.columns,
+        rows: data.rows,
+        artifacts: Array.isArray(data.artifacts) ? data.artifacts : [],
+        plainText: data.plainText || data.rows.map((row) => (Array.isArray(row) ? row.join(" - ") : "")).join("\n")
+      };
+    }
+
     return {
       kind: "TEXT",
       title: "AI Result",
@@ -1155,9 +1706,12 @@ export default function AIChatWidget({
     const normalizedMeta = meta && typeof meta === "object" ? meta : null;
     if (!normalizedMeta && !extra.actionIntent) return null;
 
-    const resultData = normalizedMeta?.resultData
+    const formattedResultData = normalizedMeta?.resultData
       ? formatInfoPayload(normalizedMeta.resultData)
       : null;
+    const resultData = formattedResultData?.kind === "CONFIRMATION" && !normalizedMeta?.awaitingConfirmation
+      ? null
+      : formattedResultData;
 
     return {
       agentMeta: normalizedMeta,
@@ -1223,7 +1777,7 @@ export default function AIChatWidget({
           </div>
         )}
 
-        {!reviewTask && actionIntent?.action && (
+        {!reviewTask && actionIntent?.action && !meta.confirmedPendingAction && (
           <div className="ai-review-card autonomous">
             <div className="ai-review-card-head">
               <strong>Prepared Action</strong>
@@ -1379,8 +1933,10 @@ export default function AIChatWidget({
   const sendMessage = async (textOverride = null, options = {}) => {
     const rawText = textOverride == null ? input : textOverride;
     const textToSend = String(rawText || "").trim();
+    const ignoreComposerAttachments = Boolean(options.ignoreComposerAttachments);
+    const activePendingAttachments = ignoreComposerAttachments ? [] : pendingAttachments;
 
-    if ((!textToSend && pendingAttachments.length === 0) || !activeThreadId || isLoading) return;
+    if ((!textToSend && activePendingAttachments.length === 0) || !activeThreadId || isLoading) return;
 
     const replaceFromIndex = Number.isInteger(options.replaceFromIndex)
       ? Math.max(0, options.replaceFromIndex)
@@ -1390,14 +1946,18 @@ export default function AIChatWidget({
     const historyMessages = replaceFromIndex == null
       ? currentMessages
       : currentMessages.slice(0, replaceFromIndex);
+    const latestAiThreadMessage = [...historyMessages].reverse().find((msg) => msg?.role === "ai") || null;
+    const awaitingThreadConfirmation = Boolean(
+      latestAiThreadMessage?.data?.agentMeta?.awaitingConfirmation
+    );
 
-    const requestAttachments = pendingAttachments.map((item) => ({
+    const requestAttachments = activePendingAttachments.map((item) => ({
       name: item.name,
       type: item.type,
       contentBase64: item.contentBase64
     }));
 
-    const userAttachmentMeta = pendingAttachments.map((item) => ({
+    const userAttachmentMeta = activePendingAttachments.map((item) => ({
       id: item.id,
       name: item.name,
       type: item.type,
@@ -1414,8 +1974,10 @@ export default function AIChatWidget({
 
     updateActiveThreadMessages(() => [...historyMessages, userMessage]);
     setInput("");
-    setPendingAttachments([]);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (!ignoreComposerAttachments) {
+      setPendingAttachments([]);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
     setIsLoading(true);
     const requestController = new AbortController();
     activeChatRequestRef.current = requestController;
@@ -1425,6 +1987,7 @@ export default function AIChatWidget({
       const shouldTryStream =
         requestAttachments.length === 0
         && !isLikelyActionPrompt(composedUserText)
+        && !awaitingThreadConfirmation
         && !options.forceHttp;
 
       if (shouldTryStream) {
@@ -1441,17 +2004,34 @@ export default function AIChatWidget({
         if (requestController.signal.aborted) return;
 
         if (streamResult.status === "ok" && streamResult.text) {
-          updateActiveThreadMessages((existingMessages) => [
-            ...existingMessages,
-            createMessage("ai", streamResult.text, {
-              data: buildAgentMessageData(streamResult.meta)
-            })
-          ]);
+          const streamedActionIntent = streamResult?.meta?.actionIntent && typeof streamResult.meta.actionIntent === "object"
+            ? {
+                action: String(streamResult.meta.actionIntent.action || "").toUpperCase().trim(),
+                payload: streamResult.meta.actionIntent.payload && typeof streamResult.meta.actionIntent.payload === "object"
+                  ? streamResult.meta.actionIntent.payload
+                  : {},
+                reply: String(streamResult.meta.actionIntent.reply || "").trim()
+              }
+            : extractActionIntentFromText(streamResult.text);
 
-          if (isLiveModeRef.current) {
-            speak(streamResult.text);
+          // If stream produced an action-shaped output, switch to HTTP path so it can execute via /ai/execute.
+          if (streamedActionIntent?.action) {
+            // Continue to HTTP fallback path below.
+          } else if (looksLikeActionJsonLeak(streamResult.text)) {
+            // Continue to HTTP fallback path below.
+          } else {
+            updateActiveThreadMessages((existingMessages) => [
+              ...existingMessages,
+              createMessage("ai", streamResult.text, {
+                data: buildAgentMessageData(streamResult.meta)
+              })
+            ]);
+
+            if (isLiveModeRef.current) {
+              speak(streamResult.text);
+            }
+            return;
           }
-          return;
         }
 
         if (streamResult.status === "aborted") return;
@@ -1469,28 +2049,47 @@ export default function AIChatWidget({
       if (requestController.signal.aborted) return;
 
       const replyData = res?.data?.reply;
+      let normalizedReplyData = replyData;
 
       let aiText = "";
       let isAction = false;
 
-      if (replyData && typeof replyData === "object") {
-        if (replyData.type === "CHAT") {
-          aiText = replyData.message || replyData.reply || "I could not understand that fully.";
-        } else if (replyData.type === "ACTION") {
+      if (normalizedReplyData && typeof normalizedReplyData === "object") {
+        if (normalizedReplyData.type === "CHAT") {
+          aiText = normalizedReplyData.message || normalizedReplyData.reply || "I could not understand that fully.";
+        } else if (normalizedReplyData.type === "ACTION") {
           isAction = true;
-          aiText = replyData.reply || "Processing your request.";
+          aiText = normalizedReplyData.reply || "Processing your request.";
         } else {
-          aiText = replyData.message || JSON.stringify(replyData);
+          aiText = normalizedReplyData.message || JSON.stringify(normalizedReplyData);
         }
       } else {
-        aiText = String(replyData || "Communication error.");
+        aiText = String(normalizedReplyData || "Communication error.");
+      }
+
+      if (!isAction) {
+        const leakedAction = extractActionIntentFromText(aiText);
+        if (leakedAction?.action) {
+          isAction = true;
+          normalizedReplyData = {
+            type: "ACTION",
+            action: leakedAction.action,
+            payload: leakedAction.payload || {},
+            reply: leakedAction.reply || "Processing your request."
+          };
+          aiText = normalizedReplyData.reply;
+        }
+      }
+
+      if (!isAction && looksLikeActionJsonLeak(aiText)) {
+        aiText = "I understood your request. Processing it now.";
       }
 
       if (aiText) {
         updateActiveThreadMessages((existingMessages) => [
           ...existingMessages,
           createMessage("ai", aiText, {
-            data: buildReplyMessageData(replyData)
+            data: buildReplyMessageData(normalizedReplyData)
           })
         ]);
 
@@ -1499,9 +2098,9 @@ export default function AIChatWidget({
         }
       }
 
-      if (isAction && replyData.action) {
+      if (isAction && normalizedReplyData?.action && !normalizedReplyData?.meta?.awaitingConfirmation) {
         const exec = await api.post("/ai/execute", {
-          intent: replyData,
+          intent: normalizedReplyData,
           threadId: activeThreadId,
           accountKey
         }, { signal: requestController.signal });
@@ -1511,32 +2110,37 @@ export default function AIChatWidget({
         let execResultData = null;
         let execSpeechText = "";
         if (exec.data.status === "DONE") {
-          execResultText = `[SUCCESS] ${exec.data.message}`;
+          execResultText = String(exec.data.message || "I completed your request successfully.");
           execSpeechText = execResultText;
         } else if (exec.data.status === "INFO") {
           const infoPayload = formatInfoPayload(exec.data.data);
-          execResultText = infoPayload?.plainText || "Here is the generated result.";
           execResultData = infoPayload;
-          execSpeechText = [infoPayload?.title, infoPayload?.summary].filter(Boolean).join(". ") || execResultText;
+          const isHallStatusTable = String(exec?.data?.data?.kind || "").toUpperCase() === "HALL_STATUS";
+          execResultText = isHallStatusTable
+            ? ""
+            : (infoPayload?.plainText || infoPayload?.summary || "Here is the generated result.");
+          execSpeechText = [infoPayload?.title, infoPayload?.summary].filter(Boolean).join(". ")
+            || execResultText
+            || "Here is the generated result.";
         } else if (exec.data.status === "ERROR") {
-          execResultText = `[ERROR] ${exec.data.msg}`;
+          execResultText = `I couldn't complete that request: ${exec.data.msg || "Unknown error."}`;
           execSpeechText = execResultText;
         } else if (exec.data.status === "READY") {
           try {
             await api.post(exec.data.call, exec.data.payload, { signal: requestController.signal });
             if (requestController.signal.aborted) return;
-            execResultText = "[SUCCESS] Booking request sent successfully.";
+            execResultText = "I have sent the booking request successfully.";
             execSpeechText = execResultText;
           } catch (executionErr) {
             const executionCancelled = executionErr?.code === "ERR_CANCELED"
               || executionErr?.name === "CanceledError";
             if (executionCancelled) return;
-            execResultText = `[ERROR] ${executionErr.response?.data?.msg || executionErr.message}`;
+            execResultText = `I couldn't complete that request: ${executionErr.response?.data?.msg || executionErr.message}`;
             execSpeechText = execResultText;
           }
         }
 
-        if (execResultText) {
+        if (execResultText || execResultData) {
           updateActiveThreadMessages((existingMessages) => [
             ...existingMessages,
             createMessage("ai", execResultText, {
@@ -1566,6 +2170,17 @@ export default function AIChatWidget({
       setIsLoading(false);
     }
   };
+
+  async function submitConfirmationDecision(decision) {
+    const normalizedDecision = String(decision || "").trim().toLowerCase();
+    if (!normalizedDecision || isLoading) return;
+
+    closeConfirmationEditor();
+    await sendMessage(normalizedDecision, {
+      forceHttp: true,
+      ignoreComposerAttachments: true
+    });
+  }
 
   const startEditMessage = (message) => {
     setEditingMessageId(message.id);
@@ -1617,12 +2232,212 @@ export default function AIChatWidget({
     return <DescriptionRoundedIcon fontSize="inherit" />;
   };
 
-  const renderStructuredData = (data) => {
+  const renderStructuredData = (data, message = null) => {
     if (!data || typeof data !== "object") return null;
 
     const columns = Array.isArray(data.columns) ? data.columns : [];
     const rows = Array.isArray(data.rows) ? data.rows : [];
     const artifacts = Array.isArray(data.artifacts) ? data.artifacts : [];
+    const isEditingConfirmation = Boolean(message?.id) && editingConfirmationMessageId === message.id;
+
+    const renderTable = () => (
+      columns.length > 0 && (
+        <div className="ai-table-wrap">
+          <table className="ai-table">
+            <thead>
+              <tr>
+                {columns.map((column, index) => (
+                  <th key={`${column}-${index}`}>{column}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length}>No rows.</td>
+                </tr>
+              ) : (
+                rows.map((row, rowIndex) => (
+                  <tr key={`row-${rowIndex}`}>
+                    {(Array.isArray(row) ? row : []).map((cell, cellIndex) => (
+                      <td key={`cell-${rowIndex}-${cellIndex}`}>{String(cell || "")}</td>
+                    ))}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )
+    );
+
+    if (data.kind === "CONFIRMATION") {
+      const fields = Array.isArray(data?.editForm?.fields) ? data.editForm.fields : [];
+      const showDecisionButtons = isAwaitingConfirmationMessage(message) && !isEditingConfirmation;
+
+      const renderConfirmationField = (field) => {
+        const key = String(field?.key || "").trim();
+        if (!key) return null;
+
+        if (field.input === "textarea") {
+          return (
+            <label key={key} className="ai-confirmation-field">
+              <span>{field.label || key}</span>
+              <textarea
+                value={String(editingConfirmationDraft[key] ?? "")}
+                onChange={(event) => updateConfirmationDraftValue(key, event.target.value)}
+                rows={4}
+                className="ai-confirmation-input textarea"
+              />
+            </label>
+          );
+        }
+
+        if (field.input === "select") {
+          return (
+            <label key={key} className="ai-confirmation-field">
+              <span>{field.label || key}</span>
+              <select
+                value={String(editingConfirmationDraft[key] ?? "")}
+                onChange={(event) => updateConfirmationDraftValue(key, event.target.value)}
+                className="ai-confirmation-input"
+              >
+                {(Array.isArray(field.options) ? field.options : []).map((option, index) => (
+                  <option key={`${key}-option-${index}`} value={String(option?.value ?? "")}>
+                    {option?.label || option?.value || ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          );
+        }
+
+        if (field.input === "checkbox_list") {
+          const selectedValues = Array.isArray(editingConfirmationDraft[key])
+            ? editingConfirmationDraft[key].map((item) => String(item || ""))
+            : [];
+
+          return (
+            <div key={key} className="ai-confirmation-field full">
+              <span>{field.label || key}</span>
+              <div className="ai-confirmation-checkbox-list">
+                {(Array.isArray(field.options) ? field.options : []).map((option, index) => {
+                  const optionValue = String(option?.value ?? "");
+                  const checked = selectedValues.includes(optionValue);
+                  return (
+                    <label key={`${key}-check-${index}`} className="ai-confirmation-checkbox-item">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(event) => {
+                          const nextValues = event.target.checked
+                            ? [...selectedValues, optionValue]
+                            : selectedValues.filter((value) => value !== optionValue);
+                          updateConfirmationDraftValue(key, nextValues);
+                        }}
+                      />
+                      <span>{option?.label || optionValue}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <label key={key} className="ai-confirmation-field">
+            <span>{field.label || key}</span>
+            <input
+              type={field.input === "date" ? "date" : "text"}
+              value={String(editingConfirmationDraft[key] ?? "")}
+              onChange={(event) => updateConfirmationDraftValue(key, event.target.value)}
+              className="ai-confirmation-input"
+            />
+          </label>
+        );
+      };
+
+      return (
+        <div className="ai-structured-block ai-confirmation-block">
+          <div className="ai-confirmation-head">
+            <div>
+              {data.title && <div className="ai-structured-title">{data.title}</div>}
+              {data.summary && <div className="ai-structured-summary">{data.summary}</div>}
+            </div>
+
+            {data.editForm && message?.id && !isEditingConfirmation && (
+              <button
+                type="button"
+                className="ai-confirmation-edit-btn"
+                onClick={() => openConfirmationEditor(message)}
+                disabled={isLoading || confirmationSaveBusy}
+                aria-label="Edit confirmation details"
+              >
+                <EditOutlinedIcon fontSize="inherit" />
+              </button>
+            )}
+          </div>
+
+          {isEditingConfirmation ? (
+            <div className="ai-confirmation-edit-wrap">
+              <div className="ai-confirmation-edit-grid">
+                {fields.map((field) => renderConfirmationField(field))}
+              </div>
+
+              {confirmationEditError && (
+                <div className="ai-confirmation-error">{confirmationEditError}</div>
+              )}
+
+              <div className="ai-confirmation-actions">
+                <button
+                  type="button"
+                  className="msg-action-btn"
+                  onClick={closeConfirmationEditor}
+                  disabled={confirmationSaveBusy}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="msg-action-btn primary"
+                  onClick={() => saveConfirmationEdit(message)}
+                  disabled={confirmationSaveBusy}
+                >
+                  {confirmationSaveBusy ? "Saving..." : "Save Draft"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {renderTable()}
+              {data.prompt && <div className="ai-confirmation-prompt">{data.prompt}</div>}
+
+              {showDecisionButtons && (
+                <div className="ai-confirmation-decision-row">
+                  <button
+                    type="button"
+                    className="msg-action-btn danger"
+                    onClick={() => submitConfirmationDecision("no")}
+                    disabled={isLoading || confirmationSaveBusy}
+                  >
+                    No
+                  </button>
+                  <button
+                    type="button"
+                    className="msg-action-btn primary"
+                    onClick={() => submitConfirmationDecision("yes")}
+                    disabled={isLoading || confirmationSaveBusy}
+                  >
+                    Yes
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      );
+    }
 
     if (data.kind === "TABLE" || data.kind === "SCHEDULE_EXPORT") {
       return (
@@ -1630,34 +2445,7 @@ export default function AIChatWidget({
           {data.title && <div className="ai-structured-title">{data.title}</div>}
           {data.summary && <div className="ai-structured-summary">{data.summary}</div>}
 
-          {columns.length > 0 && (
-            <div className="ai-table-wrap">
-              <table className="ai-table">
-                <thead>
-                  <tr>
-                    {columns.map((column, index) => (
-                      <th key={`${column}-${index}`}>{column}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.length === 0 ? (
-                    <tr>
-                      <td colSpan={columns.length}>No rows.</td>
-                    </tr>
-                  ) : (
-                    rows.map((row, rowIndex) => (
-                      <tr key={`row-${rowIndex}`}>
-                        {(Array.isArray(row) ? row : []).map((cell, cellIndex) => (
-                          <td key={`cell-${rowIndex}-${cellIndex}`}>{String(cell || "")}</td>
-                        ))}
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {renderTable()}
 
           {artifacts.length > 0 && (
             <div className="ai-artifact-list">
@@ -1666,7 +2454,7 @@ export default function AIChatWidget({
                   key={`${artifact.name || artifact.type || "artifact"}-${index}`}
                   type="button"
                   className="ai-artifact-btn"
-                  onClick={() => downloadBase64Artifact(artifact)}
+                  onClick={() => handleArtifactAction(artifact)}
                 >
                   <DownloadRoundedIcon fontSize="inherit" />
                   <span>{artifact.name || artifact.type || "Download"}</span>
@@ -1674,6 +2462,15 @@ export default function AIChatWidget({
               ))}
             </div>
           )}
+        </div>
+      );
+    }
+
+    if (data.kind === "TEXT" && data.plainText) {
+      return (
+        <div className="ai-structured-block">
+          {data.title && <div className="ai-structured-title">{data.title}</div>}
+          <pre className="msg-text-pre">{data.plainText}</pre>
         </div>
       );
     }
@@ -1887,32 +2684,106 @@ export default function AIChatWidget({
                 const thread = result.thread;
                 const active = thread.id === activeThreadId;
                 const searchSnippet = result.snippet;
+                const isRenaming = renamingThreadId === thread.id;
+                const isMenuOpen = openThreadMenuId === thread.id;
                 return (
-                  <button
+                  <div
                     key={thread.id}
-                    type="button"
-                    className={`thread-item ${active ? "active" : ""}`}
-                    onClick={() => {
-                      setActiveThreadId(thread.id);
-                      setEditingMessageId(null);
-                      setEditingDraft("");
-                      if (normalizedSidebarSearch && result.matchedMessageId) {
-                        setPendingSearchJump({
-                          threadId: thread.id,
-                          messageId: result.matchedMessageId,
-                          query: sidebarSearchTerm
-                        });
-                      } else {
-                        setPendingSearchJump(null);
-                        setSearchHighlight(null);
-                      }
-                    }}
+                    className={`thread-item-row ${active ? "active" : ""}`.trim()}
                     title={thread.title}
                   >
-                    <span className="thread-title">{thread.title}</span>
-                    {searchSnippet && <span className="thread-snippet">{searchSnippet}</span>}
-                    <span className="thread-time">{formatThreadTime(thread.updatedAt)}</span>
-                  </button>
+                    <button
+                      type="button"
+                      className={`thread-item ${active ? "active" : ""}`.trim()}
+                      onClick={() => selectThreadFromSidebar(thread.id, result.matchedMessageId)}
+                    >
+                      {isRenaming ? (
+                        <input
+                          type="text"
+                          className="thread-title-input"
+                          value={threadTitleDraft}
+                          onChange={(event) => setThreadTitleDraft(event.target.value)}
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              saveThreadRename(thread.id);
+                            }
+                            if (event.key === "Escape") {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              cancelThreadRename();
+                            }
+                          }}
+                          onBlur={cancelThreadRename}
+                          autoFocus
+                          maxLength={62}
+                          aria-label="Rename chat title"
+                        />
+                      ) : (
+                        <span className="thread-title">{thread.title}</span>
+                      )}
+                      {searchSnippet && <span className="thread-snippet">{searchSnippet}</span>}
+                      <span className="thread-time">{formatThreadTime(thread.updatedAt)}</span>
+                    </button>
+
+                    <div
+                      className={`thread-item-actions ${isMenuOpen ? "open" : ""}`.trim()}
+                      ref={(node) => {
+                        if (node) threadMenuRefs.current.set(thread.id, node);
+                        else threadMenuRefs.current.delete(thread.id);
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className={`thread-more-btn ${isMenuOpen ? "open" : ""}`.trim()}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setOpenThreadMenuId((current) => (current === thread.id ? "" : thread.id));
+                          if (renamingThreadId && renamingThreadId !== thread.id) {
+                            setRenamingThreadId("");
+                            setThreadTitleDraft("");
+                          }
+                        }}
+                        aria-label={`Open actions for ${thread.title}`}
+                        aria-expanded={isMenuOpen}
+                        aria-haspopup="menu"
+                      >
+                        <MoreHorizRoundedIcon fontSize="small" />
+                      </button>
+
+                      {isMenuOpen && (
+                        <div className="thread-actions-menu" role="menu">
+                          <button
+                            type="button"
+                            className="thread-actions-menu-item"
+                            role="menuitem"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              beginThreadRename(thread);
+                            }}
+                          >
+                            Rename
+                          </button>
+                          <button
+                            type="button"
+                            className="thread-actions-menu-item danger"
+                            role="menuitem"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              requestThreadDelete(thread.id);
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 );
               })
             )}
@@ -2087,7 +2958,7 @@ export default function AIChatWidget({
                           </pre>
                         ) : null}
 
-                        {renderStructuredData(message.data?.agentResult || message.data)}
+                        {renderStructuredData(message.data?.agentResult || message.data, message)}
                         {renderAgentMeta(message.data)}
 
                         {Array.isArray(message.attachments) && message.attachments.length > 0 && (
@@ -2154,11 +3025,22 @@ export default function AIChatWidget({
           })}
 
           {isLoading && (
-            <div className="gemini-msg-row ai">
-              <div className="ai-avatar">
-                <AutoAwesomeIcon sx={{ fontSize: 16 }} />
+            <div className="gemini-msg-row ai ai-thinking-row">
+              <div className="gemini-loader thinking" role="status" aria-label="AI is thinking">
+                <div className="gemini-thinking-swirl"></div>
+                <svg className="gemini-thinking-star" viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
+                  <defs>
+                    <linearGradient id={thinkingStarGradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#4285f4" />
+                      <stop offset="100%" stopColor="#24c1e0" />
+                    </linearGradient>
+                  </defs>
+                  <path
+                    d="M12 0C12 6.627 17.373 12 24 12C17.373 12 12 17.373 12 24C12 17.373 6.627 12 0 12C6.627 12 12 6.627 12 0Z"
+                    fill={`url(#${thinkingStarGradientId})`}
+                  />
+                </svg>
               </div>
-              <div className="gemini-bubble ai loading-bubble">Thinking...</div>
             </div>
           )}
 
@@ -2273,6 +3155,37 @@ export default function AIChatWidget({
           </div>
         </div>
       </div>
+
+      {threadPendingDelete && (
+        <div
+          className="thread-delete-modal-backdrop"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              cancelThreadDelete();
+            }
+          }}
+        >
+          <div className="thread-delete-modal-card" role="dialog" aria-modal="true" aria-labelledby="thread-delete-title">
+            <h3 id="thread-delete-title" className="thread-delete-title">Delete Chat?</h3>
+            <p className="thread-delete-text">
+              This will permanently delete
+              {" "}
+              <strong>{threadPendingDelete.title || "this chat"}</strong>
+              {" "}
+              from your chat list.
+            </p>
+            <div className="thread-delete-actions">
+              <button type="button" className="thread-delete-cancel-btn" onClick={cancelThreadDelete}>
+                Cancel
+              </button>
+              <button type="button" className="thread-delete-confirm-btn" onClick={confirmThreadDelete}>
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

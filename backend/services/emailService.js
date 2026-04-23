@@ -21,6 +21,48 @@ const formatDateTime = (date) =>
     timeStyle: 'short'
   });
 
+const escapeHtml = (value) =>
+  String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+exports.sendGenericEmail = async ({
+  to,
+  subject,
+  text = '',
+  html = '',
+  replyTo = ''
+}) => {
+  const recipient = String(to || '').trim();
+  const safeSubject = String(subject || 'BIT Booking AI Message').trim().slice(0, 200);
+  const safeText = String(text || '').trim();
+  const safeReplyTo = String(replyTo || '').trim();
+
+  if (!recipient) {
+    throw new Error('Recipient email is required.');
+  }
+
+  const fallbackHtml = safeText
+    ? `<div style="font-family:Segoe UI,Arial,sans-serif;line-height:1.6;color:#111827;white-space:pre-wrap;">${escapeHtml(safeText)}</div>`
+    : '';
+
+  const mailOptions = {
+    to: recipient,
+    subject: safeSubject,
+    text: safeText || undefined,
+    html: String(html || '').trim() || fallbackHtml || undefined
+  };
+
+  if (safeReplyTo) {
+    mailOptions.replyTo = safeReplyTo;
+  }
+
+  await transporter.sendMail(mailOptions);
+};
+
 /* =========================================================
    1. ADMIN: NEW DEPARTMENT REGISTRATION ALERT
    ========================================================= */

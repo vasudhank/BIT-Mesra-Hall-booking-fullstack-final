@@ -1,4 +1,5 @@
 const Imap = require('imap-simple');
+const dns = require('node:dns').promises;
 const { simpleParser } = require('mailparser');
 const Complaint = require('../models/complaint');
 const Query = require('../models/query');
@@ -16,6 +17,7 @@ const DEFAULT_DEVELOPER_EMAIL = 'jarti2731@gmail.com';
 let syncTimer = null;
 let syncRunning = false;
 let selfSignedWarningPrinted = false;
+let lastDnsFailureLogAt = 0;
 
 const parseAddressList = (addressObj) => {
   const values = Array.isArray(addressObj?.value) ? addressObj.value : [];
@@ -323,6 +325,7 @@ const processMailboxMessages = async ({ conn, searchCriteria }) => {
 const buildImapConfig = ({ email, appPassword }) => {
   const normalizedUser = String(email || '').trim();
   const normalizedPassword = String(appPassword || '').trim();
+  const host = String(process.env.COMPLAINT_MAIL_IMAP_HOST || process.env.MAIL_IMAP_HOST || 'imap.gmail.com').trim();
   const rejectUnauthorized =
     String(process.env.COMPLAINT_MAIL_SYNC_TLS_REJECT_UNAUTHORIZED || 'true').toLowerCase() !== 'false';
 
@@ -335,7 +338,7 @@ const buildImapConfig = ({ email, appPassword }) => {
     imap: {
       user: normalizedUser,
       password: normalizedPassword,
-      host: 'imap.gmail.com',
+      host,
       port: 993,
       tls: true,
       authTimeout: 10000,
@@ -350,6 +353,22 @@ const syncMailbox = async ({ email, appPassword }) => {
   if (!normalizedEmail || !normalizedPassword) return;
 
   const cfg = buildImapConfig({ email: normalizedEmail, appPassword: normalizedPassword });
+  const imapHost = String(cfg?.imap?.host || '').trim();
+  if (imapHost) {
+    try {
+      await dns.lookup(imapHost);
+    } catch (dnsErr) {
+      const now = Date.now();
+      if (now - lastDnsFailureLogAt > 60000) {
+        lastDnsFailureLogAt = now;
+        console.error(
+          `[ComplaintMailSync] DNS lookup failed for ${imapHost}: ${dnsErr?.code || dnsErr?.message || dnsErr}. Skipping this sync cycle.`
+        );
+      }
+      return;
+    }
+  }
+
   const sinceDate = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
 
   let conn;
@@ -372,7 +391,7 @@ const syncMailbox = async ({ email, appPassword }) => {
       });
     }
   } catch (err) {
-    console.error('[ComplaintMailSync] mailbox sync failed:', err.message);
+    console.error('[ComplaintMailSync] mailbox sync failed:', err?.code || err?.message || err);
   } finally {
     if (conn) {
       try {

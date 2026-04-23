@@ -1,4 +1,5 @@
 const Imap = require('imap-simple');
+const dns = require('node:dns').promises;
 const { simpleParser } = require('mailparser');
 const { createNotice } = require('./noticeService');
 
@@ -13,6 +14,7 @@ const SENT_BOX_CANDIDATES = [
 
 let syncTimer = null;
 let syncRunning = false;
+let lastDnsFailureLogAt = 0;
 
 const maskEmail = (email) => {
   const value = String(email || '').trim();
@@ -90,6 +92,7 @@ const getMailboxConfig = () => {
   const targetRecipient = String(process.env.NOTICE_TARGET_TO || DEFAULT_TARGET_RECIPIENT).toLowerCase().trim();
   const user = String(process.env.NOTICE_MAIL_USER || targetRecipient || DEFAULT_TARGET_RECIPIENT).trim();
   const password = String(process.env.NOTICE_MAIL_APP_PASSWORD || process.env.EMAIL_APP_PASSWORD || '').trim();
+  const host = String(process.env.NOTICE_MAIL_IMAP_HOST || process.env.MAIL_IMAP_HOST || 'imap.gmail.com').trim();
   const allowedSender = String(process.env.NOTICE_ALLOWED_FROM || '').toLowerCase().trim();
   const includeSent = String(process.env.NOTICE_MAIL_SYNC_INCLUDE_SENT || 'false').toLowerCase() === 'true';
   const rejectUnauthorized =
@@ -108,7 +111,7 @@ const getMailboxConfig = () => {
     imap: {
       user,
       password,
-      host: 'imap.gmail.com',
+      host,
       port: 993,
       tls: true,
       authTimeout: 10000,
@@ -183,6 +186,22 @@ const syncMailbox = async () => {
   const sinceDays = Math.max(Number(process.env.NOTICE_MAIL_SYNC_LOOKBACK_DAYS || 5), 1);
   const sinceDate = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
   const markSeen = String(process.env.NOTICE_MAIL_SYNC_MARK_SEEN || 'false').toLowerCase() === 'true';
+  const imapHost = String(cfg?.imap?.host || '').trim();
+
+  if (imapHost) {
+    try {
+      await dns.lookup(imapHost);
+    } catch (dnsErr) {
+      const now = Date.now();
+      if (now - lastDnsFailureLogAt > 60000) {
+        lastDnsFailureLogAt = now;
+        console.error(
+          `[NoticeMailSync] DNS lookup failed for ${imapHost}: ${dnsErr?.code || dnsErr?.message || dnsErr}. Skipping this sync cycle.`
+        );
+      }
+      return;
+    }
+  }
 
   let conn = null;
   try {
@@ -218,7 +237,7 @@ const syncMailbox = async () => {
       console.log(`[NoticeMailSync] synced ${created} new notice(s)`);
     }
   } catch (err) {
-    console.error('[NoticeMailSync] sync failed:', err.message);
+    console.error('[NoticeMailSync] sync failed:', err?.code || err?.message || err);
   } finally {
     if (conn) {
       try {

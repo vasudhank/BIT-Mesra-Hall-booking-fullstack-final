@@ -117,6 +117,21 @@ const toolStateTone = (state) => {
   return 'setup';
 };
 
+const vectorHealthLabel = (state) => {
+  const normalized = String(state || '').toLowerCase();
+  if (normalized === 'live') return 'Live';
+  if (normalized === 'degraded') return 'Degraded';
+  if (normalized === 'setup_required') return 'Setup needed';
+  return titleCaseWords(state || 'unknown');
+};
+
+const vectorHealthTone = (state) => {
+  const normalized = String(state || '').toLowerCase();
+  if (normalized === 'live') return 'healthy';
+  if (normalized === 'degraded') return 'watch';
+  return 'setup';
+};
+
 const statusLabel = (policy) => {
   const status = String(policy?.status || 'OK').toUpperCase();
   if (status === 'FIRING') return 'Critical';
@@ -585,6 +600,7 @@ export default function DeveloperMonitoringPage() {
   const service = overview?.service || {};
   const endpoints = overview?.endpoints || {};
   const aiRuntime = overview?.aiRuntime || {};
+  const vectorRuntime = overview?.vectorRuntime || {};
   const reviewQueue = overview?.reviewQueue || {};
   const observability = overview?.observability || {};
   const policies = useMemo(
@@ -600,6 +616,9 @@ export default function DeveloperMonitoringPage() {
   }, [overview, policies]);
 
   const currentProvider = aiRuntime.currentProvider || null;
+  const vectorSync = vectorRuntime.sync || {};
+  const vectorLastSummary = vectorSync.lastSummary || {};
+  const vectorRuntimeTone = vectorHealthTone(vectorRuntime.health);
   const observabilityTools = useMemo(
     () => (Array.isArray(observability.tools) ? observability.tools : []),
     [observability.tools]
@@ -878,6 +897,12 @@ export default function DeveloperMonitoringPage() {
           <strong>{formatCount(reviewQueue.pending)}</strong>
           <p>{reviewPreview.length ? 'Sensitive agent actions are waiting for human approval.' : 'No agent actions are waiting in the review queue.'}</p>
         </article>
+
+        <article className="monitoring-kpi-card">
+          <span>Vector runtime</span>
+          <strong>{vectorRuntime.provider ? titleCaseWords(vectorRuntime.provider) : '--'}</strong>
+          <p>{vectorHealthLabel(vectorRuntime.health)}{vectorRuntime.remote ? ' remote deployment' : ' local deployment'}.</p>
+        </article>
       </section>
 
       <section className="monitoring-section">
@@ -937,6 +962,76 @@ export default function DeveloperMonitoringPage() {
                 </small>
               </article>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="monitoring-section">
+        <div className="monitoring-section-head">
+          <div>
+            <p className="monitoring-kicker">Retrieval Runtime</p>
+            <h2>Vector Deployment</h2>
+          </div>
+          <p className="monitoring-section-copy">
+            Live status for the vector retrieval layer, including the active provider, deployment mode, sync activity, and whether the remote store is actually reachable now.
+          </p>
+        </div>
+
+        <div className="monitoring-provider-spotlight">
+          <article className={`monitoring-card provider-highlight ${vectorRuntimeTone}`.trim()}>
+            <div className="monitoring-card-head">
+              <span>{vectorHealthLabel(vectorRuntime.health)}</span>
+              <strong>{vectorRuntime.provider ? titleCaseWords(vectorRuntime.provider) : 'Vector runtime unavailable'}</strong>
+            </div>
+            <div className="monitoring-provider-highlight-grid">
+              <div>
+                <span>Deployment mode</span>
+                <strong>{titleCaseWords(vectorRuntime.deployment || '--')}</strong>
+              </div>
+              <div>
+                <span>Namespace</span>
+                <strong>{vectorRuntime.namespace || '--'}</strong>
+              </div>
+              <div>
+                <span>Embedding provider</span>
+                <strong>{titleCaseWords(vectorRuntime.embeddingProvider || '--')}</strong>
+              </div>
+              <div>
+                <span>Last live check</span>
+                <strong>{formatRelativeTime(vectorRuntime.checkedAt)}</strong>
+              </div>
+              <div>
+                <span>Last successful check</span>
+                <strong>{formatRelativeTime(vectorRuntime.lastSuccessAt)}</strong>
+              </div>
+              <div>
+                <span>Last vector sync</span>
+                <strong>{formatRelativeTime(vectorLastSummary.syncedAt)}</strong>
+              </div>
+            </div>
+            <p>{vectorRuntime.detail || 'No vector runtime detail returned yet.'}</p>
+          </article>
+
+          <div className="monitoring-provider-summary">
+            <article className="monitoring-provider-chip current">
+              <div>
+                <span>Connection target</span>
+                <strong>{vectorRuntime.config?.endpoint || 'Local Mongo vector store'}</strong>
+              </div>
+              <p>{vectorRuntime.remote ? 'Remote vector service target' : 'Embedded local vector target'}</p>
+              <small>{vectorRuntime.config?.className ? `Class: ${vectorRuntime.config.className}` : 'No remote class name required for this provider.'}</small>
+            </article>
+
+            <article className="monitoring-provider-chip">
+              <div>
+                <span>Sync summary</span>
+                <strong>{formatCount(vectorLastSummary.upserted || 0)} vectors</strong>
+              </div>
+              <p>{vectorLastSummary.skipped ? 'Last sync was skipped or failed safely.' : 'Latest sync completed and pushed vectors to the active provider.'}</p>
+              <small>
+                FAQ {formatCount(vectorLastSummary.sourceCounts?.faq || 0)} | Notice {formatCount(vectorLastSummary.sourceCounts?.notice || 0)}
+              </small>
+            </article>
           </div>
         </div>
       </section>

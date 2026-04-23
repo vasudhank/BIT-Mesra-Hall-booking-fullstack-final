@@ -55,6 +55,13 @@ const MOBILE_HEADER_COLLAPSE_CONFIG = Object.freeze({
   hideXSize: 16,
   hideXFontSize: 11
 });
+const VIEW_LABELS = Object.freeze({
+  timeGridDay: 'Day',
+  timeGridWeek: 'Week',
+  dayGridMonth: 'Month',
+  multiMonthYear: 'Year',
+  listYear: 'Schedule'
+});
 
 const defaultTaskForm = {
   title: '',
@@ -1426,7 +1433,7 @@ export default function CalendarPage() {
     };
   }, [pushMoveSpanDebug]);
 
-  const applyThemeMode = async (nextMode) => {
+  const applyThemeMode = useCallback(async (nextMode) => {
     const normalized = normalizeThemeMode(nextMode);
     setThemeMode(normalized);
     persistThemeLocally(normalized);
@@ -1439,7 +1446,7 @@ export default function CalendarPage() {
       setSnackbarMessage('Theme saved on this browser, but account sync failed.');
       setSnackbarOpen(true);
     }
-  };
+  }, [isAuthenticated]);
 
   const miniDays = useMemo(() => buildMiniMonthDays(miniAnchorDate), [miniAnchorDate]);
 
@@ -2031,6 +2038,11 @@ export default function CalendarPage() {
       overflowCount
     };
   }, [filteredEvents, viewRange, viewType]);
+
+  const weekAllDayOverflowSignature = useMemo(
+    () => (weekAllDayOverflow.overflowByDay || []).join(','),
+    [weekAllDayOverflow]
+  );
 
   const visibleSearchResults = useMemo(() => {
     return searchResults.filter((event) => eventPassesFilters(event, filters));
@@ -2626,11 +2638,6 @@ export default function CalendarPage() {
         .trim();
       const targetMaxHeight = cssVar || '176px';
       const targetMaxHeightPx = parseFloat(targetMaxHeight) || 176;
-      const weekCollapsedCssVar = window
-        .getComputedStyle(document.documentElement)
-        .getPropertyValue('--gcal-week-all-day-collapsed-max-height')
-        .trim();
-      const weekCollapsedMaxHeightPx = parseFloat(weekCollapsedCssVar) || 76;
 
       const resetWeekCollapsedAllDayLinkStyles = () => {
         if (!isWeekView) return;
@@ -2997,7 +3004,7 @@ export default function CalendarPage() {
     dayAllDayOverflow.hasOverflow,
     weekAllDayExpanded,
     weekAllDayOverflow.hasOverflow,
-    (weekAllDayOverflow.overflowByDay || []).join(','),
+    weekAllDayOverflowSignature,
     filteredEvents.length,
     sidebarOpen
   ]);
@@ -5143,7 +5150,7 @@ export default function CalendarPage() {
     setSettingsDropdownOpen(false);
   }, [printSubmitting]);
 
-  const openPrintDialog = () => {
+  const openPrintDialog = useCallback(() => {
     const api = calendarRef.current?.getApi();
     const activeView = String(api?.view?.type || viewType || 'dayGridMonth');
     const preferredView = PRINT_VIEW_BY_CAL_VIEW[activeView] || 'month';
@@ -5197,7 +5204,7 @@ export default function CalendarPage() {
     setPrintPreviewFullscreen(false);
     setPrintForm(nextForm);
     setPrintModalOpen(true);
-  };
+  }, [monthPrintOptions, schedulePrintOptions, viewRange, viewType, weekPrintOptions]);
 
   const handlePrintFormChange = (field, value) => {
     setPrintForm((prev) => {
@@ -6934,12 +6941,11 @@ export default function CalendarPage() {
     }
   };
 
-  const viewLabels = { timeGridDay: 'Day', timeGridWeek: 'Week', dayGridMonth: 'Month', multiMonthYear: 'Year', listYear: 'Schedule' };
   const mobileTodayLabel = String(new Date(headerClockTick).getDate());
   const displayViewTitle = useMemo(() => {
     if (!isMobile) return viewTitle;
     const withoutYear = stripYearFromHeaderTitle(viewTitle);
-    return withoutYear || viewLabels[viewType] || viewTitle;
+    return withoutYear || VIEW_LABELS[viewType] || viewTitle;
   }, [isMobile, viewTitle, viewType]);
   const clampMobileHeaderPosition = useCallback((rawX, rawY, width, height) => {
     if (typeof window === 'undefined') return { x: rawX, y: rawY };
@@ -7771,7 +7777,7 @@ export default function CalendarPage() {
                 {/* View Selector Dropdown */}
                 <div className="gcal-view-selector-container">
                   <button className="gcal-view-selector-btn" onClick={() => setViewDropdownOpen(!viewDropdownOpen)}>
-                    {viewLabels[viewType]} <Svgs.CaretDown />
+                    {VIEW_LABELS[viewType]} <Svgs.CaretDown />
                   </button>
                   {viewDropdownOpen && (
                     <div className="gcal-dropdown-menu view-menu">
@@ -7865,7 +7871,7 @@ export default function CalendarPage() {
             <div className="gcal-mobile-sidebar-section">
               <div className="gcal-mobile-sidebar-title">Views</div>
               <div className="gcal-mobile-view-grid">
-                {Object.entries(viewLabels).map(([value, label]) => (
+                {Object.entries(VIEW_LABELS).map(([value, label]) => (
                   <button
                     key={value}
                     type="button"

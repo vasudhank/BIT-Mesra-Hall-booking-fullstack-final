@@ -20,7 +20,10 @@ const chunkText = (text, size = 40) => {
 
 const isLikelyActionRequest = (message) => {
   const lower = String(message || '').toLowerCase();
-  return /\b(book|booking|reserve|request hall|approve|reject|vacate|clear hall|unbook|pending requests|show halls|hall status|export schedule|download schedule|slack|whatsapp|crm|hubspot|notify)\b/.test(lower);
+  const directAction = /\b(book|booking|reserve|request hall|approve|reject|vacate|clear hall|unbook|pending requests|show halls|hall status|export schedule|download schedule|slack|whatsapp|crm|hubspot|notify)\b/.test(lower);
+  const hallContinuation = /\bhall\s*[-:]?\s*[a-z0-9]+\b/.test(lower)
+    && /\b(also|too|add|book|reserve|request|from|to|today|tomorrow|next|this)\b/.test(lower);
+  return directAction || hallContinuation;
 };
 
 const safeSend = (ws, payload) => {
@@ -134,6 +137,10 @@ const handleStreamConversation = async (ws, packet = {}) => {
 const attachAiRealtimeSocketServer = (httpServer) => {
   if (!httpServer) return null;
   const wss = new WebSocketServer({ server: httpServer, path: '/api/ai/ws' });
+
+  wss.on('error', (err) => {
+    logger.error('AI websocket server error', { error: err?.message || err });
+  });
 
   wss.on('connection', (ws, req) => {
     safeSend(ws, {

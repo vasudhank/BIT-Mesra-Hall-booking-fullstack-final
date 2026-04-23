@@ -59,24 +59,46 @@ app.use(
   })
 );
 
-app.set('trust proxy', 1);
-app.use(
-  session({
-    name: 'seminar.sid',
-    secret: process.env.SESSION_SECRET || 'rkm seminar',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      maxAge: 1000 * 60 * 60 * 24,
-      sameSite: NODE_ENV === 'production' ? 'none' : 'lax',
-      secure: NODE_ENV === 'production'
-    },
-    store: MongoStore.create({
-      mongoUrl: process.env.MONGO_URI,
+const sessionConfig = {
+  name: 'seminar.sid',
+  secret: process.env.SESSION_SECRET || 'rkm seminar',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    maxAge: 1000 * 60 * 60 * 24,
+    sameSite: NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: NODE_ENV === 'production'
+  }
+};
+
+const useMongoSessionStore =
+  String(process.env.SESSION_STORE_USE_MONGO || 'true').toLowerCase() !== 'false';
+const mongoSessionUri = String(process.env.MONGO_URI || '').trim();
+
+if (useMongoSessionStore && mongoSessionUri) {
+  try {
+    const sessionStore = MongoStore.create({
+      mongoUrl: mongoSessionUri,
       collectionName: 'sessions'
-    })
-  })
-);
+    });
+    sessionStore.on('error', (err) => {
+      logger.error('Mongo session store error', { error: err?.message || err });
+    });
+    sessionConfig.store = sessionStore;
+  } catch (err) {
+    logger.error('Failed to initialize Mongo session store. Using in-memory session store.', {
+      error: err?.message || err
+    });
+  }
+} else {
+  logger.warn('Mongo session store disabled. Using in-memory session store.', {
+    useMongoSessionStore,
+    mongoUriConfigured: Boolean(mongoSessionUri)
+  });
+}
+
+app.set('trust proxy', 1);
+app.use(session(sessionConfig));
 
 app.use(passport.initialize());
 app.use(passport.session());
@@ -127,6 +149,7 @@ const ensureDefaultDeveloper = async () => {
 
 const server = app.listen(PORT, () => {
   logger.info('Server started', { port: PORT });
+  attachAiRealtimeSocketServer(server);
   ensureDefaultDeveloper().catch(() => {});
   if (String(process.env.COMPLAINT_MAIL_SYNC_ENABLED || 'true').toLowerCase() !== 'false') {
     try {
@@ -144,8 +167,6 @@ const server = app.listen(PORT, () => {
   startNoticeTrashCleanupSchedule();
   startVectorKnowledgeSync();
 });
-
-attachAiRealtimeSocketServer(server);
 
 server.on('error', (err) => {
   if (err && err.code === 'EADDRINUSE') {

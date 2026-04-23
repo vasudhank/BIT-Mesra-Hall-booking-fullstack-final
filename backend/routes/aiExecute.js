@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Hall = require('../models/hall');
 const Booking_Requests = require('../models/booking_requests');
+const CalendarTask = require('../models/calendar_task');
 const PDFDocument = require('pdfkit');
 const { safeExecute } = require('../utils/safeNotify');
 const { generateApprovalToken, getTokenExpiry } = require('../utils/token');
@@ -20,7 +21,8 @@ const { getReviewTaskById, markReviewTaskExecuted } = require('../services/agent
 const {
   sendBookingApprovalMail,
   sendBookingAutoBookedMail,
-  sendDecisionToDepartment
+  sendDecisionToDepartment,
+  sendGenericEmail
 } = require('../services/emailService');
 
 const {
@@ -28,6 +30,8 @@ const {
   sendBookingAutoBookedSMS,
   sendDecisionSMSDepartment
 } = require('../services/smsService');
+const { createNotice, getNoticeClosures, listNotices } = require('../services/noticeService');
+const { clearPendingAction } = require('../services/agentPendingActionService');
 
 require('dotenv').config();
 
@@ -94,9 +98,11 @@ const normalizeSubAction = (subAction) => {
     'APPROVE_SAFE',
     'APPROVE_ALL',
     'APPROVE_SPECIFIC',
+    'APPROVE_SELECTED',
     'REJECT_CONFLICTS',
     'REJECT_ALL',
-    'REJECT_SPECIFIC'
+    'REJECT_SPECIFIC',
+    'REJECT_SELECTED'
   ];
 
   if (supported.includes(raw)) return raw;
@@ -121,14 +127,26 @@ const normalizeConflictFilter = (rawFilter) => {
 
 const normalizeHallStatusMode = (rawMode) => {
   const raw = String(rawMode || '').toUpperCase().trim();
+  if (raw === 'OPEN' || raw === 'CLOSED') return raw;
   if (raw.includes('NOT') && (raw.includes('BOOK') || raw.includes('OCCUP') || raw.includes('FILL') || raw.includes('BUSY'))) return 'AVAILABLE';
   if (raw.includes('UNBOOK') || raw.includes('EMPTY')) return 'AVAILABLE';
   if (raw.includes('UNAVAILABLE') || (raw.includes('NOT') && (raw.includes('FREE') || raw.includes('AVAILABLE') || raw.includes('VACANT')))) return 'FILLED';
+  if (raw.includes('OPEN')) return 'OPEN';
+  if (raw.includes('CLOSE')) return 'CLOSED';
   if (raw === 'ALL' || raw === 'AVAILABLE' || raw === 'FILLED') return raw;
 
   if (raw.includes('FREE') || raw.includes('VACANT') || raw.includes('AVAILABLE')) return 'AVAILABLE';
   if (raw.includes('BOOKED') || raw.includes('OCCUPIED') || raw.includes('FILLED')) return 'FILLED';
   return 'ALL';
+};
+
+const formatDateYYYYMMDD = (value) => {
+  const dt = value instanceof Date ? value : new Date(value);
+  if (!(dt instanceof Date) || Number.isNaN(dt.getTime())) return null;
+  const yyyy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 };
 
 const parseDateRange = (dateText) => {
@@ -140,13 +158,47 @@ const parseDateRange = (dateText) => {
   const end = new Date(`${raw}T23:59:59.999`);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
 
-  return { date: raw, start, end };
+  return { date: raw, dateFrom: null, dateTo: null, start, end };
 };
 
 const parseOptionalDateRange = (dateText) => {
   const raw = String(dateText || '').trim();
   if (!raw) return null;
   return parseDateRange(raw);
+};
+
+const parseDateWindow = (payload = {}) => {
+  const raw = payload && typeof payload === 'object' ? payload : {};
+  const single = parseDateRange(raw.date);
+  if (single) return single;
+
+  const startRange = parseOptionalDateRange(raw.dateFrom || raw.startDate || raw.rangeStart);
+  const endRange = parseOptionalDateRange(raw.dateTo || raw.endDate || raw.rangeEnd);
+  if (!startRange && !endRange) return null;
+
+  const start = startRange ? startRange.start : endRange.start;
+  const end = endRange ? endRange.end : startRange.end;
+  if (!(start instanceof Date) || Number.isNaN(start.getTime()) || !(end instanceof Date) || Number.isNaN(end.getTime())) {
+    return null;
+  }
+
+  const normalizedStart = start.getTime() <= end.getTime() ? start : end;
+  const normalizedEnd = start.getTime() <= end.getTime() ? end : start;
+  const dateFrom = formatDateYYYYMMDD(normalizedStart);
+  const dateTo = formatDateYYYYMMDD(normalizedEnd);
+  if (!dateFrom || !dateTo) return null;
+
+  if (dateFrom === dateTo) {
+    return parseDateRange(dateFrom);
+  }
+
+  return {
+    date: null,
+    dateFrom,
+    dateTo,
+    start: normalizedStart,
+    end: normalizedEnd
+  };
 };
 
 const getTodayISTDate = () => {
@@ -175,6 +227,154 @@ const htmlEscape = (input) =>
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+
+const clipText = (value, limit = 4000) =>
+  String(value || '')
+    .trim()
+    .slice(0, limit);
+
+const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+
+const toDateOnlyBounds = (requestDoc) => {
+  const startSource = requestDoc?.startDate || requestDoc?.startDateTime;
+  const endSource = requestDoc?.endDate || requestDoc?.endDateTime || startSource;
+  const start = new Date(startSource);
+  const end = new Date(endSource);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+};
+
+const toMinutesFromRequestTime = (value, fallbackDateTime) => {
+  const raw = String(value || '').trim();
+  const fromTime = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (fromTime) {
+    return Number(fromTime[1]) * 60 + Number(fromTime[2]);
+  }
+
+  const fallback = fallbackDateTime ? new Date(fallbackDateTime) : null;
+  if (!fallback || Number.isNaN(fallback.getTime())) return null;
+  return fallback.getHours() * 60 + fallback.getMinutes();
+};
+
+const getRequestTimeWindow = (requestDoc) => ({
+  start: toMinutesFromRequestTime(requestDoc?.startTime24, requestDoc?.startDateTime),
+  end: toMinutesFromRequestTime(requestDoc?.endTime24, requestDoc?.endDateTime)
+});
+
+const buildConflictLabel = (conflictType) => {
+  const normalized = String(conflictType || '').trim().toUpperCase();
+  if (normalized === 'TIME_CONFLICT' || normalized === 'APPROVED_BOOKING_CONFLICT') return 'TIME CONFLICT';
+  if (normalized === 'DATE_CONFLICT') return 'DATE CONFLICT';
+  if (normalized === 'NOTICE_CLOSURE') return 'NOTICE CLOSURE';
+  return 'NON-CONFLICTING';
+};
+
+const classifyBookingRequestConflict = async (requestDoc, allPending = []) => {
+  const hallDoc = await Hall.findOne({ name: requestDoc.hall }).select('name bookings');
+  if (!hallDoc) {
+    return {
+      conflict: 'CONFLICTING',
+      conflictType: 'HALL_NOT_FOUND',
+      detail: 'Hall no longer exists.'
+    };
+  }
+
+  const noticeConflicts = await getNoticeClosures({
+    hallName: requestDoc.hall,
+    startDateTime: requestDoc.startDateTime,
+    endDateTime: requestDoc.endDateTime
+  });
+  if (noticeConflicts.length > 0) {
+    const first = noticeConflicts[0];
+    return {
+      conflict: 'CONFLICTING',
+      conflictType: 'NOTICE_CLOSURE',
+      detail: first?.title || first?.holidayName || 'Hall is closed for a notice/holiday.',
+      notices: noticeConflicts
+    };
+  }
+
+  const approvedConflict = (hallDoc.bookings || []).find((booking) =>
+    overlaps(booking.startDateTime, booking.endDateTime, requestDoc.startDateTime, requestDoc.endDateTime)
+  );
+  if (approvedConflict) {
+    return {
+      conflict: 'CONFLICTING',
+      conflictType: 'APPROVED_BOOKING_CONFLICT',
+      detail: approvedConflict.event || 'Overlaps an existing approved booking.'
+    };
+  }
+
+  const requestDayBounds = toDateOnlyBounds(requestDoc);
+  const requestTimeWindow = getRequestTimeWindow(requestDoc);
+
+  for (const other of allPending) {
+    if (!other || !other._id || requestDoc._id.equals(other._id)) continue;
+    if (String(other.status || '').toUpperCase() !== 'PENDING') continue;
+    if (String(other.hall || '').toLowerCase() !== String(requestDoc.hall || '').toLowerCase()) continue;
+
+    if (overlaps(requestDoc.startDateTime, requestDoc.endDateTime, other.startDateTime, other.endDateTime)) {
+      return {
+        conflict: 'CONFLICTING',
+        conflictType: 'TIME_CONFLICT',
+        detail: `Overlaps pending request ${String(other._id)}.`
+      };
+    }
+
+    const otherDayBounds = toDateOnlyBounds(other);
+    const otherTimeWindow = getRequestTimeWindow(other);
+    const datesOverlap = requestDayBounds && otherDayBounds
+      ? requestDayBounds.start.getTime() <= otherDayBounds.end.getTime()
+        && otherDayBounds.start.getTime() <= requestDayBounds.end.getTime()
+      : false;
+    const timesOverlap = requestTimeWindow.start !== null
+      && requestTimeWindow.end !== null
+      && otherTimeWindow.start !== null
+      && otherTimeWindow.end !== null
+      ? requestTimeWindow.start < otherTimeWindow.end && otherTimeWindow.start < requestTimeWindow.end
+      : false;
+
+    if (datesOverlap && !timesOverlap) {
+      return {
+        conflict: 'CONFLICTING',
+        conflictType: 'DATE_CONFLICT',
+        detail: `Date range overlaps pending request ${String(other._id)}.`
+      };
+    }
+  }
+
+  return {
+    conflict: 'NON_CONFLICTING',
+    conflictType: 'SAFE',
+    detail: 'No time/date/closure conflicts detected.'
+  };
+};
+
+const notifyDepartmentDecision = (requestDoc, decision) => {
+  const departmentEmail = requestDoc?.department?.email || '';
+  if (departmentEmail) {
+    safeExecute(
+      () => sendDecisionToDepartment({
+        email: departmentEmail,
+        booking: requestDoc,
+        decision
+      }),
+      'DEPARTMENT EMAIL'
+    );
+  }
+
+  if (requestDoc?.department) {
+    safeExecute(
+      () => sendDecisionSMSDepartment({
+        booking: requestDoc,
+        decision
+      }),
+      'DEPARTMENT SMS'
+    );
+  }
+};
 
 const buildScheduleCsv = (rows) => {
   const header = ['Hall', 'Status', 'Event', 'Department', 'Time'];
@@ -314,32 +514,8 @@ const overlaps = (startA, endA, startB, endB) =>
 const formatDateLabel = (dateRange) => dateRange?.date || 'the current active time';
 
 const analyzeRequestConflict = async (requestDoc, allPending) => {
-  const startA = new Date(requestDoc.startDateTime).getTime();
-  const endA = new Date(requestDoc.endDateTime).getTime();
-
-  const approvedConflict = await Hall.findOne({
-    name: requestDoc.hall,
-    bookings: {
-      $elemMatch: {
-        startDateTime: { $lt: requestDoc.endDateTime },
-        endDateTime: { $gt: requestDoc.startDateTime }
-      }
-    }
-  });
-
-  if (approvedConflict) return 'TIME_CONFLICT';
-
-  for (const other of allPending) {
-    if (!other || !other._id || requestDoc._id.equals(other._id)) continue;
-    if (other.status !== 'PENDING') continue;
-    if (String(other.hall).toLowerCase() !== String(requestDoc.hall).toLowerCase()) continue;
-
-    const startB = new Date(other.startDateTime).getTime();
-    const endB = new Date(other.endDateTime).getTime();
-    if (startA < endB && endA > startB) return 'TIME_CONFLICT';
-  }
-
-  return 'SAFE';
+  const result = await classifyBookingRequestConflict(requestDoc, allPending);
+  return result?.conflictType || 'SAFE';
 };
 
 const approveRequest = async (requestDoc) => {
@@ -360,45 +536,13 @@ const approveRequest = async (requestDoc) => {
 
   requestDoc.status = 'APPROVED';
   await requestDoc.save();
-
-  safeExecute(
-    () => sendDecisionToDepartment({
-      email: requestDoc.department.email,
-      booking: requestDoc,
-      decision: 'APPROVED'
-    }),
-    'DEPARTMENT EMAIL'
-  );
-
-  safeExecute(
-    () => sendDecisionSMSDepartment({
-      booking: requestDoc,
-      decision: 'APPROVED'
-    }),
-    'DEPARTMENT SMS'
-  );
+  notifyDepartmentDecision(requestDoc, 'APPROVED');
 };
 
 const rejectRequest = async (requestDoc) => {
   requestDoc.status = 'REJECTED';
   await requestDoc.save();
-
-  safeExecute(
-    () => sendDecisionToDepartment({
-      email: requestDoc.department.email,
-      booking: requestDoc,
-      decision: 'REJECTED'
-    }),
-    'DEPARTMENT EMAIL'
-  );
-
-  safeExecute(
-    () => sendDecisionSMSDepartment({
-      booking: requestDoc,
-      decision: 'REJECTED'
-    }),
-    'DEPARTMENT SMS'
-  );
+  notifyDepartmentDecision(requestDoc, 'REJECTED');
 };
 
 router.post('/execute', async (req, res) => {
@@ -441,6 +585,7 @@ router.post('/execute', async (req, res) => {
       accountKey: req.body?.accountKey,
       channel: 'http_execute'
     });
+    const fromConfirmedPendingAction = Boolean(intent?.meta?.confirmedPendingAction);
 
     const originalJson = res.json.bind(res);
     let memoryPersistQueued = false;
@@ -474,6 +619,15 @@ router.post('/execute', async (req, res) => {
             error: finalStatus === 'ERROR'
           }).catch((reviewErr) => {
             captureException(reviewErr, { area: 'ai_execute_review_mark' });
+          });
+        }
+
+        if (fromConfirmedPendingAction && ['DONE', 'INFO'].includes(finalStatus)) {
+          clearPendingAction({
+            ownerKey: agentMemoryContext?.ownerKey,
+            threadId: agentMemoryContext?.threadId
+          }).catch((pendingErr) => {
+            captureException(pendingErr, { area: 'ai_execute_pending_clear' });
           });
         }
       }
@@ -556,6 +710,7 @@ router.post('/execute', async (req, res) => {
 
       if (user.type === 'Admin') {
         let successCount = 0;
+        let autoBookedCount = 0;
         const failMessages = [];
 
         for (const requestItem of requests) {
@@ -596,16 +751,44 @@ router.post('/execute', async (req, res) => {
               continue;
             }
 
-            const hasConflict = (hallDoc.bookings || []).some((booking) =>
+            const hasBookingConflict = (hallDoc.bookings || []).some((booking) =>
               overlaps(startDateTime, endDateTime, booking.startDateTime, booking.endDateTime)
             );
-            if (hasConflict) {
-              failMessages.push(`${hallDoc.name} is already booked for the requested time range.`);
+            const noticeConflicts = await getNoticeClosures({
+              hallName: hallDoc.name,
+              startDateTime,
+              endDateTime
+            });
+            if (hasBookingConflict || noticeConflicts.length > 0) {
+              const reason = noticeConflicts.length > 0
+                ? `${hallDoc.name} is closed for the requested time range.`
+                : `${hallDoc.name} is already booked for the requested time range.`;
+              failMessages.push(reason);
               continue;
             }
 
+            const approvalToken = generateApprovalToken();
+            const tokenExpiry = getTokenExpiry(15);
+            const requestDoc = await Booking_Requests.create({
+              hall: hallDoc.name,
+              department: null,
+              event,
+              description: 'Booked via AI Assistant by admin',
+              startDateTime,
+              endDateTime,
+              startTime12: start12,
+              endTime12: end12,
+              startTime24: `${start24}:00`,
+              endTime24: `${end24}:00`,
+              startDate: date,
+              endDate: date,
+              approvalToken,
+              tokenExpiry,
+              status: 'AUTO_BOOKED'
+            });
+
             hallDoc.bookings.push({
-              bookingRequest: null,
+              bookingRequest: requestDoc._id,
               department: null,
               event,
               startDateTime,
@@ -614,6 +797,26 @@ router.post('/execute', async (req, res) => {
             hallDoc.status = hallDoc.isFilledAt(new Date()) ? 'Filled' : 'Not Filled';
             await hallDoc.save();
             successCount += 1;
+            autoBookedCount += 1;
+
+            const baseUrl = `${process.env.PUBLIC_BASE_URL}/api/approval`;
+            safeExecute(
+              () => sendBookingAutoBookedMail({
+                adminEmail: process.env.EMAIL,
+                booking: requestDoc,
+                vacateUrl: `${baseUrl}/vacate/${approvalToken}`,
+                leaveUrl: `${baseUrl}/leave/${approvalToken}`
+              }),
+              'ADMIN EMAIL'
+            );
+
+            safeExecute(
+              () => sendBookingAutoBookedSMS({
+                booking: requestDoc,
+                token: approvalToken
+              }),
+              'ADMIN SMS'
+            );
           } catch (err) {
             console.error('AI admin direct booking error:', err);
             failMessages.push('An unexpected error happened for one admin booking.');
@@ -628,10 +831,10 @@ router.post('/execute', async (req, res) => {
         }
 
         const suffix = failMessages.length > 0 ? ` ${failMessages.join(' ')}` : '';
-        return res.json({
-          status: 'DONE',
-          message: `Admin booked ${successCount} hall slot(s) directly.${suffix}`
-        });
+      return res.json({
+        status: 'DONE',
+        message: `I have booked ${successCount} hall ${successCount === 1 ? 'slot' : 'slots'} directly as requested. The admin dashboard cards were updated for ${autoBookedCount} ${autoBookedCount === 1 ? 'entry' : 'entries'}.${suffix}`
+      });
       }
 
       if (user.type !== 'Department') {
@@ -685,7 +888,12 @@ router.post('/execute', async (req, res) => {
           const overlappingBookings = (hallDoc.bookings || []).filter((booking) =>
             overlaps(startDateTime, endDateTime, booking.startDateTime, booking.endDateTime)
           );
-          const hasConflict = overlappingBookings.length > 0;
+          const noticeConflicts = await getNoticeClosures({
+            hallName: hallDoc.name,
+            startDateTime,
+            endDateTime
+          });
+          const hasConflict = overlappingBookings.length > 0 || noticeConflicts.length > 0;
 
           const approvalToken = generateApprovalToken();
           const tokenExpiry = getTokenExpiry(15);
@@ -705,7 +913,19 @@ router.post('/execute', async (req, res) => {
             endDate: date,
             approvalToken,
             tokenExpiry,
-            status: hasConflict ? 'PENDING' : 'AUTO_BOOKED'
+            status: hasConflict ? 'PENDING' : 'AUTO_BOOKED',
+            forceRequested: false,
+            conflictDetails: hasConflict
+              ? {
+                  bookings: overlappingBookings.map((booking) => ({
+                    bookingRequest: booking.bookingRequest || null,
+                    event: booking.event || 'Booked',
+                    startDateTime: booking.startDateTime,
+                    endDateTime: booking.endDateTime
+                  })),
+                  notices: noticeConflicts
+                }
+              : {}
           });
 
           const saved = await newRequest.save();
@@ -808,7 +1028,189 @@ router.post('/execute', async (req, res) => {
       const suffix = failMessages.length > 0 ? ` ${failMessages.join(' ')}` : '';
       return res.json({
         status: 'DONE',
-        message: `Created ${successCount} booking request(s). Auto-booked: ${autoBookedCount}, pending admin approval: ${pendingApprovalCount}.${suffix}`
+        message: `I created ${successCount} booking ${successCount === 1 ? 'request' : 'requests'}. ${autoBookedCount} ${autoBookedCount === 1 ? 'was' : 'were'} auto-booked, and ${pendingApprovalCount} ${pendingApprovalCount === 1 ? 'is' : 'are'} pending admin approval.${suffix}`
+      });
+    }
+
+    if (actionType === 'CREATE_PUBLIC_TASK') {
+      if (!['Admin', 'Department'].includes(String(user.type || ''))) {
+        return res.json({ status: 'ERROR', msg: 'Creating public calendar tasks requires admin or faculty login.' });
+      }
+
+      const title = clipText(payload.title || payload.event || 'Public Task', 240);
+      const description = clipText(payload.description || '', 4000);
+      const startDateTime = payload.startDateTime ? new Date(payload.startDateTime) : null;
+      const endDateTime = payload.endDateTime ? new Date(payload.endDateTime) : null;
+      const allDay = Boolean(payload.allDay);
+
+      if (!title || !startDateTime || !endDateTime) {
+        return res.json({ status: 'ERROR', msg: 'Task title, startDateTime, and endDateTime are required.' });
+      }
+      if (Number.isNaN(startDateTime.getTime()) || Number.isNaN(endDateTime.getTime())) {
+        return res.json({ status: 'ERROR', msg: 'Task date/time is invalid.' });
+      }
+      if (endDateTime <= startDateTime) {
+        return res.json({ status: 'ERROR', msg: 'Task end time must be after start time.' });
+      }
+
+      const task = await CalendarTask.create({
+        title,
+        description,
+        startDateTime,
+        endDateTime,
+        allDay,
+        createdBy: {
+          id: user.id || user._id || null,
+          type: user.type || '',
+          name: user.name || user.head || user.department || user.email || 'User',
+          email: user.email || ''
+        }
+      });
+
+      return res.json({
+        status: 'INFO',
+        data: {
+          kind: 'CALENDAR_TASK',
+          title: task.title,
+          summary: 'Public task created successfully.',
+          columns: ['Field', 'Value'],
+          rows: [
+            ['Title', task.title],
+            ['From', String(task.startDateTime || '')],
+            ['To', String(task.endDateTime || '')],
+            ['All Day', allDay ? 'Yes' : 'No'],
+            ['Description', task.description || '-']
+          ]
+        }
+      });
+    }
+
+    if (actionType === 'CREATE_NOTICE') {
+      if (user.type !== 'Admin') {
+        return res.json({ status: 'ERROR', msg: 'Posting notices via AI requires admin login.' });
+      }
+
+      const title = clipText(payload.title || payload.subject || '', 240);
+      const content = clipText(payload.content || payload.body || payload.summary || '', 8000);
+      if (!title && !content) {
+        return res.json({ status: 'ERROR', msg: 'Notice title or content is required.' });
+      }
+
+      const { notice } = await createNotice({
+        subject: title,
+        body: content,
+        source: 'ADMIN',
+        manualOverrides: {
+          kind: String(payload.kind || 'GENERAL').trim().toUpperCase(),
+          holidayName: clipText(payload.holidayName || '', 240),
+          startDateTime: payload.startDateTime || null,
+          endDateTime: payload.endDateTime || null,
+          closureAllHalls: Boolean(payload.closureAllHalls),
+          rooms: Array.isArray(payload.rooms) ? payload.rooms : [],
+          title,
+          content
+        },
+        postedBy: {
+          id: user._id || user.id || null,
+          type: user.type || '',
+          name: user.name || user.email || 'Admin'
+        }
+      });
+
+      return res.json({
+        status: 'INFO',
+        data: {
+          kind: 'NOTICE_RESULT',
+          noticeId: String(notice._id),
+          title: notice.title || title,
+          content: notice.content || content,
+          summary: `Notice posted as ${notice.kind || 'GENERAL'}.`,
+          columns: ['Field', 'Value'],
+          rows: [
+            ['Title', notice.title || title],
+            ['Type', notice.kind || 'GENERAL'],
+            ['From', String(notice.startDateTime || '') || '-'],
+            ['To', String(notice.endDateTime || '') || '-'],
+            ['Institute-wide Closure', notice.closureAllHalls ? 'Yes' : 'No'],
+            ['Rooms', Array.isArray(notice.rooms) && notice.rooms.length > 0 ? notice.rooms.join(', ') : '-']
+          ]
+        }
+      });
+    }
+
+    if (actionType === 'GET_NOTICE') {
+      const query = clipText(payload.query || payload.title || payload.notice || '', 240);
+      if (!query) {
+        return res.json({ status: 'ERROR', msg: 'Please specify which notice you want to open or download.' });
+      }
+
+      const matches = await listNotices({ search: query, limit: 5 });
+      if (!matches.length) {
+        return res.json({ status: 'ERROR', msg: `No notice matched "${query}".` });
+      }
+
+      const notice = matches[0];
+      return res.json({
+        status: 'INFO',
+        data: {
+          kind: 'NOTICE_RESULT',
+          noticeId: String(notice._id),
+          title: notice.title || 'Notice',
+          content: notice.content || notice.body || notice.summary || '',
+          summary: matches.length > 1
+            ? `Showing the best match out of ${matches.length} notice results for "${query}".`
+            : `Showing the matching notice for "${query}".`,
+          columns: ['Field', 'Value'],
+          rows: [
+            ['Title', notice.title || 'Notice'],
+            ['Type', notice.kind || 'GENERAL'],
+            ['From', String(notice.startDateTime || '') || '-'],
+            ['To', String(notice.endDateTime || '') || '-'],
+            ['Institute-wide Closure', notice.closureAllHalls ? 'Yes' : 'No'],
+            ['Rooms', Array.isArray(notice.rooms) && notice.rooms.length > 0 ? notice.rooms.join(', ') : '-'],
+            ['Content', notice.content || notice.body || notice.summary || '-']
+          ]
+        }
+      });
+    }
+
+    if (actionType === 'SEND_EMAIL') {
+      if (!['Admin', 'Department'].includes(String(user.type || ''))) {
+        return res.json({ status: 'ERROR', msg: 'Sending email via AI requires admin or faculty login.' });
+      }
+
+      const to = String(payload.to || payload.email || '').trim();
+      const subject = clipText(payload.subject || 'BIT Booking AI Message', 200);
+      const text = String(payload.content || payload.body || payload.text || '').trim();
+
+      if (!isValidEmail(to)) {
+        return res.json({ status: 'ERROR', msg: 'A valid recipient email address is required.' });
+      }
+      if (!text) {
+        return res.json({ status: 'ERROR', msg: 'Email content is required.' });
+      }
+
+      await sendGenericEmail({
+        to,
+        subject,
+        text,
+        replyTo: user.email || ''
+      });
+
+      return res.json({
+        status: 'INFO',
+        data: {
+          kind: 'EMAIL_RESULT',
+          title: 'Email Sent',
+          summary: `Email sent to ${to}.`,
+          columns: ['Field', 'Value'],
+          rows: [
+            ['To', to],
+            ['Subject', subject],
+            ['Reply-To', user.email || '-'],
+            ['Content', text]
+          ]
+        }
       });
     }
 
@@ -884,6 +1286,9 @@ router.post('/execute', async (req, res) => {
 
       const subAction = normalizeSubAction(payload.subAction);
       const targetHall = String(payload.targetHall || '').trim();
+      const selectedRequestIds = Array.isArray(payload.requestIds)
+        ? payload.requestIds.map((id) => String(id || '').trim()).filter(Boolean)
+        : [];
 
       if (!subAction) {
         return res.json({ status: 'ERROR', msg: 'Admin action was not clear. Please try again.' });
@@ -904,8 +1309,11 @@ router.post('/execute', async (req, res) => {
       const scopedRequests = targetHall
         ? pendingRequests.filter((requestDoc) => requestDoc.hall.toLowerCase() === targetHall.toLowerCase())
         : pendingRequests;
+      const executableRequests = selectedRequestIds.length > 0
+        ? scopedRequests.filter((requestDoc) => selectedRequestIds.includes(String(requestDoc._id)))
+        : scopedRequests;
 
-      if (scopedRequests.length === 0) {
+      if (executableRequests.length === 0) {
         return res.json({
           status: 'DONE',
           message: targetHall
@@ -916,22 +1324,23 @@ router.post('/execute', async (req, res) => {
 
       const stats = { approved: 0, rejected: 0, skipped: 0, failed: 0 };
 
-      for (const requestDoc of scopedRequests) {
+      for (const requestDoc of executableRequests) {
         try {
-          const needsConflictCheck = subAction === 'APPROVE_SAFE' || subAction === 'REJECT_CONFLICTS';
-          const conflictStatus = needsConflictCheck
-            ? await analyzeRequestConflict(requestDoc, scopedRequests)
-            : 'SAFE';
+          const conflictMeta = await classifyBookingRequestConflict(requestDoc, pendingRequests);
+          const isSafe = conflictMeta.conflict === 'NON_CONFLICTING';
+          const isConflicting = !isSafe;
 
           const shouldApprove =
             subAction === 'APPROVE_ALL' ||
             subAction === 'APPROVE_SPECIFIC' ||
-            (subAction === 'APPROVE_SAFE' && conflictStatus === 'SAFE');
+            subAction === 'APPROVE_SELECTED' ||
+            (subAction === 'APPROVE_SAFE' && isSafe);
 
           const shouldReject =
             subAction === 'REJECT_ALL' ||
             subAction === 'REJECT_SPECIFIC' ||
-            (subAction === 'REJECT_CONFLICTS' && conflictStatus === 'TIME_CONFLICT');
+            subAction === 'REJECT_SELECTED' ||
+            (subAction === 'REJECT_CONFLICTS' && isConflicting);
 
           if (shouldApprove) {
             await approveRequest(requestDoc);
@@ -954,18 +1363,18 @@ router.post('/execute', async (req, res) => {
 
       return res.json({
         status: 'DONE',
-        message: `Processed pending requests. Approved: ${stats.approved}, Rejected: ${stats.rejected}, Skipped: ${stats.skipped}, Failed: ${stats.failed}.`
+        message: `I have processed the pending requests. Approved: ${stats.approved}, rejected: ${stats.rejected}, skipped: ${stats.skipped}, failed: ${stats.failed}.`
       });
     }
 
     if (actionType === 'LIST_BOOKING_REQUESTS') {
-      if (user.type !== 'Admin') {
-        return res.json({ status: 'ERROR', msg: 'This AI action is admin-only.' });
+      if (!['Admin', 'Department'].includes(String(user.type || ''))) {
+        return res.json({ status: 'ERROR', msg: 'Viewing booking request lists requires admin or faculty login.' });
       }
 
       const filter = normalizeConflictFilter(payload.filter);
       const targetHall = String(payload.targetHall || '').trim();
-      const dateRange = parseDateRange(payload.date);
+      const dateRange = parseDateWindow(payload);
 
       const pendingRequests = await Booking_Requests
         .find({ status: 'PENDING' })
@@ -990,7 +1399,9 @@ router.post('/execute', async (req, res) => {
             filter,
             targetHall: targetHall || null,
             date: dateRange ? dateRange.date : null,
-            summary: { total: 0, conflicting: 0, nonConflicting: 0 },
+            dateFrom: dateRange ? dateRange.dateFrom || null : null,
+            dateTo: dateRange ? dateRange.dateTo || null : null,
+            summary: { total: 0, conflicting: 0, nonConflicting: 0, timeConflicts: 0, dateConflicts: 0, closureConflicts: 0 },
             items: []
           }
         });
@@ -998,8 +1409,9 @@ router.post('/execute', async (req, res) => {
 
       const items = [];
       for (const requestDoc of scoped) {
-        const conflictStatus = await analyzeRequestConflict(requestDoc, pendingRequests);
-        const conflict = conflictStatus === 'TIME_CONFLICT' ? 'CONFLICTING' : 'NON_CONFLICTING';
+        const conflictMeta = await classifyBookingRequestConflict(requestDoc, pendingRequests);
+        const conflict = conflictMeta.conflict;
+        const conflictType = conflictMeta.conflictType;
 
         items.push({
           id: String(requestDoc._id),
@@ -1012,14 +1424,19 @@ router.post('/execute', async (req, res) => {
           requestedEmail: requestDoc.department?.email || 'N/A',
           requestedPhone: requestDoc.department?.phone || '',
           department: requestDoc.department?.department || '',
-          conflict
+          conflict,
+          conflictType,
+          conflictDetail: conflictMeta.detail || ''
         });
       }
 
       const summary = {
         total: items.length,
         conflicting: items.filter((item) => item.conflict === 'CONFLICTING').length,
-        nonConflicting: items.filter((item) => item.conflict === 'NON_CONFLICTING').length
+        nonConflicting: items.filter((item) => item.conflict === 'NON_CONFLICTING').length,
+        timeConflicts: items.filter((item) => ['TIME_CONFLICT', 'APPROVED_BOOKING_CONFLICT'].includes(item.conflictType)).length,
+        dateConflicts: items.filter((item) => item.conflictType === 'DATE_CONFLICT').length,
+        closureConflicts: items.filter((item) => item.conflictType === 'NOTICE_CLOSURE').length
       };
 
       const filteredItems = filter === 'CONFLICTING'
@@ -1035,6 +1452,8 @@ router.post('/execute', async (req, res) => {
           filter,
           targetHall: targetHall || null,
           date: dateRange ? dateRange.date : null,
+          dateFrom: dateRange ? dateRange.dateFrom || null : null,
+          dateTo: dateRange ? dateRange.dateTo || null : null,
           summary,
           items: filteredItems
         }
@@ -1044,47 +1463,73 @@ router.post('/execute', async (req, res) => {
     if (actionType === 'SHOW_HALL_STATUS') {
       const mode = normalizeHallStatusMode(payload.mode);
       const targetHall = String(payload.targetHall || '').trim();
-      const dateRange = parseDateRange(payload.date);
+      const dateRange = parseDateWindow(payload);
       const halls = targetHall ? await Hall.find({ name: targetHall }) : await Hall.find();
-      const now = new Date();
+      const activeRange = dateRange || parseDateRange(getTodayISTDate());
 
-      const items = halls.map((hall) => {
-        if (dateRange) {
-          const dayBookings = (hall.bookings || []).filter((booking) =>
-            overlaps(booking.startDateTime, booking.endDateTime, dateRange.start, dateRange.end)
-          );
-          const status = dayBookings.length > 0 ? 'FILLED' : 'AVAILABLE';
-
-          return {
-            hall: hall.name,
-            status,
-            currentEvent: dayBookings[0]?.event || 'None'
-          };
-        }
-
-        const currentBooking = (hall.bookings || []).find((booking) =>
-          new Date(booking.startDateTime) <= now && new Date(booking.endDateTime) >= now
+      const items = [];
+      for (const hall of halls) {
+        const bookings = (hall.bookings || []).filter((booking) =>
+          overlaps(booking.startDateTime, booking.endDateTime, activeRange.start, activeRange.end)
         );
+        const sortedBookings = [...bookings].sort(
+          (a, b) => new Date(a.startDateTime).getTime() - new Date(b.startDateTime).getTime()
+        );
+        const bookingTimeRanges = sortedBookings.map((booking) =>
+          formatTimeRange(booking.startDateTime, booking.endDateTime)
+        );
+        const bookingEvents = sortedBookings
+          .map((booking) => String(booking?.event || '').trim() || 'Booked')
+          .filter(Boolean);
+        const closures = await getNoticeClosures({
+          hallName: hall.name,
+          startDateTime: activeRange.start,
+          endDateTime: activeRange.end
+        });
 
-        return {
+        const isClosed = closures.length > 0;
+        const isFilled = bookings.length > 0;
+        const status = isClosed ? 'CLOSED' : isFilled ? 'FILLED' : 'AVAILABLE';
+        const bookingLabel = bookingEvents.length === 0
+          ? 'None'
+          : bookingEvents.length <= 2
+            ? bookingEvents.join(', ')
+            : `${bookingEvents.slice(0, 2).join(', ')} (+${bookingEvents.length - 2} more)`;
+        const bookingTimingsText = bookingTimeRanges.length > 0 ? bookingTimeRanges.join(', ') : 'None';
+        const closureLabel = closures.length <= 1
+          ? (closures[0]?.title || closures[0]?.holidayName || 'None')
+          : `${closures.length} closures in selected range`;
+
+        items.push({
           hall: hall.name,
-          status: currentBooking ? 'FILLED' : 'AVAILABLE',
-          currentEvent: currentBooking ? currentBooking.event : 'None'
-        };
-      });
+          status,
+          bookingStatus: isFilled ? 'BOOKED' : 'NOT_BOOKED',
+          closureStatus: isClosed ? 'CLOSED' : 'OPEN',
+          currentEvent: bookingLabel,
+          bookingTimings: bookingTimeRanges,
+          bookingTimingsText,
+          closureReason: closureLabel
+        });
+      }
 
       const filteredItems = mode === 'AVAILABLE'
         ? items.filter((item) => item.status === 'AVAILABLE')
         : mode === 'FILLED'
           ? items.filter((item) => item.status === 'FILLED')
-          : items;
+          : mode === 'OPEN'
+            ? items.filter((item) => item.closureStatus === 'OPEN')
+            : mode === 'CLOSED'
+              ? items.filter((item) => item.closureStatus === 'CLOSED')
+              : items;
 
       return res.json({
         status: 'INFO',
         data: {
           kind: 'HALL_STATUS',
           mode,
-          date: dateRange ? dateRange.date : null,
+          date: activeRange ? activeRange.date : null,
+          dateFrom: activeRange ? activeRange.dateFrom || null : null,
+          dateTo: activeRange ? activeRange.dateTo || null : null,
           targetHall: targetHall || null,
           items: filteredItems
         }

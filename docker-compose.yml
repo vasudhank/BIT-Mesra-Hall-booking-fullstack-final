@@ -9,6 +9,23 @@ services:
     volumes:
       - mongo_data:/data/db
 
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.27.10
+    profiles:
+      - vector
+    restart: unless-stopped
+    environment:
+      - AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true
+      - DEFAULT_VECTORIZER_MODULE=none
+      - ENABLE_MODULES=
+      - QUERY_DEFAULTS_LIMIT=25
+      - PERSISTENCE_DATA_PATH=/var/lib/weaviate
+      - CLUSTER_HOSTNAME=node1
+    ports:
+      - "8080:8080"
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+
   backend:
     build:
       context: ./backend
@@ -88,5 +105,6 @@ services:
 
 volumes:
   mongo_data:
+  weaviate_data:
   prometheus_data:
   grafana_data:

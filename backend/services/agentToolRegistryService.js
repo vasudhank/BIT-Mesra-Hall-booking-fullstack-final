@@ -48,7 +48,39 @@ const parseDateRange = (dateText) => {
   const start = new Date(`${normalizedDate}T00:00:00.000`);
   const end = new Date(`${normalizedDate}T23:59:59.999`);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
-  return { date: normalizedDate, start, end };
+  return { date: normalizedDate, dateFrom: null, dateTo: null, start, end };
+};
+
+const parseDateWindow = ({ date = '', dateFrom = '', dateTo = '' } = {}) => {
+  const single = parseDateRange(date);
+  if (single) return single;
+
+  const startRange = parseDateRange(dateFrom);
+  const endRange = parseDateRange(dateTo);
+  if (!startRange && !endRange) return null;
+
+  const start = startRange ? startRange.start : endRange.start;
+  const end = endRange ? endRange.end : startRange.end;
+  if (!(start instanceof Date) || Number.isNaN(start.getTime()) || !(end instanceof Date) || Number.isNaN(end.getTime())) {
+    return null;
+  }
+
+  const normalizedStart = start.getTime() <= end.getTime() ? start : end;
+  const normalizedEnd = start.getTime() <= end.getTime() ? end : start;
+  const startKey = formatDateYYYYMMDD(normalizedStart);
+  const endKey = formatDateYYYYMMDD(normalizedEnd);
+
+  if (startKey === endKey) {
+    return parseDateRange(startKey);
+  }
+
+  return {
+    date: null,
+    dateFrom: startKey,
+    dateTo: endKey,
+    start: normalizedStart,
+    end: normalizedEnd
+  };
 };
 
 const to12HourTime = (inputTime) => {
@@ -211,44 +243,37 @@ const buildScheduleRows = async (dateRange) => {
   return rows;
 };
 
-const listHallStatusData = async ({ targetHall = '', mode = 'ALL', date = '' } = {}) => {
+const listHallStatusData = async ({ targetHall = '', mode = 'ALL', date = '', dateFrom = '', dateTo = '' } = {}) => {
+  const dateRange = parseDateWindow({ date, dateFrom, dateTo }) || parseDateRange(getTodayISTDate());
+
   if (!isMongoReady()) {
     return {
       kind: 'HALL_STATUS',
       mode: normalizeHallStatusMode(mode),
       targetHall: targetHall || null,
-      date: parseDateValue(date),
+      date: dateRange ? dateRange.date : null,
+      dateFrom: dateRange ? dateRange.dateFrom || null : null,
+      dateTo: dateRange ? dateRange.dateTo || null : null,
       items: []
     };
   }
 
   const normalizedMode = normalizeHallStatusMode(mode);
-  const dateRange = parseDateRange(date);
   const halls = targetHall
     ? await Hall.find({ name: new RegExp(`^${escapeRegex(targetHall)}$`, 'i') })
     : await Hall.find();
-  const now = new Date();
 
   const items = halls.map((hall) => {
-    if (dateRange) {
-      const dayBookings = (hall.bookings || []).filter((booking) =>
-        overlaps(booking.startDateTime, booking.endDateTime, dateRange.start, dateRange.end)
-      );
-      return {
-        hall: hall.name,
-        status: dayBookings.length > 0 ? 'FILLED' : 'AVAILABLE',
-        currentEvent: dayBookings[0]?.event || 'None'
-      };
-    }
-
-    const currentBooking = (hall.bookings || []).find((booking) =>
-      new Date(booking.startDateTime) <= now && new Date(booking.endDateTime) >= now
+    const dayBookings = (hall.bookings || []).filter((booking) =>
+      overlaps(booking.startDateTime, booking.endDateTime, dateRange.start, dateRange.end)
     );
 
     return {
       hall: hall.name,
-      status: currentBooking ? 'FILLED' : 'AVAILABLE',
-      currentEvent: currentBooking ? currentBooking.event : 'None'
+      status: dayBookings.length > 0 ? 'FILLED' : 'AVAILABLE',
+      currentEvent: dayBookings.length <= 1
+        ? (dayBookings[0]?.event || 'None')
+        : `${dayBookings.length} bookings in selected range`
     };
   });
 
@@ -263,13 +288,15 @@ const listHallStatusData = async ({ targetHall = '', mode = 'ALL', date = '' } =
     mode: normalizedMode,
     targetHall: targetHall || null,
     date: dateRange ? dateRange.date : null,
+    dateFrom: dateRange ? dateRange.dateFrom || null : null,
+    dateTo: dateRange ? dateRange.dateTo || null : null,
     items: filteredItems
   };
 };
 
-const listPendingBookingRequestsData = async ({ filter = 'ALL', targetHall = '', date = '' } = {}) => {
+const listPendingBookingRequestsData = async ({ filter = 'ALL', targetHall = '', date = '', dateFrom = '', dateTo = '' } = {}) => {
   const normalizedFilter = normalizeConflictFilter(filter);
-  const dateRange = parseDateRange(date);
+  const dateRange = parseDateWindow({ date, dateFrom, dateTo });
 
   if (!isMongoReady()) {
     return {
@@ -277,6 +304,8 @@ const listPendingBookingRequestsData = async ({ filter = 'ALL', targetHall = '',
       filter: normalizedFilter,
       targetHall: targetHall || null,
       date: dateRange ? dateRange.date : null,
+      dateFrom: dateRange ? dateRange.dateFrom || null : null,
+      dateTo: dateRange ? dateRange.dateTo || null : null,
       summary: { total: 0, conflicting: 0, nonConflicting: 0 },
       items: []
     };
@@ -332,6 +361,8 @@ const listPendingBookingRequestsData = async ({ filter = 'ALL', targetHall = '',
     filter: normalizedFilter,
     targetHall: targetHall || null,
     date: dateRange ? dateRange.date : null,
+    dateFrom: dateRange ? dateRange.dateFrom || null : null,
+    dateTo: dateRange ? dateRange.dateTo || null : null,
     summary,
     items: filteredItems
   };
@@ -505,10 +536,12 @@ const toolCatalog = [
     schema: z.object({
       targetHall: z.string().optional().describe('Optional exact hall name when the user asks about one hall.'),
       mode: z.enum(['ALL', 'AVAILABLE', 'FILLED']).optional().describe('Optional filter for available or filled halls.'),
-      date: z.string().optional().describe('Optional date in YYYY-MM-DD or natural language.')
+      date: z.string().optional().describe('Optional single date in YYYY-MM-DD or natural language.'),
+      dateFrom: z.string().optional().describe('Optional range start date in YYYY-MM-DD or natural language.'),
+      dateTo: z.string().optional().describe('Optional range end date in YYYY-MM-DD or natural language.')
     }),
-    handler: async ({ targetHall, mode, date }) => {
-      const data = await listHallStatusData({ targetHall, mode, date });
+    handler: async ({ targetHall, mode, date, dateFrom, dateTo }) => {
+      const data = await listHallStatusData({ targetHall, mode, date, dateFrom, dateTo });
       return resolveToolResult({
         kind: 'lookup',
         title: 'Hall status lookup',
@@ -523,9 +556,11 @@ const toolCatalog = [
     schema: z.object({
       filter: z.enum(['ALL', 'CONFLICTING', 'NON_CONFLICTING']).optional().describe('Filter for all, conflicting, or non-conflicting requests.'),
       targetHall: z.string().optional().describe('Optional hall name to scope the list.'),
-      date: z.string().optional().describe('Optional date in YYYY-MM-DD or natural language.')
+      date: z.string().optional().describe('Optional single date in YYYY-MM-DD or natural language.'),
+      dateFrom: z.string().optional().describe('Optional range start date in YYYY-MM-DD or natural language.'),
+      dateTo: z.string().optional().describe('Optional range end date in YYYY-MM-DD or natural language.')
     }),
-    handler: async ({ filter, targetHall, date }, context) => {
+    handler: async ({ filter, targetHall, date, dateFrom, dateTo }, context) => {
       if (String(context.userRole || '').toUpperCase() !== 'ADMIN') {
         return resolveToolResult({
           kind: 'policy',
@@ -535,7 +570,7 @@ const toolCatalog = [
         });
       }
 
-      const data = await listPendingBookingRequestsData({ filter, targetHall, date });
+      const data = await listPendingBookingRequestsData({ filter, targetHall, date, dateFrom, dateTo });
       return resolveToolResult({
         kind: 'lookup',
         title: 'Pending booking requests',

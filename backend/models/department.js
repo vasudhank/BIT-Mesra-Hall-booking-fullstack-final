@@ -32,7 +32,10 @@ const departmentSchema = new mongoose.Schema({
 
     // New Account Setup fields
     setupToken: { type: String, default: null },
-    setupTokenExpiry: { type: Date, default: null }
+    setupTokenExpiry: { type: Date, default: null },
+
+    // Optional per-account session duration preference (in milliseconds).
+    sessionTimeoutMs: { type: Number, default: null }
 });
 
 const Department = mongoose.model('Department', departmentSchema);

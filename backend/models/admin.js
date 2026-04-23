@@ -29,7 +29,11 @@ const adminSchema = new mongoose.Schema({
     pendingEmail: {
       type: String,
       default: null
-    }
+    },
+
+    // Optional per-account session duration preference (in milliseconds).
+    // When set, the backend will use this to set req.session.cookie.maxAge on login/update.
+    sessionTimeoutMs: { type: Number, default: null }
 
 });
 

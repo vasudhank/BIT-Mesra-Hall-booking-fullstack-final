@@ -9,9 +9,73 @@ import {
   getAccount,
   sendAccountEmailOtp,
   updateAccountProfile,
+  updateAccountSessionTimeout,
   verifyAccountEmailOtp
 } from '../api/accountApi';
 import './RoleAccountPage.css';
+
+// Session timeout presets. "Month" is treated as 30 days and "Year" as 365 days to match backend.
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+const WEEK_MS = 7 * DAY_MS;
+const MONTH_MS = 30 * DAY_MS;
+const YEAR_MS = 365 * DAY_MS;
+const DEFAULT_SESSION_TIMEOUT_MS = DAY_MS;
+
+const SESSION_PRESETS = [
+  { key: '1d', label: '1 day', ms: DAY_MS },
+  { key: '1w', label: '1 week', ms: WEEK_MS },
+  { key: '1m', label: '1 month', ms: MONTH_MS },
+  { key: '1y', label: '1 year', ms: YEAR_MS },
+  { key: 'custom', label: 'Custom (YY:MM:DD:HH)', ms: null }
+];
+
+const msToParts = (ms = 0) => {
+  const totalHours = Math.max(0, Math.floor(Number(ms || 0) / HOUR_MS));
+  const hoursPerYear = 365 * 24;
+  const hoursPerMonth = 30 * 24;
+
+  const years = Math.floor(totalHours / hoursPerYear);
+  let remaining = totalHours - years * hoursPerYear;
+
+  const months = Math.floor(remaining / hoursPerMonth);
+  remaining -= months * hoursPerMonth;
+
+  const days = Math.floor(remaining / 24);
+  remaining -= days * 24;
+
+  const hours = remaining;
+  return { years, months, days, hours };
+};
+
+const partsToMs = (parts = {}) => {
+  const years = Math.max(0, Math.floor(Number(parts.years || 0)));
+  const months = Math.max(0, Math.floor(Number(parts.months || 0)));
+  const days = Math.max(0, Math.floor(Number(parts.days || 0)));
+  const hours = Math.max(0, Math.floor(Number(parts.hours || 0)));
+  return years * YEAR_MS + months * MONTH_MS + days * DAY_MS + hours * HOUR_MS;
+};
+
+const humanizeParts = (parts = {}) => {
+  const years = Math.max(0, Math.floor(Number(parts.years || 0)));
+  const months = Math.max(0, Math.floor(Number(parts.months || 0)));
+  const days = Math.max(0, Math.floor(Number(parts.days || 0)));
+  const hours = Math.max(0, Math.floor(Number(parts.hours || 0)));
+
+  const chunks = [];
+  if (years) chunks.push(`${years} year${years === 1 ? '' : 's'}`);
+  if (months) chunks.push(`${months} month${months === 1 ? '' : 's'}`);
+  if (days) chunks.push(`${days} day${days === 1 ? '' : 's'}`);
+  if (hours) chunks.push(`${hours} hour${hours === 1 ? '' : 's'}`);
+  if (!chunks.length) return '0 hours';
+  return chunks.join(' ');
+};
+
+const findPresetKeyForMs = (ms) => {
+  const target = Math.floor(Number(ms || 0));
+  const preset = SESSION_PRESETS.find((p) => p.ms && p.ms === target);
+  return preset ? preset.key : 'custom';
+};
 
 const checkPasswordStrength = (pwd = '') => ({
   length: pwd.length >= 8,
@@ -44,6 +108,9 @@ export default function RoleAccountPage({ role = 'admin', backPath = '/', title 
     newPassword: '',
     confirmPassword: ''
   });
+  const [sessionPreset, setSessionPreset] = useState('1d');
+  const [sessionCustom, setSessionCustom] = useState({ years: 0, months: 0, days: 0, hours: 0 });
+  const [savingSessionTimeout, setSavingSessionTimeout] = useState(false);
 
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -64,6 +131,12 @@ export default function RoleAccountPage({ role = 'admin', backPath = '/', title 
       setAccount(acc);
       const resolvedName = String(acc.head || acc.name || '').trim();
       setProfile({ name: resolvedName, phone: acc.phone || '' });
+
+      const rawMs = Number(acc.sessionTimeoutMs || 0);
+      const resolvedMs = Number.isFinite(rawMs) && rawMs > 0 ? rawMs : DEFAULT_SESSION_TIMEOUT_MS;
+      const presetKey = findPresetKeyForMs(resolvedMs);
+      setSessionPreset(presetKey);
+      setSessionCustom(msToParts(resolvedMs));
     } catch (err) {
       alert(err?.response?.data?.error || 'Failed to load account');
     } finally {
@@ -133,6 +206,58 @@ export default function RoleAccountPage({ role = 'admin', backPath = '/', title 
     }
   };
 
+  const onSessionPresetChange = (value) => {
+    const key = String(value || 'custom');
+    setSessionPreset(key);
+
+    const preset = SESSION_PRESETS.find((p) => p.key === key);
+    if (preset && preset.ms) {
+      setSessionCustom(msToParts(preset.ms));
+    }
+  };
+
+  const setCustomField = (field, value) => {
+    const num = value === '' ? '' : Number(value);
+    setSessionCustom((prev) => ({
+      ...prev,
+      [field]: Number.isFinite(num) ? Math.max(0, Math.floor(num)) : 0
+    }));
+  };
+
+  const saveSessionTimeout = async () => {
+    if (savingSessionTimeout) return;
+
+    try {
+      setSavingSessionTimeout(true);
+
+      let payload;
+      if (sessionPreset !== 'custom') {
+        payload = { preset: sessionPreset };
+      } else {
+        const ms = partsToMs(sessionCustom);
+        if (!ms) {
+          alert('Custom duration cannot be all zeros.');
+          return;
+        }
+        payload = { preset: 'custom', custom: sessionCustom };
+      }
+
+      const res = await updateAccountSessionTimeout(role, payload);
+      setAccount(res.account || account);
+
+      const nextMs = Number(res?.account?.sessionTimeoutMs || 0) || DEFAULT_SESSION_TIMEOUT_MS;
+      const nextPreset = findPresetKeyForMs(nextMs);
+      setSessionPreset(nextPreset);
+      setSessionCustom(msToParts(nextMs));
+
+      alert('Session timeout updated. This session will now expire using the new timing.');
+    } catch (err) {
+      alert(err?.response?.data?.error || 'Failed to update session timeout.');
+    } finally {
+      setSavingSessionTimeout(false);
+    }
+  };
+
   return (
     <div className="role-account-page">
       <div className="role-account-container">
@@ -173,6 +298,83 @@ export default function RoleAccountPage({ role = 'admin', backPath = '/', title 
                 />
                 <button type="submit">Save Profile</button>
               </form>
+            </section>
+
+            <section className="role-account-card">
+              <h2>Session Timeout</h2>
+              <div className="role-account-summary">
+                <p>
+                  Choose how long you stay signed in on this device. Month = 30 days, Year = 365 days.
+                </p>
+              </div>
+
+              <div className="role-account-form">
+                <label className="role-account-input-label">Sign out after</label>
+                <select
+                  value={sessionPreset}
+                  onChange={(e) => onSessionPresetChange(e.target.value)}
+                >
+                  {SESSION_PRESETS.map((preset) => (
+                    <option key={preset.key} value={preset.key}>
+                      {preset.label}
+                    </option>
+                  ))}
+                </select>
+
+                {sessionPreset === 'custom' && (
+                  <>
+                    <label className="role-account-input-label">Custom duration (YY : MM : DD : HH)</label>
+                    <div className="role-account-duration-grid" role="group" aria-label="Custom session timeout">
+                      <input
+                        className="role-account-duration-input"
+                        type="number"
+                        min="0"
+                        value={sessionCustom.years}
+                        onChange={(e) => setCustomField('years', e.target.value)}
+                        aria-label="Years"
+                      />
+                      <span className="role-account-duration-sep" aria-hidden="true">:</span>
+                      <input
+                        className="role-account-duration-input"
+                        type="number"
+                        min="0"
+                        value={sessionCustom.months}
+                        onChange={(e) => setCustomField('months', e.target.value)}
+                        aria-label="Months"
+                      />
+                      <span className="role-account-duration-sep" aria-hidden="true">:</span>
+                      <input
+                        className="role-account-duration-input"
+                        type="number"
+                        min="0"
+                        value={sessionCustom.days}
+                        onChange={(e) => setCustomField('days', e.target.value)}
+                        aria-label="Days"
+                      />
+                      <span className="role-account-duration-sep" aria-hidden="true">:</span>
+                      <input
+                        className="role-account-duration-input"
+                        type="number"
+                        min="0"
+                        value={sessionCustom.hours}
+                        onChange={(e) => setCustomField('hours', e.target.value)}
+                        aria-label="Hours"
+                      />
+                    </div>
+                    <div className="role-account-duration-help">
+                      Example: 0 : 0 : 2 : 22 means 2 days 22 hours.
+                    </div>
+                  </>
+                )}
+
+                <div className="role-account-duration-preview">
+                  Current selection: <span>{humanizeParts(sessionCustom)}</span>
+                </div>
+
+                <button type="button" onClick={saveSessionTimeout} disabled={savingSessionTimeout}>
+                  {savingSessionTimeout ? 'Saving...' : 'Update Session Timeout'}
+                </button>
+              </div>
             </section>
 
             <section className="role-account-card">

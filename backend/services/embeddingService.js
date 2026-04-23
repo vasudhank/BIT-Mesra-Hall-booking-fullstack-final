@@ -1,4 +1,9 @@
 const fetch = require('node-fetch');
+const {
+  getRotatedOpenAIApiKeys,
+  hasOpenAIApiKeyConfigured,
+  shouldRetryWithAnotherOpenAIKey
+} = require('./openaiKeyPoolService');
 
 const OPENAI_BASE_URL = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
 const OPENAI_EMBEDDING_MODEL = process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small';
@@ -64,44 +69,67 @@ const localEmbeddings = (texts = []) =>
   }));
 
 const callOpenAIEmbeddings = async (texts) => {
-  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
-  if (!apiKey) throw new Error('OPENAI_API_KEY missing for remote embeddings.');
+  const apiKeys = getRotatedOpenAIApiKeys();
+  if (apiKeys.length === 0) throw new Error('OPENAI_API_KEY/OPENAI_API_KEYS missing for remote embeddings.');
 
-  const response = await fetch(`${OPENAI_BASE_URL}/embeddings`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: OPENAI_EMBEDDING_MODEL,
-      input: texts
-    })
+  const requestBody = JSON.stringify({
+    model: OPENAI_EMBEDDING_MODEL,
+    input: texts
   });
 
-  if (!response.ok) {
-    const details = await response.text().catch(() => '');
-    throw new Error(`OpenAI embeddings failed (${response.status}) ${details.slice(0, 200)}`);
+  const failures = [];
+  for (let idx = 0; idx < apiKeys.length; idx += 1) {
+    const apiKey = apiKeys[idx];
+    try {
+      const response = await fetch(`${OPENAI_BASE_URL}/embeddings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`
+        },
+        body: requestBody
+      });
+
+      if (!response.ok) {
+        const details = await response.text().catch(() => '');
+        const status = Number(response.status || 0);
+        failures.push(`key${idx + 1}:${status} ${details.slice(0, 120)}`.trim());
+
+        const canRetry = idx < (apiKeys.length - 1)
+          && shouldRetryWithAnotherOpenAIKey({ status, details });
+        if (!canRetry) {
+          throw new Error(`OpenAI embeddings failed (${status}) ${details.slice(0, 200)}`);
+        }
+        continue;
+      }
+
+      const data = await response.json();
+      const rows = Array.isArray(data?.data) ? data.data : [];
+      if (rows.length !== texts.length) {
+        throw new Error(`OpenAI embedding size mismatch. expected=${texts.length}, got=${rows.length}`);
+      }
+
+      return rows.map((item) => ({
+        vector: normalizeVector(Array.isArray(item?.embedding) ? item.embedding : []),
+        model: OPENAI_EMBEDDING_MODEL,
+        provider: 'openai'
+      }));
+    } catch (err) {
+      const canRetry = idx < (apiKeys.length - 1)
+        && shouldRetryWithAnotherOpenAIKey({ status: 0, error: err });
+      failures.push(`key${idx + 1}:0 ${String(err?.message || err).slice(0, 120)}`.trim());
+      if (!canRetry) throw err;
+    }
   }
 
-  const data = await response.json();
-  const rows = Array.isArray(data?.data) ? data.data : [];
-  if (rows.length !== texts.length) {
-    throw new Error(`OpenAI embedding size mismatch. expected=${texts.length}, got=${rows.length}`);
-  }
-
-  return rows.map((item) => ({
-    vector: normalizeVector(Array.isArray(item?.embedding) ? item.embedding : []),
-    model: OPENAI_EMBEDDING_MODEL,
-    provider: 'openai'
-  }));
+  throw new Error(`OpenAI embeddings failed for all configured API keys. ${failures.join(' | ')}`.trim());
 };
 
 const embedTexts = async (texts = [], { preferRemote = true } = {}) => {
   const cleanTexts = (texts || []).map((item) => String(item || '').slice(0, 12000));
   if (cleanTexts.length === 0) return [];
 
-  if (preferRemote && String(process.env.OPENAI_API_KEY || '').trim()) {
+  if (preferRemote && hasOpenAIApiKeyConfigured()) {
     try {
       return await callOpenAIEmbeddings(cleanTexts);
     } catch (err) {

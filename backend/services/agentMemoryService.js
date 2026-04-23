@@ -535,17 +535,22 @@ const persistAgentTurn = async ({
   if (!userText && !assistantText) return;
 
   try {
+    const conversationSet = {
+      userRole: normalizeRole(metadata.userRole || String(ownerKey).split(':')[0]),
+      lastMessageAt: new Date(),
+      title: getConversationTitle(userText),
+      'metadata.lastChannel': context.channel || metadata.channel || 'unknown'
+    };
+
+    // Keep reply meta for observability without replacing existing metadata like pendingAction.
+    if (metadata.replyMeta !== undefined) {
+      conversationSet['metadata.lastReplyMeta'] = metadata.replyMeta;
+    }
+
     await AgentConversation.findOneAndUpdate(
       { ownerKey, threadId },
       {
-        $set: {
-          userRole: normalizeRole(metadata.userRole || String(ownerKey).split(':')[0]),
-          lastMessageAt: new Date(),
-          title: getConversationTitle(userText),
-          metadata: {
-            lastChannel: context.channel || metadata.channel || 'unknown'
-          }
-        },
+        $set: conversationSet,
         $inc: {
           messageCount: (userText ? 1 : 0) + (assistantText ? 1 : 0),
           actionCount: action ? 1 : 0

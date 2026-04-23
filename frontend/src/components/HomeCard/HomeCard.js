@@ -52,17 +52,21 @@ export default function HomeCard() {
     };
 
     const observer = new IntersectionObserver(obsCallback, options);
+    const adminCardNode = adminCardRef.current;
+    const adminAnimNode = adminAnimRef.current;
+    const deptCardNode = deptCardRef.current;
+    const deptAnimNode = deptAnimRef.current;
 
-    if (adminCardRef.current) observer.observe(adminCardRef.current);
-    if (adminAnimRef.current) observer.observe(adminAnimRef.current);
-    if (deptCardRef.current) observer.observe(deptCardRef.current);
-    if (deptAnimRef.current) observer.observe(deptAnimRef.current);
+    if (adminCardNode) observer.observe(adminCardNode);
+    if (adminAnimNode) observer.observe(adminAnimNode);
+    if (deptCardNode) observer.observe(deptCardNode);
+    if (deptAnimNode) observer.observe(deptAnimNode);
 
     return () => {
-      if (adminCardRef.current) observer.unobserve(adminCardRef.current);
-      if (adminAnimRef.current) observer.unobserve(adminAnimRef.current);
-      if (deptCardRef.current) observer.unobserve(deptCardRef.current);
-      if (deptAnimRef.current) observer.unobserve(deptAnimRef.current);
+      if (adminCardNode) observer.unobserve(adminCardNode);
+      if (adminAnimNode) observer.unobserve(adminAnimNode);
+      if (deptCardNode) observer.unobserve(deptCardNode);
+      if (deptAnimNode) observer.unobserve(deptAnimNode);
       observer.disconnect();
     };
   }, []);

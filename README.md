@@ -14,7 +14,9 @@ Live frontend: https://hall-booking-frontend-4o04.onrender.com/
   - Ollama, OpenAI, Anthropic with fallback chain
 - Retrieval stack:
   - keyword retrieval from FAQ/notices
-  - vector retrieval via local vector store (with Pinecone/Weaviate adapters)
+  - vector retrieval via live local or remote vector stores
+  - production runtime supports Mongo-backed local vectors, managed Pinecone, and remote/self-hosted Weaviate
+  - runtime probe + sync status available at `GET /api/vector/status`
 - Persistent agent memory:
   - Mongo-backed conversations, messages, long-term facts/preferences/constraints
   - memory extraction from user turns with vector-backed recall
@@ -66,6 +68,28 @@ Live frontend: https://hall-booking-frontend-4o04.onrender.com/
   - optional Sentry error/performance tracing with `SENTRY_DSN`
   - optional Datadog APM with `DATADOG_ENABLED=true` / `DD_TRACE_ENABLED=true`
 
+## Vector Deployment
+
+- `VECTOR_DB_PROVIDER=local|pinecone|weaviate`
+- Live vector runtime probe:
+  - `GET /api/vector/status`
+  - `POST /api/vector/probe` (admin/developer)
+- Live vector sync:
+  - `POST /api/vector/sync`
+- Protected monitoring overview now includes vector runtime health, deployment mode, sync history, and remote readiness in `GET /api/ops/monitoring`
+- Pinecone production deployment:
+  - set `PINECONE_API_KEY`
+  - set `PINECONE_INDEX_URL`
+  - optionally set `VECTOR_PROVIDER_REQUIRED=true` to make readiness fail if the remote index is not live
+- Weaviate production deployment:
+  - set `WEAVIATE_URL`
+  - optional `WEAVIATE_API_KEY`
+  - optional `WEAVIATE_CLASS`
+  - backend auto-creates the class on first sync if it is missing
+- Local live Weaviate deployment:
+  - `docker compose --profile vector up weaviate`
+  - point backend env to `WEAVIATE_URL=http://weaviate:8080`
+
 ## Deployment
 
 - Render blueprint updated for both backend + frontend in `render.yaml`.
@@ -95,6 +119,12 @@ Live frontend: https://hall-booking-frontend-4o04.onrender.com/
 
 - Integration env template:
   - `backend/.env.integrations.example`
+
+## AI-Native Development Evidence
+
+- Repository workflow now includes an AI-native development proof template in `.github/pull_request_template.md`
+- Contributor guidance for Codex / Cursor / Claude Code style workflows lives in [docs/AI_NATIVE_DEVELOPMENT.md](docs/AI_NATIVE_DEVELOPMENT.md)
+- This gives the repo a repeatable way to show where AI-native tooling accelerated implementation, debugging, and verification
 
 ## Useful Commands
 

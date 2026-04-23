@@ -10,6 +10,11 @@ export const updateAccountProfile = async (role, payload) => {
   return data;
 };
 
+export const updateAccountSessionTimeout = async (role, payload) => {
+  const { data } = await api.patch(`/account/${role}/session_timeout`, payload, { withCredentials: true });
+  return data;
+};
+
 export const sendAccountEmailOtp = async (role, payload) => {
   const { data } = await api.post(`/account/${role}/send_email_otp`, payload, { withCredentials: true });
   return data;

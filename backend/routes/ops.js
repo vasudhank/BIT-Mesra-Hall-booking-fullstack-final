@@ -6,6 +6,8 @@ const { captureException, withDatadogSpan } = require('../services/observability
 const { resolveSupportRuntime } = require('../services/supportWorkflowService');
 const { getLlmRuntimeProfile } = require('../services/llmGatewayService');
 const { getReviewQueueSnapshot } = require('../services/agentReviewService');
+const { getVectorStoreRuntimeStatus } = require('../services/vectorStoreService');
+const { getVectorKnowledgeSyncStatus } = require('../services/vectorKnowledgeSyncService');
 
 const router = express.Router();
 
@@ -106,7 +108,7 @@ const probeUrl = async (url, path = '', okStatusCodes = [200]) => {
   }
 };
 
-const buildAlertPolicies = (snapshot, dbReady) => {
+const buildAlertPolicies = (snapshot, dbReady, vectorRuntime) => {
   const aiRequests = Number(snapshot?.ai?.requestsTotal || 0);
   const aiErrors = Number(snapshot?.ai?.errorsTotal || 0);
   const llmCalls = Number(snapshot?.llm?.callsTotal || 0);
@@ -116,6 +118,9 @@ const buildAlertPolicies = (snapshot, dbReady) => {
   const toolCalls = Number(snapshot?.tools?.callsTotal || 0);
   const toolErrors = Number(snapshot?.tools?.errorsTotal || 0);
   const pendingReviews = Number(snapshot?.reviews?.pendingTotal || 0);
+  const remoteVectorRequired = Boolean(vectorRuntime?.remote);
+  const vectorIsLive = Boolean(vectorRuntime?.live);
+  const vectorConfigured = Boolean(vectorRuntime?.configured);
 
   return [
     {
@@ -165,6 +170,32 @@ const buildAlertPolicies = (snapshot, dbReady) => {
       condition: 'Tool invocations should succeed consistently once the planner begins using the tool registry.',
       status: toolCalls > 0 && toolErrors / toolCalls > 0.1 ? 'WATCH' : 'OK',
       recommendation: toolCalls === 0 ? 'No tool traffic recorded yet.' : 'Inspect the failing tool names, provider context, and prepared action payloads.'
+    },
+    {
+      id: 'vector-store-connectivity',
+      name: 'Vector deployment health',
+      severity: !remoteVectorRequired
+        ? 'healthy'
+        : vectorIsLive
+          ? 'healthy'
+          : vectorConfigured
+            ? 'warning'
+            : 'critical',
+      condition: 'The configured vector store should be reachable when remote retrieval is enabled.',
+      status: !remoteVectorRequired
+        ? 'OK'
+        : vectorIsLive
+          ? 'OK'
+          : vectorConfigured
+            ? 'WATCH'
+            : 'FIRING',
+      recommendation: !remoteVectorRequired
+        ? 'Local Mongo-backed vectors are active for this environment.'
+        : vectorIsLive
+          ? 'Remote vector provider is healthy.'
+          : vectorConfigured
+            ? 'Probe Pinecone/Weaviate connectivity, namespace health, and schema readiness.'
+            : 'Configure Pinecone or Weaviate environment variables before relying on remote retrieval.'
     },
     {
       id: 'human-review-backlog',
@@ -295,18 +326,49 @@ router.get('/health', (req, res) => {
   });
 });
 
-router.get('/ready', (req, res) => {
+router.get('/ready', async (req, res) => {
   const dbReady = Number(mongoose?.connection?.readyState || 0) === 1;
+  const vectorRequired = envEnabled(process.env.VECTOR_PROVIDER_REQUIRED);
+  let vectorRuntime = null;
+  if (vectorRequired) {
+    try {
+      vectorRuntime = await getVectorStoreRuntimeStatus({ force: true });
+    } catch (err) {
+      vectorRuntime = {
+        provider: 'unknown',
+        live: false,
+        connected: false,
+        health: 'degraded',
+        detail: err.message || 'Vector runtime probe failed.'
+      };
+    }
+  }
+  const vectorReady = !vectorRequired || Boolean(vectorRuntime?.live || (!vectorRuntime?.remote && vectorRuntime?.connected));
+
   if (!dbReady) {
     return res.status(503).json({
       status: 'degraded',
       dbReady: false,
+      vectorReady,
       now: new Date().toISOString()
     });
   }
+
+  if (!vectorReady) {
+    return res.status(503).json({
+      status: 'degraded',
+      dbReady: true,
+      vectorReady: false,
+      vectorRuntime,
+      now: new Date().toISOString()
+    });
+  }
+
   return res.json({
     status: 'ready',
     dbReady: true,
+    vectorReady: true,
+    vectorRuntime,
     now: new Date().toISOString()
   });
 });
@@ -331,6 +393,19 @@ router.get('/monitoring', requireTrusted, async (req, res) => {
   const providerOverview = buildProviderOverview(snapshot);
   const observability = await buildObservabilityTools(req, sentryConfigured, datadogConfigured);
   const reviewQueue = await getReviewQueueSnapshot({ limit: 8 });
+  let vectorRuntime;
+  try {
+    vectorRuntime = await getVectorStoreRuntimeStatus({ force: false });
+  } catch (err) {
+    vectorRuntime = {
+      provider: 'unknown',
+      live: false,
+      connected: false,
+      health: 'degraded',
+      detail: err.message || 'Vector runtime probe failed.'
+    };
+  }
+  const vectorSync = getVectorKnowledgeSyncStatus();
 
   return res.json({
     status: 'ok',
@@ -343,8 +418,12 @@ router.get('/monitoring', requireTrusted, async (req, res) => {
     },
     metrics: snapshot,
     aiRuntime: providerOverview,
+    vectorRuntime: {
+      ...vectorRuntime,
+      sync: vectorSync
+    },
     reviewQueue,
-    alertPolicies: buildAlertPolicies(snapshot, dbReady),
+    alertPolicies: buildAlertPolicies(snapshot, dbReady, vectorRuntime),
     observability,
     endpoints: {
       health: '/api/ops/health',

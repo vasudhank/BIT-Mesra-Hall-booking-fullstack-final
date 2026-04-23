@@ -18,6 +18,12 @@ let lastSummary = {
   syncedAt: null,
   upserted: 0,
   provider: resolveVectorProvider(),
+  namespace: DEFAULT_VECTOR_NAMESPACE,
+  documentsPrepared: 0,
+  sourceCounts: {
+    faq: 0,
+    notice: 0
+  },
   skipped: true
 };
 
@@ -105,7 +111,13 @@ const syncSupportKnowledgeVectors = async ({ force = false } = {}) => {
     lastSummary = {
       syncedAt: new Date().toISOString(),
       provider: result.provider,
+      namespace: DEFAULT_VECTOR_NAMESPACE,
       upserted: Number(result.upserted || 0),
+      documentsPrepared: docs.length,
+      sourceCounts: {
+        faq: faqDocs.length,
+        notice: noticeDocs.length
+      },
       skipped: false
     };
 
@@ -119,6 +131,7 @@ const syncSupportKnowledgeVectors = async ({ force = false } = {}) => {
     lastSummary = {
       ...lastSummary,
       syncedAt: new Date().toISOString(),
+      namespace: DEFAULT_VECTOR_NAMESPACE,
       skipped: true,
       reason: err.message || 'sync_failed'
     };
@@ -144,7 +157,17 @@ const startVectorKnowledgeSync = () => {
   logger.info('Vector knowledge sync scheduler started', { intervalMs: SYNC_INTERVAL_MS });
 };
 
+const getVectorKnowledgeSyncStatus = () => ({
+  enabled: String(process.env.VECTOR_SYNC_ENABLED || 'true').toLowerCase() !== 'false',
+  running,
+  intervalMs: SYNC_INTERVAL_MS,
+  provider: resolveVectorProvider(),
+  namespace: DEFAULT_VECTOR_NAMESPACE,
+  lastSummary: { ...lastSummary }
+});
+
 module.exports = {
   startVectorKnowledgeSync,
-  syncSupportKnowledgeVectors
+  syncSupportKnowledgeVectors,
+  getVectorKnowledgeSyncStatus
 };

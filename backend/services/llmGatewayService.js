@@ -1,6 +1,11 @@
 const fetch = require('node-fetch');
 const { observeLlmProviderCall } = require('./metricsService');
 const { captureException, withDatadogSpan } = require('./observabilityService');
+const {
+  getRotatedOpenAIApiKeys,
+  hasOpenAIApiKeyConfigured,
+  shouldRetryWithAnotherOpenAIKey
+} = require('./openaiKeyPoolService');
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434/api/generate';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'phi3';
@@ -60,7 +65,7 @@ const resolveProviderModel = (provider) => {
 
 const isProviderConfigured = (provider) => {
   if (provider === 'ollama') return Boolean(String(OLLAMA_URL || '').trim());
-  if (provider === 'openai') return Boolean(String(process.env.OPENAI_API_KEY || '').trim());
+  if (provider === 'openai') return hasOpenAIApiKeyConfigured();
   if (provider === 'anthropic') return Boolean(String(process.env.ANTHROPIC_API_KEY || '').trim());
   return false;
 };
@@ -125,6 +130,11 @@ const toModelPrompt = ({ prompt, systemPrompt, userPrompt }) => {
 };
 
 const sanitizeStopArray = (stopLike) => {
+  if (typeof stopLike === 'string') {
+    const one = String(stopLike || '').trim();
+    return one ? [one] : [];
+  }
+
   if (!Array.isArray(stopLike)) return [];
   return stopLike
     .map((item) => String(item || '').trim())
@@ -137,6 +147,13 @@ const callOllama = async (input) => {
   if (!prompt) throw new Error('Prompt is required for Ollama call.');
 
   const images = Array.isArray(input.images) ? input.images.filter(Boolean).slice(0, 3) : [];
+  const stop = sanitizeStopArray(input.stop);
+  const options = {
+    temperature: Number.isFinite(Number(input.temperature)) ? Number(input.temperature) : 0.3,
+    num_predict: Math.max(Number(input.maxTokens || DEFAULT_MAX_TOKENS), 64),
+    ...(stop.length > 0 ? { stop } : {})
+  };
+
   const response = await withTimeout(
     OLLAMA_URL,
     {
@@ -147,11 +164,7 @@ const callOllama = async (input) => {
         prompt,
         stream: false,
         images: images.length > 0 ? images : undefined,
-        options: {
-          temperature: Number.isFinite(Number(input.temperature)) ? Number(input.temperature) : 0.3,
-          num_predict: Math.max(Number(input.maxTokens || DEFAULT_MAX_TOKENS), 64),
-          stop: sanitizeStopArray(input.stop)
-        }
+        options
       })
     },
     input.timeoutMs
@@ -219,43 +232,67 @@ const parseOpenAIText = (data) => {
 };
 
 const callOpenAI = async (input) => {
-  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
-  if (!apiKey) throw new Error('OPENAI_API_KEY is not configured.');
+  const apiKeys = getRotatedOpenAIApiKeys();
+  if (apiKeys.length === 0) throw new Error('OPENAI_API_KEY/OPENAI_API_KEYS is not configured.');
 
   const images = Array.isArray(input.images) ? input.images.filter(Boolean).slice(0, 3) : [];
-  const response = await withTimeout(
-    `${OPENAI_BASE_URL}/chat/completions`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: String(process.env.OPENAI_MODEL || input.model || OPENAI_MODEL),
-        messages: buildOpenAIMessages({ ...input, images }),
-        temperature: Number.isFinite(Number(input.temperature)) ? Number(input.temperature) : 0.3,
-        max_tokens: Math.max(Number(input.maxTokens || DEFAULT_MAX_TOKENS), 64),
-        stop: sanitizeStopArray(input.stop)
-      })
-    },
-    input.timeoutMs
-  );
+  const stop = sanitizeStopArray(input.stop);
+  const requestBody = {
+    model: String(process.env.OPENAI_MODEL || input.model || OPENAI_MODEL),
+    messages: buildOpenAIMessages({ ...input, images }),
+    temperature: Number.isFinite(Number(input.temperature)) ? Number(input.temperature) : 0.3,
+    max_tokens: Math.max(Number(input.maxTokens || DEFAULT_MAX_TOKENS), 64),
+    ...(stop.length > 0 ? { stop } : {})
+  };
 
-  if (!response.ok) {
-    const details = await response.text().catch(() => '');
-    throw new Error(`OpenAI request failed (${response.status}) ${details.slice(0, 260)}`.trim());
+  const failures = [];
+  for (let idx = 0; idx < apiKeys.length; idx += 1) {
+    const apiKey = apiKeys[idx];
+    try {
+      const response = await withTimeout(
+        `${OPENAI_BASE_URL}/chat/completions`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`
+          },
+          body: JSON.stringify(requestBody)
+        },
+        input.timeoutMs
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const text = parseOpenAIText(data);
+        if (!text) throw new Error('OpenAI returned empty response.');
+
+        return {
+          provider: 'openai',
+          model: String(process.env.OPENAI_MODEL || input.model || OPENAI_MODEL),
+          text
+        };
+      }
+
+      const details = await response.text().catch(() => '');
+      const status = Number(response.status || 0);
+      failures.push(`key${idx + 1}:${status} ${details.slice(0, 120)}`.trim());
+
+      const canRetry = idx < (apiKeys.length - 1)
+        && shouldRetryWithAnotherOpenAIKey({ status, details });
+
+      if (!canRetry) {
+        throw new Error(`OpenAI request failed (${status}) ${details.slice(0, 260)}`.trim());
+      }
+    } catch (err) {
+      const canRetry = idx < (apiKeys.length - 1)
+        && shouldRetryWithAnotherOpenAIKey({ status: 0, error: err });
+      failures.push(`key${idx + 1}:0 ${String(err?.message || err).slice(0, 120)}`.trim());
+      if (!canRetry) throw err;
+    }
   }
 
-  const data = await response.json();
-  const text = parseOpenAIText(data);
-  if (!text) throw new Error('OpenAI returned empty response.');
-
-  return {
-    provider: 'openai',
-    model: String(process.env.OPENAI_MODEL || input.model || OPENAI_MODEL),
-    text
-  };
+  throw new Error(`OpenAI request failed for all configured API keys. ${failures.join(' | ')}`.trim());
 };
 
 const buildAnthropicContent = ({ prompt, userPrompt, images = [] }) => {
@@ -292,6 +329,21 @@ const callAnthropic = async (input) => {
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not configured.');
 
   const images = Array.isArray(input.images) ? input.images.filter(Boolean).slice(0, 3) : [];
+  const stopSequences = sanitizeStopArray(input.stop);
+  const requestBody = {
+    model: String(process.env.ANTHROPIC_MODEL || input.model || ANTHROPIC_MODEL),
+    max_tokens: Math.max(Number(input.maxTokens || DEFAULT_MAX_TOKENS), 64),
+    temperature: Number.isFinite(Number(input.temperature)) ? Number(input.temperature) : 0.3,
+    ...(stopSequences.length > 0 ? { stop_sequences: stopSequences } : {}),
+    system: String(input.systemPrompt || '').trim() || undefined,
+    messages: [
+      {
+        role: 'user',
+        content: buildAnthropicContent({ ...input, images })
+      }
+    ]
+  };
+
   const response = await withTimeout(
     `${ANTHROPIC_BASE_URL}/messages`,
     {
@@ -301,19 +353,7 @@ const callAnthropic = async (input) => {
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01'
       },
-      body: JSON.stringify({
-        model: String(process.env.ANTHROPIC_MODEL || input.model || ANTHROPIC_MODEL),
-        max_tokens: Math.max(Number(input.maxTokens || DEFAULT_MAX_TOKENS), 64),
-        temperature: Number.isFinite(Number(input.temperature)) ? Number(input.temperature) : 0.3,
-        stop_sequences: sanitizeStopArray(input.stop),
-        system: String(input.systemPrompt || '').trim() || undefined,
-        messages: [
-          {
-            role: 'user',
-            content: buildAnthropicContent({ ...input, images })
-          }
-        ]
-      })
+      body: JSON.stringify(requestBody)
     },
     input.timeoutMs
   );
