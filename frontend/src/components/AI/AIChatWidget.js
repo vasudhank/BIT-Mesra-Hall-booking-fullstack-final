@@ -15,7 +15,6 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import RecordVoiceOverIcon from "@mui/icons-material/RecordVoiceOver";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import ReplayRoundedIcon from "@mui/icons-material/ReplayRounded";
 import CreateOutlinedIcon from "@mui/icons-material/CreateOutlined";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
@@ -38,6 +37,7 @@ const STORAGE_PREFIX = "bit_booking_ai_threads_v1";
 const MAX_THREADS = Number.POSITIVE_INFINITY;
 const MAX_MESSAGES_PER_THREAD = Number.POSITIVE_INFINITY;
 const MAX_INPUT_HEIGHT = 140;
+const MAX_EDIT_QUERY_HEIGHT = 220;
 const MAX_ATTACHMENT_COUNT = 4;
 const MAX_ATTACHMENT_BYTES = 6 * 1024 * 1024;
 const WELCOME_HEADLINE = "How can I help you today?";
@@ -482,6 +482,30 @@ const buildNoticePdfDocument = (notice) => {
   };
 };
 
+const GeminiDiamondIcon = ({ size = 22, className = "" }) => {
+  const gradientId = useId();
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#4285f4" />
+          <stop offset="100%" stopColor="#24c1e0" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M12 0C12 6.627 17.373 12 24 12C17.373 12 12 17.373 12 24C12 17.373 6.627 12 0 12C6.627 12 12 6.627 12 0Z"
+        fill={`url(#${gradientId})`}
+      />
+    </svg>
+  );
+};
+
 const SidebarCollapseArrowIcon = ({ direction = "right" }) => (
   <span
     className={`ai-sidebar-collapse-icon ${direction === "left" ? "left" : "right"}`.trim()}
@@ -552,6 +576,7 @@ export default function AIChatWidget({
   const sidebarRef = useRef(null);
   const messagesEndRef = useRef(null);
   const inputFieldRef = useRef(null);
+  const editingInputRef = useRef(null);
   const fileInputRef = useRef(null);
   const recognitionRef = useRef(null);
   const isLiveModeRef = useRef(isLiveMode);
@@ -561,7 +586,6 @@ export default function AIChatWidget({
   const threadMenuRefs = useRef(new Map());
 
   const storageKey = useMemo(() => getStorageKey(accountKey), [accountKey]);
-  const thinkingStarGradientId = useId();
 
   useEffect(() => {
     isLiveModeRef.current = isLiveMode;
@@ -806,9 +830,24 @@ export default function AIChatWidget({
     setIsInputExpanded(nextHeight > 34);
   }, []);
 
+  const resizeEditingField = useCallback(() => {
+    const inputEl = editingInputRef.current;
+    if (!inputEl) return;
+
+    inputEl.style.height = "0px";
+    const nextHeight = Math.min(Math.max(inputEl.scrollHeight, 56), MAX_EDIT_QUERY_HEIGHT);
+    inputEl.style.height = `${nextHeight}px`;
+    inputEl.style.overflowY = inputEl.scrollHeight > MAX_EDIT_QUERY_HEIGHT ? "auto" : "hidden";
+  }, []);
+
   useEffect(() => {
     resizeInputField();
   }, [input, resizeInputField]);
+
+  useEffect(() => {
+    if (!editingMessageId) return;
+    resizeEditingField();
+  }, [editingDraft, editingMessageId, resizeEditingField]);
 
   useEffect(() => {
     const fullWelcomeText = `${WELCOME_HEADLINE}\n${WELCOME_SUBTITLE}`;
@@ -2937,18 +2976,20 @@ export default function AIChatWidget({
               >
                 {!isUser && (
                   <div className="ai-avatar">
-                    <AutoAwesomeIcon sx={{ fontSize: 16 }} />
+                    <GeminiDiamondIcon size={17} className="gemini-diamond-icon" />
                   </div>
                 )}
 
-                <div className="gemini-message-stack">
-                  <div className={`gemini-bubble ${message.role}`}>
+                <div className={`gemini-message-stack ${isEditing && isUser ? "editing-user" : ""}`.trim()}>
+                  <div className={`gemini-bubble ${message.role} ${isEditing && isUser ? "editing-user" : ""}`.trim()}>
                     {isEditing ? (
                       <textarea
+                        ref={editingInputRef}
                         value={editingDraft}
                         onChange={(event) => setEditingDraft(event.target.value)}
                         className="edit-query-input"
-                        rows={3}
+                        rows={1}
+                        autoFocus
                       />
                     ) : (
                       <>
@@ -2976,7 +3017,7 @@ export default function AIChatWidget({
                     )}
                   </div>
 
-                  <div className={`msg-actions ${message.role} ${isEditing ? "editing" : ""}`.trim()}>
+                  <div className={`msg-actions ${message.role} ${isEditing ? "editing edit-controls" : ""}`.trim()}>
                     {isEditing ? (
                       <>
                         <button
@@ -2993,7 +3034,7 @@ export default function AIChatWidget({
                           onClick={() => regenerateFromEdit(index)}
                           disabled={isLoading || !editingDraft.trim()}
                         >
-                          <ReplayRoundedIcon fontSize="inherit" /> Regenerate
+                          Update
                         </button>
                       </>
                     ) : (
@@ -3028,18 +3069,7 @@ export default function AIChatWidget({
             <div className="gemini-msg-row ai ai-thinking-row">
               <div className="gemini-loader thinking" role="status" aria-label="AI is thinking">
                 <div className="gemini-thinking-swirl"></div>
-                <svg className="gemini-thinking-star" viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
-                  <defs>
-                    <linearGradient id={thinkingStarGradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#4285f4" />
-                      <stop offset="100%" stopColor="#24c1e0" />
-                    </linearGradient>
-                  </defs>
-                  <path
-                    d="M12 0C12 6.627 17.373 12 24 12C17.373 12 12 17.373 12 24C12 17.373 6.627 12 0 12C6.627 12 12 6.627 12 0Z"
-                    fill={`url(#${thinkingStarGradientId})`}
-                  />
-                </svg>
+                <GeminiDiamondIcon size={22} className="gemini-thinking-star" />
               </div>
             </div>
           )}
