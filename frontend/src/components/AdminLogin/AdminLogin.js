@@ -183,9 +183,8 @@ export default function AdminLogin() {
                           style: {
                             padding: 0,
                             height: "100%",
-                            display: "flex",
-                            alignItems: "center",
-                            marginTop: "11px"
+                            display: "block",
+                            lineHeight: "1.2"
                           },
                         }}
                       />
@@ -215,9 +214,8 @@ export default function AdminLogin() {
                           style: {
                             padding: 0,
                             height: "100%",
-                            display: "flex",
-                            alignItems: "center",
-                            marginTop: "11px"
+                            display: "block",
+                            lineHeight: "1.2"
                           },
                         }}
                       />

@@ -12,7 +12,8 @@ passport.use(
     { usernameField: 'email' },
     async (email, password, done) => {
       try {
-        const admin = await Admin.findOne({ email });
+        const normalizedEmail = String(email || '').toLowerCase().trim();
+        const admin = await Admin.findOne({ email: normalizedEmail }).sort({ _id: -1 });
         if (!admin) return done(null, false);
         if (!compareSync(password, admin.password)) return done(null, false);
 
@@ -35,7 +36,8 @@ passport.use(
     { usernameField: 'email' },
     async (email, password, done) => {
       try {
-        const dept = await Department.findOne({ email });
+        const normalizedEmail = String(email || '').toLowerCase().trim();
+        const dept = await Department.findOne({ email: normalizedEmail }).sort({ _id: -1 });
         if (!dept) return done(null, false);
         if (!compareSync(password, dept.password)) return done(null, false);
 
@@ -58,7 +60,8 @@ passport.use(
     { usernameField: 'email' },
     async (email, password, done) => {
       try {
-        const dev = await Developer.findOne({ email });
+        const normalizedEmail = String(email || '').toLowerCase().trim();
+        const dev = await Developer.findOne({ email: normalizedEmail }).sort({ _id: -1 });
         if (!dev) return done(null, false);
         if (!compareSync(password, dev.password)) return done(null, false);
 

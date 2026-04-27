@@ -62,6 +62,8 @@ const isAuthenticatedRole = (req, role) =>
   req.isAuthenticated() &&
   String(req.user?.type || '').toLowerCase() === String(role || '').toLowerCase();
 
+const normalizeEmail = (value = '') => String(value || '').toLowerCase().trim();
+
 const toInt = (value, fallback = 0) => {
   const num = Number(value);
   if (!Number.isFinite(num)) return fallback;
@@ -167,16 +169,32 @@ router.get('/', (req, res) => {
 });
 
 /* ---------------- CREATE ADMIN ---------------- */
-router.post('/create_admin', (req, res) => {
-  const newUser = new Admin({
-  email: req.body.email,
-  password: hashSync(req.body.password, 10),
-  type: 'Admin'
-});
+router.post('/create_admin', async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+    const password = String(req.body.password || '');
 
-  newUser.save()
-    .then(user => res.status(201).json(user))
-    .catch(() => res.status(500).json({ error: 'Failed to create user' }));
+    if (!email || !password) {
+      return res.status(400).json({ error: 'email and password are required' });
+    }
+
+    const existing = await Admin.findOne({ email }).select('_id').lean();
+    if (existing) {
+      return res.status(409).json({ error: 'Admin already exists for this email' });
+    }
+
+    const user = await Admin.create({
+      email,
+      password: hashSync(password, 10),
+      type: 'Admin'
+    });
+    return res.status(201).json(user);
+  } catch (err) {
+    if (err?.code === 11000) {
+      return res.status(409).json({ error: 'Admin already exists for this email' });
+    }
+    return res.status(500).json({ error: 'Failed to create user' });
+  }
 });
 
 /* ---------------- ADMIN LOGIN ---------------- */
@@ -209,8 +227,8 @@ router.post('/admin_login', (req, res, next) => {
 
 /* ---------------- SEND OTP (ADMIN) ---------------- */
 router.post('/admin/send_otp', async (req, res) => {
-  const { email } = req.body;
-  const admin = await Admin.findOne({ email });
+  const email = normalizeEmail(req.body.email);
+  const admin = await Admin.findOne({ email }).sort({ _id: -1 });
 
   if (!admin) return res.status(404).send({ success: false });
 
@@ -262,8 +280,10 @@ router.post('/admin/send_otp', async (req, res) => {
 
 /* ---------------- RESET PASSWORD (ADMIN) ---------------- */
 router.post('/admin/reset_password', async (req, res) => {
-  const { email, otp, password } = req.body;
-  const admin = await Admin.findOne({ email });
+  const email = normalizeEmail(req.body.email);
+  const otp = String(req.body.otp || '');
+  const password = String(req.body.password || '');
+  const admin = await Admin.findOne({ email }).sort({ _id: -1 });
 
   if (!admin || admin.otpExpiry < Date.now()) {
     return res.status(400).send({ success: false, msg: 'OTP expired' });
@@ -442,8 +462,9 @@ router.post('/developer/reset_password', async (req, res) => {
 
 /* ---------------- VERIFY OTP (ADMIN) ---------------- */
 router.post('/admin/verify_otp', async (req, res) => {
-  const { email, otp } = req.body;
-  const admin = await Admin.findOne({ email });
+  const email = normalizeEmail(req.body.email);
+  const otp = String(req.body.otp || '');
+  const admin = await Admin.findOne({ email }).sort({ _id: -1 });
 
   if (!admin) {
     return res.status(404).send({ success: false, msg: 'User not found' });

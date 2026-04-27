@@ -244,11 +244,8 @@ export default function DepartmentLogin() {
 
                             height: "100%",
 
-                            display: "flex",
-
-                            alignItems: "center",
-
-                            marginTop: "11px"
+                            display: "block",
+                            lineHeight: "1.2"
 
                           },
 
@@ -304,11 +301,8 @@ export default function DepartmentLogin() {
 
                             height: "100%",
 
-                            display: "flex",
-
-                            alignItems: "center",
-
-                            marginTop: "11px"
+                            display: "block",
+                            lineHeight: "1.2"
 
                           },
 

@@ -132,3 +132,14 @@ body.dark-mode .department-booking-body .MuiInputBase-root input::placeholder {
 body.dark-mode .department-booking-body .MuiSvgIcon-root {
   color: #e2e8f0 !important;
 }
+
+/* Keep Department "BOOK HALL" action text on one line and aligned cleanly. */
+.department-booking-body .hall-card-actions .btn-admin-hall {
+  width: 100% !important;
+  margin-top: 0.25rem !important;
+  margin-bottom: 0 !important;
+  padding: 6px 10px !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+  text-align: center !important;
+}

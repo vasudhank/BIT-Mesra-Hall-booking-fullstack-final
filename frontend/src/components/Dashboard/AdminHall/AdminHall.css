@@ -71,9 +71,9 @@
 /* Base button style (Used for Create Hall) */
 .btn-admin-hall {
   background: #8d6850 !important;
-  border-radius: 1rem !important;
+  border-radius: 0.5rem !important;
   font-family: 'RecklessNeue';
-  width: 30%; 
+  width: 40%; 
   color: white !important;
   font-size: large;
   margin-bottom: 1rem !important;

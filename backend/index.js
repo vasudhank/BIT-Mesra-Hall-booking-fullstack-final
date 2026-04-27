@@ -71,8 +71,10 @@ const sessionConfig = {
   }
 };
 
+const defaultSessionStoreUseMongo = NODE_ENV === 'production' ? 'true' : 'false';
 const useMongoSessionStore =
-  String(process.env.SESSION_STORE_USE_MONGO || 'true').toLowerCase() !== 'false';
+  String(process.env.SESSION_STORE_USE_MONGO || defaultSessionStoreUseMongo).toLowerCase() !==
+  'false';
 const mongoSessionUri = String(process.env.MONGO_URI || '').trim();
 
 if (useMongoSessionStore && mongoSessionUri) {
@@ -81,9 +83,25 @@ if (useMongoSessionStore && mongoSessionUri) {
       mongoUrl: mongoSessionUri,
       collectionName: 'sessions'
     });
-    sessionStore.on('error', (err) => {
-      logger.error('Mongo session store error', { error: err?.message || err });
-    });
+    const logSessionStoreFailure = (err) => {
+      logger.error('Mongo session store error. Check MONGO_URI credentials.', {
+        error: err?.message || err
+      });
+    };
+    sessionStore.on('error', logSessionStoreFailure);
+    // connect-mongo internally keeps startup promises; handling rejections here avoids process crashes.
+    if (sessionStore.clientP && typeof sessionStore.clientP.catch === 'function') {
+      sessionStore.clientP.catch((err) => {
+        logSessionStoreFailure(err);
+        return null;
+      });
+    }
+    if (sessionStore.collectionP && typeof sessionStore.collectionP.catch === 'function') {
+      sessionStore.collectionP.catch((err) => {
+        logSessionStoreFailure(err);
+        return null;
+      });
+    }
     sessionConfig.store = sessionStore;
   } catch (err) {
     logger.error('Failed to initialize Mongo session store. Using in-memory session store.', {
@@ -93,7 +111,8 @@ if (useMongoSessionStore && mongoSessionUri) {
 } else {
   logger.warn('Mongo session store disabled. Using in-memory session store.', {
     useMongoSessionStore,
-    mongoUriConfigured: Boolean(mongoSessionUri)
+    mongoUriConfigured: Boolean(mongoSessionUri),
+    defaultedForEnvironment: !process.env.SESSION_STORE_USE_MONGO
   });
 }
 

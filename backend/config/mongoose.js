@@ -13,6 +13,16 @@ const MONGO_SERVER_SELECTION_TIMEOUT_MS = Math.max(
 
 let reconnectTimer = null;
 let hasConnectedOnce = false;
+let connectInFlight = null;
+
+const isMongoAuthError = (err) => {
+  const message = String(err?.message || '').toLowerCase();
+  return (
+    err?.code === 8000 ||
+    message.includes('authentication failed') ||
+    message.includes('bad auth')
+  );
+};
 
 const scheduleReconnect = () => {
   if (reconnectTimer) return;
@@ -28,21 +38,38 @@ const connectMongo = async () => {
     return false;
   }
 
-  if (mongoose.connection.readyState === 1 || mongoose.connection.readyState === 2) {
+  if (mongoose.connection.readyState === 1) {
     return true;
   }
 
-  try {
-    await mongoose.connect(MONGO_URI, {
-      serverSelectionTimeoutMS: MONGO_SERVER_SELECTION_TIMEOUT_MS
-    });
-    hasConnectedOnce = true;
-    return true;
-  } catch (err) {
-    console.error('MongoDB connection error:', err);
-    scheduleReconnect();
-    return false;
+  if (connectInFlight) {
+    return connectInFlight;
   }
+
+  connectInFlight = mongoose
+    .connect(MONGO_URI, {
+      serverSelectionTimeoutMS: MONGO_SERVER_SELECTION_TIMEOUT_MS
+    })
+    .then(() => {
+      hasConnectedOnce = true;
+      return true;
+    })
+    .catch((err) => {
+      console.error('MongoDB connection error:', err);
+      if (isMongoAuthError(err)) {
+        console.error(
+          'MongoDB authentication failed. Update backend/.env MONGO_URI with valid Atlas credentials or use a local Mongo URI.'
+        );
+        return false;
+      }
+      scheduleReconnect();
+      return false;
+    })
+    .finally(() => {
+      connectInFlight = null;
+    });
+
+  return connectInFlight;
 };
 
 mongoose.connection.on('connected', () => {
@@ -51,6 +78,11 @@ mongoose.connection.on('connected', () => {
 
 mongoose.connection.on('error', (err) => {
   console.error('MongoDB connection error:', err);
+  if (isMongoAuthError(err)) {
+    console.error(
+      'MongoDB authentication failed. Check backend/.env MONGO_URI username/password and Atlas DB user access.'
+    );
+  }
 });
 
 mongoose.connection.on('disconnected', () => {

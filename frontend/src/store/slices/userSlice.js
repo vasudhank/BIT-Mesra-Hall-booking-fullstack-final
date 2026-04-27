@@ -45,18 +45,25 @@ export default userSlice.reducer;
    AUTH CHECK
 ====================== */
 export function checkauth() {
-  return async function (dispatch) {
+  return async function (dispatch, getState) {
     try {
       const response = await api.get('/details');
 
       if (response.data.status === 'Authenticated') {
         dispatch(setAuthenticated(response.data.details.type));
       } else {
-        dispatch(setUnauthenticated());
+        const current = getState().user;
+        // Avoid clobbering a fresh successful login with a stale in-flight check.
+        if (current.status !== 'Authenticated') {
+          dispatch(setUnauthenticated());
+        }
       }
     } catch (error) {
       console.error('Auth check failed:', error);
-      dispatch(setUnauthenticated());
+      const current = getState().user;
+      if (current.status !== 'Authenticated') {
+        dispatch(setUnauthenticated());
+      }
     }
   };
 }
