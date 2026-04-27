@@ -788,6 +788,8 @@ body.dark-mode .thread-delete-modal-card {
   min-width: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 16px;
   display: flex;
   flex-direction: column;

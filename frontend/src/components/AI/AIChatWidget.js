@@ -1304,6 +1304,7 @@ export default function AIChatWidget({
 
     let firstRafId = 0;
     let secondRafId = 0;
+    let attempt = 0;
 
     const alignPromptAtViewportTop = () => {
       const containerNode = messagesContainerRef.current;
@@ -1316,14 +1317,27 @@ export default function AIChatWidget({
       const containerRect = containerNode.getBoundingClientRect();
       const targetRect = targetNode.getBoundingClientRect();
       const offsetY = targetRect.top - containerRect.top;
-      containerNode.scrollTop += offsetY;
+      if (Math.abs(offsetY) > 0.5) {
+        containerNode.scrollTop += offsetY;
+      }
       containerNode.scrollLeft = 0;
 
-      freshViewportAnchorScrollTopRef.current = containerNode.scrollTop;
-      freshViewportMaxScrollUpRef.current = 0;
       const baseGap = calculateFreshViewportBaseGap();
       freshViewportBaseGapRef.current = baseGap;
       setFreshViewportSpacerHeight(baseGap);
+
+      const postContainerRect = containerNode.getBoundingClientRect();
+      const postTargetRect = targetNode.getBoundingClientRect();
+      const residualOffset = postTargetRect.top - postContainerRect.top;
+
+      if (Math.abs(residualOffset) > 0.5 && attempt < 6) {
+        attempt += 1;
+        secondRafId = window.requestAnimationFrame(alignPromptAtViewportTop);
+        return;
+      }
+
+      freshViewportAnchorScrollTopRef.current = containerNode.scrollTop;
+      freshViewportMaxScrollUpRef.current = 0;
       pendingPromptViewportRef.current = null;
     };
 
@@ -1355,11 +1369,11 @@ export default function AIChatWidget({
     ) return undefined;
 
     const handleScroll = () => {
-      const upwardDelta = Math.max(0, freshViewportAnchorScrollTopRef.current - containerNode.scrollTop);
-      if (upwardDelta <= freshViewportMaxScrollUpRef.current) return;
+      const traveledDistance = Math.abs(containerNode.scrollTop - freshViewportAnchorScrollTopRef.current);
+      if (traveledDistance <= freshViewportMaxScrollUpRef.current) return;
 
-      freshViewportMaxScrollUpRef.current = upwardDelta;
-      const nextGap = Math.max(0, freshViewportBaseGapRef.current - upwardDelta);
+      freshViewportMaxScrollUpRef.current = traveledDistance;
+      const nextGap = Math.max(0, freshViewportBaseGapRef.current - traveledDistance);
       setFreshViewportSpacerHeight((prevGap) => (Math.abs(prevGap - nextGap) < 1 ? prevGap : nextGap));
 
       if (nextGap <= 0) {
@@ -1375,6 +1389,23 @@ export default function AIChatWidget({
     if (!freshViewportPromptId || freshViewportPromptIndex < 0) return undefined;
 
     const handleResize = () => {
+      const containerNode = messagesContainerRef.current;
+      const promptNode = messageRowRefs.current.get(freshViewportPromptId);
+      const canReAnchor =
+        freshViewportMaxScrollUpRef.current <= 1
+        && containerNode instanceof Element
+        && promptNode instanceof Element;
+
+      if (canReAnchor) {
+        const containerRect = containerNode.getBoundingClientRect();
+        const promptRect = promptNode.getBoundingClientRect();
+        const offsetY = promptRect.top - containerRect.top;
+        if (Math.abs(offsetY) > 0.5) {
+          containerNode.scrollTop += offsetY;
+        }
+        freshViewportAnchorScrollTopRef.current = containerNode.scrollTop;
+      }
+
       const nextBaseGap = calculateFreshViewportBaseGap();
       freshViewportBaseGapRef.current = nextBaseGap;
       const nextGap = Math.max(0, nextBaseGap - freshViewportMaxScrollUpRef.current);
@@ -1386,7 +1417,19 @@ export default function AIChatWidget({
 
     handleResize();
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    const visualViewport = window.visualViewport;
+    if (visualViewport) {
+      visualViewport.addEventListener("resize", handleResize);
+      visualViewport.addEventListener("scroll", handleResize);
+    }
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      if (visualViewport) {
+        visualViewport.removeEventListener("resize", handleResize);
+        visualViewport.removeEventListener("scroll", handleResize);
+      }
+    };
   }, [freshViewportPromptId, freshViewportPromptIndex, calculateFreshViewportBaseGap]);
 
   useEffect(() => {
