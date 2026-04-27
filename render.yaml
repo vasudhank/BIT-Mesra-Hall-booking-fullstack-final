@@ -15,6 +15,9 @@ services:
     buildCommand: npm ci && npm run build
     staticPublishPath: build
     autoDeploy: true
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://hall-booking-backend-7fui.onrender.com/api
     routes:
       - type: rewrite
         source: /*

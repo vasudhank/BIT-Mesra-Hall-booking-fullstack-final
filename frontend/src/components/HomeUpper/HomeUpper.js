@@ -1709,7 +1709,15 @@ export default function HomeUpper({
                   onClick={async () => {
                     const played = await playElevenLabsSpeech({
                       text: "Deep diving in immersive mode",
-                      mode: "immersive_intro"
+                      mode: "immersive_intro",
+                      onError: (err) => {
+                        const status = Number(err?.status) || 0;
+                        const code = String(err?.code || "").trim().toUpperCase();
+                        const detail = String(err?.message || "Unknown voice error");
+                        console.warn(
+                          `[Immersive voice] ElevenLabs failed (${status || "status-unknown"}${code ? `, ${code}` : ""}). ${detail}`
+                        );
+                      }
                     });
 
                     if (!played && 'speechSynthesis' in window) {

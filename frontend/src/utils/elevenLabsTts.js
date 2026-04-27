@@ -52,7 +52,37 @@ export const playElevenLabsSpeech = async ({
     );
 
     const blob = response.data;
+    const contentType =
+      String(response?.headers?.["content-type"] || response?.headers?.["Content-Type"] || "").toLowerCase();
+
     if (!blob || !blob.size) throw new Error("Empty ElevenLabs audio response");
+
+    if (contentType && !contentType.startsWith("audio/")) {
+      let detailText = "";
+      try {
+        detailText = await blob.text();
+      } catch (readErr) {
+        // no-op
+      }
+
+      let parsed = null;
+      try {
+        parsed = detailText ? JSON.parse(detailText) : null;
+      } catch (parseErr) {
+        parsed = null;
+      }
+
+      const message =
+        parsed?.message
+        || parsed?.detail?.message
+        || detailText
+        || `Unexpected ElevenLabs response content type: ${contentType}`;
+      const typedError = new Error(message);
+      typedError.status = Number(response?.status) || 0;
+      typedError.code = parsed?.code || "";
+      typedError.detail = parsed?.failures || parsed || detailText;
+      throw typedError;
+    }
 
     const objectUrl = URL.createObjectURL(blob);
     const audio = new Audio(objectUrl);

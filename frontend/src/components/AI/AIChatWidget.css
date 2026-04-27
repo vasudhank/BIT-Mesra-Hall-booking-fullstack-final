@@ -819,6 +819,13 @@ body.dark-mode .thread-delete-modal-card {
   justify-content: flex-end;
 }
 
+.gemini-fresh-viewport-spacer {
+  width: min(100%, var(--gemini-content-width));
+  margin-inline: auto;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
 .ai-avatar {
   width: 28px;
   height: 28px;

@@ -18,6 +18,22 @@ const MODELS = {
 
 const MODEL_FALLBACKS = ['eleven_multilingual_v2', 'eleven_turbo_v2_5'];
 
+const parseApiKeys = () => {
+  const candidates = [];
+  const pushKeys = (value) => {
+    String(value || '')
+      .split(/[\n,\s]+/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .forEach((key) => candidates.push(key));
+  };
+
+  pushKeys(process.env.ELEVENLABS_API_KEY);
+  pushKeys(process.env.ELEVENLABS_API_KEYS);
+
+  return Array.from(new Set(candidates));
+};
+
 const toBoolean = (value, fallback) => {
   if (typeof value === 'boolean') return value;
   if (typeof value === 'string') {
@@ -120,13 +136,28 @@ const normalizeVoiceSettingsForModel = (voiceSettings, modelId) => {
   return settings;
 };
 
+const classifyFailureDetail = (detailText) => {
+  const raw = String(detailText || '').trim();
+  if (!raw) return { code: '', message: '' };
+
+  try {
+    const parsed = JSON.parse(raw);
+    const detail = parsed?.detail || parsed || {};
+    const code = String(detail?.status || parsed?.code || '').trim();
+    const message = String(detail?.message || parsed?.message || '').trim();
+    return { code, message: message || raw.slice(0, 500) };
+  } catch (err) {
+    return { code: '', message: raw.slice(0, 500) };
+  }
+};
+
 router.post('/tts', async (req, res) => {
   try {
-    const apiKey = process.env.ELEVENLABS_API_KEY;
-    if (!apiKey) {
+    const apiKeys = parseApiKeys();
+    if (!apiKeys.length) {
       return res.status(500).json({
         ok: false,
-        message: 'ELEVENLABS_API_KEY is missing on server.'
+        message: 'ELEVENLABS_API_KEY (or ELEVENLABS_API_KEYS) is missing on server.'
       });
     }
 
@@ -156,64 +187,107 @@ router.post('/tts', async (req, res) => {
 
     const failureReasons = [];
 
-    for (const voiceId of voiceCandidates) {
-      for (const modelId of modelCandidates) {
-        try {
-          const perModelSettings = normalizeVoiceSettingsForModel(voiceSettings, modelId);
+    for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex += 1) {
+      const apiKey = apiKeys[keyIndex];
 
-          const elevenResponse = await axios.post(
-            `${ELEVENLABS_BASE_URL}/text-to-speech/${voiceId}`,
-            {
-              text: safeText,
-              model_id: modelId,
-              voice_settings: perModelSettings
-            },
-            {
-              responseType: 'arraybuffer',
-              headers: {
-                'xi-api-key': apiKey,
-                'Content-Type': 'application/json',
-                Accept: 'audio/mpeg'
+      for (const voiceId of voiceCandidates) {
+        for (const modelId of modelCandidates) {
+          try {
+            const perModelSettings = normalizeVoiceSettingsForModel(voiceSettings, modelId);
+
+            const elevenResponse = await axios.post(
+              `${ELEVENLABS_BASE_URL}/text-to-speech/${voiceId}`,
+              {
+                text: safeText,
+                model_id: modelId,
+                voice_settings: perModelSettings
               },
-              timeout: 30000,
-              validateStatus: () => true
-            }
-          );
+              {
+                responseType: 'arraybuffer',
+                headers: {
+                  'xi-api-key': apiKey,
+                  'Content-Type': 'application/json',
+                  Accept: 'audio/mpeg'
+                },
+                timeout: 30000,
+                validateStatus: () => true
+              }
+            );
 
-          if (elevenResponse.status >= 200 && elevenResponse.status < 300) {
-            const contentType = elevenResponse.headers['content-type'] || 'audio/mpeg';
-            res.setHeader('Content-Type', contentType);
-            res.setHeader('Cache-Control', 'no-store');
-            res.setHeader('X-ElevenLabs-Voice-Id', voiceId);
-            res.setHeader('X-ElevenLabs-Model-Used', modelId);
-            res.setHeader('X-ElevenLabs-Language', resolvedLanguage);
-            if (voiceId !== primaryVoice) {
-              res.setHeader('X-ElevenLabs-Voice-Fallback', 'true');
+            if (elevenResponse.status >= 200 && elevenResponse.status < 300) {
+              const contentType = elevenResponse.headers['content-type'] || 'audio/mpeg';
+              res.setHeader('Content-Type', contentType);
+              res.setHeader('Cache-Control', 'no-store');
+              res.setHeader('X-ElevenLabs-Voice-Id', voiceId);
+              res.setHeader('X-ElevenLabs-Model-Used', modelId);
+              res.setHeader('X-ElevenLabs-Language', resolvedLanguage);
+              if (voiceId !== primaryVoice) {
+                res.setHeader('X-ElevenLabs-Voice-Fallback', 'true');
+              }
+              if (keyIndex > 0) {
+                res.setHeader('X-ElevenLabs-Key-Fallback', 'true');
+              }
+              return res.send(Buffer.from(elevenResponse.data));
             }
-            return res.send(Buffer.from(elevenResponse.data));
+
+            const detailText = Buffer.from(elevenResponse.data || []).toString('utf8');
+            const classified = classifyFailureDetail(detailText);
+            failureReasons.push({
+              keyIndex: keyIndex + 1,
+              voiceId,
+              modelId,
+              status: elevenResponse.status,
+              code: classified.code || undefined,
+              detail: (classified.message || detailText).slice(0, 500)
+            });
+          } catch (err) {
+            failureReasons.push({
+              keyIndex: keyIndex + 1,
+              voiceId,
+              modelId,
+              status: 0,
+              detail: err.message || 'Unknown ElevenLabs error'
+            });
           }
-
-          const detailText = Buffer.from(elevenResponse.data || []).toString('utf8');
-          failureReasons.push({
-            voiceId,
-            modelId,
-            status: elevenResponse.status,
-            detail: detailText.slice(0, 500)
-          });
-        } catch (err) {
-          failureReasons.push({
-            voiceId,
-            modelId,
-            status: 0,
-            detail: err.message || 'Unknown ElevenLabs error'
-          });
         }
       }
     }
 
+    const unusualActivityFailure = failureReasons.find(
+      (item) =>
+        Number(item?.status) === 401
+        && /detected_unusual_activity/i.test(String(item?.code || item?.detail || ''))
+    );
+
+    const invalidKeyFailure = failureReasons.find(
+      (item) =>
+        Number(item?.status) === 401
+        && /invalid_api_key|unauthorized|api key/i.test(String(item?.code || item?.detail || ''))
+    );
+
+    if (unusualActivityFailure) {
+      return res.status(502).json({
+        ok: false,
+        code: 'ELEVENLABS_UNUSUAL_ACTIVITY',
+        message:
+          'ElevenLabs blocked this server key due to unusual activity/free-tier restrictions. Use a paid/unrestricted key in backend env.',
+        failures: failureReasons
+      });
+    }
+
+    if (invalidKeyFailure) {
+      return res.status(502).json({
+        ok: false,
+        code: 'ELEVENLABS_AUTH_FAILED',
+        message: 'ElevenLabs rejected the configured API key(s). Verify backend ElevenLabs credentials.',
+        failures: failureReasons
+      });
+    }
+
     return res.status(502).json({
       ok: false,
-      message: 'ElevenLabs TTS failed for all model candidates.',
+      code: 'ELEVENLABS_TTS_FAILED',
+      message: 'ElevenLabs TTS failed for all key/model candidates.',
       failures: failureReasons
     });
   } catch (err) {
@@ -224,11 +298,11 @@ router.post('/tts', async (req, res) => {
 
 router.post('/token', async (req, res) => {
   try {
-    const apiKey = process.env.ELEVENLABS_API_KEY;
-    if (!apiKey) {
+    const apiKeys = parseApiKeys();
+    if (!apiKeys.length) {
       return res.status(500).json({
         ok: false,
-        message: 'ELEVENLABS_API_KEY is missing on server.'
+        message: 'ELEVENLABS_API_KEY (or ELEVENLABS_API_KEYS) is missing on server.'
       });
     }
 
@@ -240,36 +314,43 @@ router.post('/token', async (req, res) => {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     const failures = [];
 
-    for (const endpoint of endpointCandidates) {
-      try {
-        const tokenResponse = await axios.post(endpoint, body, {
-          headers: {
-            'xi-api-key': apiKey,
-            'Content-Type': 'application/json'
-          },
-          timeout: 15000,
-          validateStatus: () => true
-        });
+    for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex += 1) {
+      const apiKey = apiKeys[keyIndex];
 
-        if (tokenResponse.status >= 200 && tokenResponse.status < 300) {
-          return res.json({
-            ok: true,
+      for (const endpoint of endpointCandidates) {
+        try {
+          const tokenResponse = await axios.post(endpoint, body, {
+            headers: {
+              'xi-api-key': apiKey,
+              'Content-Type': 'application/json'
+            },
+            timeout: 15000,
+            validateStatus: () => true
+          });
+
+          if (tokenResponse.status >= 200 && tokenResponse.status < 300) {
+            return res.json({
+              ok: true,
+              endpoint,
+              data: tokenResponse.data,
+              keyIndex: keyIndex + 1
+            });
+          }
+
+          failures.push({
+            keyIndex: keyIndex + 1,
             endpoint,
+            status: tokenResponse.status,
             data: tokenResponse.data
           });
+        } catch (err) {
+          failures.push({
+            keyIndex: keyIndex + 1,
+            endpoint,
+            status: 0,
+            data: err.message || 'Unknown token error'
+          });
         }
-
-        failures.push({
-          endpoint,
-          status: tokenResponse.status,
-          data: tokenResponse.data
-        });
-      } catch (err) {
-        failures.push({
-          endpoint,
-          status: 0,
-          data: err.message || 'Unknown token error'
-        });
       }
     }
 

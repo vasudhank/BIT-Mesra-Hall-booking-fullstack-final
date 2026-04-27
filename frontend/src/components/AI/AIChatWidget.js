@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import api from "../../api/axiosInstance";
 import "./AIChatWidget.css";
 import { IconButton, Tooltip } from "@mui/material";
@@ -585,6 +585,8 @@ export default function AIChatWidget({
   const [renamingThreadId, setRenamingThreadId] = useState("");
   const [threadTitleDraft, setThreadTitleDraft] = useState("");
   const [deleteConfirmThreadId, setDeleteConfirmThreadId] = useState("");
+  const [freshViewportPromptId, setFreshViewportPromptId] = useState("");
+  const [freshViewportSpacerHeight, setFreshViewportSpacerHeight] = useState(0);
 
   const chatShellRef = useRef(null);
   const sidebarRef = useRef(null);
@@ -596,7 +598,12 @@ export default function AIChatWidget({
   const isLiveModeRef = useRef(isLiveMode);
   const activeChatRequestRef = useRef(null);
   const messageRowRefs = useRef(new Map());
+  const thinkingRowRef = useRef(null);
   const pendingPromptViewportRef = useRef(null);
+  const freshViewportBaseGapRef = useRef(0);
+  const freshViewportAnchorScrollTopRef = useRef(0);
+  const freshViewportMaxScrollUpRef = useRef(0);
+  const lastVoiceFailureRef = useRef("");
   const sidebarResizeMetaRef = useRef({ dragging: false, startX: 0, startWidth: 250 });
   const threadMenuRefs = useRef(new Map());
 
@@ -823,7 +830,39 @@ export default function AIChatWidget({
   );
 
   const messages = useMemo(() => activeThread?.messages || [], [activeThread]);
+  const freshViewportPromptIndex = useMemo(
+    () => messages.findIndex((message) => message.id === freshViewportPromptId),
+    [messages, freshViewportPromptId]
+  );
+  const showFreshViewportSpacer = Boolean(
+    freshViewportPromptId
+    && freshViewportPromptIndex >= 0
+    && freshViewportSpacerHeight > 0
+  );
   const thinkingStatusWord = normalizeThinkingStatusLabel(thinkingStatusLabel, "Thinking");
+  const calculateFreshViewportBaseGap = useCallback(() => {
+    if (!freshViewportPromptId || freshViewportPromptIndex < 0) return 0;
+
+    const containerNode = messagesContainerRef.current;
+    const promptNode = messageRowRefs.current.get(freshViewportPromptId);
+    if (!(containerNode instanceof Element) || !(promptNode instanceof Element)) return 0;
+
+    const promptHeight = promptNode.getBoundingClientRect().height || 0;
+    const thinkingHeight = isLoading
+      ? (
+        thinkingRowRef.current instanceof Element
+          ? (thinkingRowRef.current.getBoundingClientRect().height || 0)
+          : 46
+      )
+      : 0;
+    const containerHeight = containerNode.clientHeight || 0;
+    const viewportPaddingAllowance = 26;
+
+    return Math.max(
+      0,
+      Math.floor(containerHeight - promptHeight - thinkingHeight - viewportPaddingAllowance)
+    );
+  }, [freshViewportPromptId, freshViewportPromptIndex, isLoading]);
   const sidebarInlineStyle = useMemo(() => {
     if (sidebarHidden || !sidebarOpen || isCompactLayout || !sidebarWidth) return undefined;
     return { "--gemini-sidebar-open-width": `${sidebarWidth}px` };
@@ -1259,24 +1298,96 @@ export default function AIChatWidget({
     closeConfirmationEditor();
   }, [activeThreadId, closeConfirmationEditor]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const pendingPromptViewport = pendingPromptViewportRef.current;
-    if (!pendingPromptViewport || pendingPromptViewport.threadId !== activeThreadId) return;
+    if (!pendingPromptViewport || pendingPromptViewport.threadId !== activeThreadId) return undefined;
 
-    const containerNode = messagesContainerRef.current;
-    const targetNode = messageRowRefs.current.get(pendingPromptViewport.messageId);
-    if (!(containerNode instanceof Element) || !(targetNode instanceof Element)) return;
+    let firstRafId = 0;
+    let secondRafId = 0;
 
-    requestAnimationFrame(() => {
+    const alignPromptAtViewportTop = () => {
+      const containerNode = messagesContainerRef.current;
+      const targetNode = messageRowRefs.current.get(pendingPromptViewport.messageId);
+      if (!(containerNode instanceof Element) || !(targetNode instanceof Element)) {
+        secondRafId = window.requestAnimationFrame(alignPromptAtViewportTop);
+        return;
+      }
+
       const containerRect = containerNode.getBoundingClientRect();
       const targetRect = targetNode.getBoundingClientRect();
       const offsetY = targetRect.top - containerRect.top;
       containerNode.scrollTop += offsetY;
       containerNode.scrollLeft = 0;
-      targetNode.scrollIntoView({ behavior: "auto", block: "start", inline: "nearest" });
+
+      freshViewportAnchorScrollTopRef.current = containerNode.scrollTop;
+      freshViewportMaxScrollUpRef.current = 0;
+      const baseGap = calculateFreshViewportBaseGap();
+      freshViewportBaseGapRef.current = baseGap;
+      setFreshViewportSpacerHeight(baseGap);
       pendingPromptViewportRef.current = null;
+    };
+
+    firstRafId = window.requestAnimationFrame(() => {
+      secondRafId = window.requestAnimationFrame(alignPromptAtViewportTop);
     });
-  }, [messages, activeThreadId]);
+
+    return () => {
+      if (firstRafId) window.cancelAnimationFrame(firstRafId);
+      if (secondRafId) window.cancelAnimationFrame(secondRafId);
+    };
+  }, [messages, activeThreadId, calculateFreshViewportBaseGap]);
+
+  useEffect(() => {
+    if (!freshViewportPromptId) return;
+    if (freshViewportPromptIndex >= 0) return;
+    setFreshViewportPromptId("");
+    setFreshViewportSpacerHeight(0);
+    freshViewportBaseGapRef.current = 0;
+    freshViewportMaxScrollUpRef.current = 0;
+  }, [freshViewportPromptId, freshViewportPromptIndex]);
+
+  useEffect(() => {
+    const containerNode = messagesContainerRef.current;
+    if (
+      !freshViewportPromptId
+      || freshViewportPromptIndex < 0
+      || !(containerNode instanceof Element)
+    ) return undefined;
+
+    const handleScroll = () => {
+      const upwardDelta = Math.max(0, freshViewportAnchorScrollTopRef.current - containerNode.scrollTop);
+      if (upwardDelta <= freshViewportMaxScrollUpRef.current) return;
+
+      freshViewportMaxScrollUpRef.current = upwardDelta;
+      const nextGap = Math.max(0, freshViewportBaseGapRef.current - upwardDelta);
+      setFreshViewportSpacerHeight((prevGap) => (Math.abs(prevGap - nextGap) < 1 ? prevGap : nextGap));
+
+      if (nextGap <= 0) {
+        setFreshViewportPromptId("");
+      }
+    };
+
+    containerNode.addEventListener("scroll", handleScroll, { passive: true });
+    return () => containerNode.removeEventListener("scroll", handleScroll);
+  }, [freshViewportPromptId, freshViewportPromptIndex]);
+
+  useEffect(() => {
+    if (!freshViewportPromptId || freshViewportPromptIndex < 0) return undefined;
+
+    const handleResize = () => {
+      const nextBaseGap = calculateFreshViewportBaseGap();
+      freshViewportBaseGapRef.current = nextBaseGap;
+      const nextGap = Math.max(0, nextBaseGap - freshViewportMaxScrollUpRef.current);
+      setFreshViewportSpacerHeight(nextGap);
+      if (nextGap <= 0) {
+        setFreshViewportPromptId("");
+      }
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [freshViewportPromptId, freshViewportPromptIndex, calculateFreshViewportBaseGap]);
 
   useEffect(() => {
     if (!pendingSearchJump) return;
@@ -1398,8 +1509,18 @@ export default function AIChatWidget({
         setAiSpeaking(false);
         if (isLiveModeRef.current) setTimeout(() => startListening(), 350);
       },
-      onError: () => {
+      onError: (err) => {
         setAiSpeaking(false);
+        const status = Number(err?.status) || 0;
+        const code = String(err?.code || "").trim().toUpperCase();
+        const signature = `${status}:${code}`;
+        if (signature && signature !== lastVoiceFailureRef.current) {
+          lastVoiceFailureRef.current = signature;
+          const detail = String(err?.message || "Unknown voice error");
+          console.warn(
+            `[AI voice] ElevenLabs failed (${status || "status-unknown"}${code ? `, ${code}` : ""}). ${detail}`
+          );
+        }
       }
     });
 
@@ -2064,6 +2185,11 @@ export default function AIChatWidget({
       threadId: activeThreadId,
       messageId: userMessage.id
     };
+    setFreshViewportPromptId(userMessage.id);
+    setFreshViewportSpacerHeight(0);
+    freshViewportBaseGapRef.current = 0;
+    freshViewportAnchorScrollTopRef.current = 0;
+    freshViewportMaxScrollUpRef.current = 0;
 
     updateActiveThreadMessages(() => [...historyMessages, userMessage]);
     setInput("");
@@ -3022,110 +3148,111 @@ export default function AIChatWidget({
             );
 
             return (
-              <div
-                key={message.id}
-                className={`gemini-msg-row ${message.role} ${isSearchHit ? "search-hit" : ""}`.trim()}
-                ref={(node) => {
-                  if (node) {
-                    messageRowRefs.current.set(message.id, node);
-                  } else {
-                    messageRowRefs.current.delete(message.id);
-                  }
-                }}
-              >
-                {!isUser && (
-                  <div className="ai-avatar">
-                    <GeminiDiamondIcon size={17} className="gemini-diamond-icon" />
-                  </div>
-                )}
+              <React.Fragment key={message.id}>
+                <div
+                  className={`gemini-msg-row ${message.role} ${isSearchHit ? "search-hit" : ""}`.trim()}
+                  ref={(node) => {
+                    if (node) {
+                      messageRowRefs.current.set(message.id, node);
+                    } else {
+                      messageRowRefs.current.delete(message.id);
+                    }
+                  }}
+                >
+                  {!isUser && (
+                    <div className="ai-avatar">
+                      <GeminiDiamondIcon size={17} className="gemini-diamond-icon" />
+                    </div>
+                  )}
 
-                <div className={`gemini-message-stack ${isEditing && isUser ? "editing-user" : ""}`.trim()}>
-                  <div className={`gemini-bubble ${message.role} ${isEditing && isUser ? "editing-user" : ""}`.trim()}>
-                    {isEditing ? (
-                      <textarea
-                        ref={editingInputRef}
-                        value={editingDraft}
-                        onChange={(event) => setEditingDraft(event.target.value)}
-                        className="edit-query-input"
-                        rows={1}
-                        autoFocus
-                      />
-                    ) : (
-                      <>
-                        {message.text ? (
-                          <pre className="msg-text-pre">
-                            {isSearchHit ? renderHighlightedText(message.text, searchHighlight?.query) : message.text}
-                          </pre>
-                        ) : null}
+                  <div className={`gemini-message-stack ${isEditing && isUser ? "editing-user" : ""}`.trim()}>
+                    <div className={`gemini-bubble ${message.role} ${isEditing && isUser ? "editing-user" : ""}`.trim()}>
+                      {isEditing ? (
+                        <textarea
+                          ref={editingInputRef}
+                          value={editingDraft}
+                          onChange={(event) => setEditingDraft(event.target.value)}
+                          className="edit-query-input"
+                          rows={1}
+                          autoFocus
+                        />
+                      ) : (
+                        <>
+                          {message.text ? (
+                            <pre className="msg-text-pre">
+                              {isSearchHit ? renderHighlightedText(message.text, searchHighlight?.query) : message.text}
+                            </pre>
+                          ) : null}
 
-                        {renderStructuredData(message.data?.agentResult || message.data, message)}
-                        {renderAgentMeta(message.data)}
+                          {renderStructuredData(message.data?.agentResult || message.data, message)}
+                          {renderAgentMeta(message.data)}
 
-                        {Array.isArray(message.attachments) && message.attachments.length > 0 && (
-                          <div className="msg-attachment-list">
-                            {message.attachments.map((attachment) => (
-                              <span key={attachment.id || attachment.name} className="msg-attachment-chip">
-                                <span className="msg-attachment-icon">{renderAttachmentIcon(attachment.type)}</span>
-                                <span className="msg-attachment-name">{attachment.name}</span>
-                                <span className="msg-attachment-size">{formatBytes(attachment.size)}</span>
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
+                          {Array.isArray(message.attachments) && message.attachments.length > 0 && (
+                            <div className="msg-attachment-list">
+                              {message.attachments.map((attachment) => (
+                                <span key={attachment.id || attachment.name} className="msg-attachment-chip">
+                                  <span className="msg-attachment-icon">{renderAttachmentIcon(attachment.type)}</span>
+                                  <span className="msg-attachment-name">{attachment.name}</span>
+                                  <span className="msg-attachment-size">{formatBytes(attachment.size)}</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
 
-                  <div className={`msg-actions ${message.role} ${isEditing ? "editing edit-controls" : ""}`.trim()}>
-                    {isEditing ? (
-                      <>
-                        <button
-                          type="button"
-                          className="msg-action-btn"
-                          onClick={cancelEditMessage}
-                          disabled={isLoading}
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          className="msg-action-btn primary"
-                          onClick={() => regenerateFromEdit(index)}
-                          disabled={isLoading || !editingDraft.trim()}
-                        >
-                          Update
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          className="msg-action-btn"
-                          onClick={() => copyToClipboard(message.text, message.id)}
-                        >
-                          <ContentCopyRoundedIcon fontSize="inherit" /> {copied ? "Copied" : ""}
-                        </button>
-
-                        {isUser && (
+                    <div className={`msg-actions ${message.role} ${isEditing ? "editing edit-controls" : ""}`.trim()}>
+                      {isEditing ? (
+                        <>
                           <button
                             type="button"
                             className="msg-action-btn"
-                            onClick={() => startEditMessage(message)}
+                            onClick={cancelEditMessage}
                             disabled={isLoading}
                           >
-                            <EditOutlinedIcon fontSize="inherit" />
+                            Cancel
                           </button>
-                        )}
-                      </>
-                    )}
+                          <button
+                            type="button"
+                            className="msg-action-btn primary"
+                            onClick={() => regenerateFromEdit(index)}
+                            disabled={isLoading || !editingDraft.trim()}
+                          >
+                            Update
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className="msg-action-btn"
+                            onClick={() => copyToClipboard(message.text, message.id)}
+                          >
+                            <ContentCopyRoundedIcon fontSize="inherit" /> {copied ? "Copied" : ""}
+                          </button>
+
+                          {isUser && (
+                            <button
+                              type="button"
+                              className="msg-action-btn"
+                              onClick={() => startEditMessage(message)}
+                              disabled={isLoading}
+                            >
+                              <EditOutlinedIcon fontSize="inherit" />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
+              </React.Fragment>
             );
           })}
 
           {isLoading && (
-            <div className="gemini-msg-row ai ai-thinking-row">
+            <div ref={thinkingRowRef} className="gemini-msg-row ai ai-thinking-row">
               <div className="gemini-loader thinking" role="status" aria-label="AI is thinking">
                 <div className="gemini-thinking-swirl"></div>
                 <GeminiDiamondIcon size={22} className="gemini-thinking-star" />
@@ -3134,6 +3261,13 @@ export default function AIChatWidget({
                 {thinkingStatusWord}
               </div>
             </div>
+          )}
+          {showFreshViewportSpacer && (
+            <div
+              className="gemini-fresh-viewport-spacer"
+              style={{ height: `${freshViewportSpacerHeight}px` }}
+              aria-hidden="true"
+            />
           )}
 
         </div>
