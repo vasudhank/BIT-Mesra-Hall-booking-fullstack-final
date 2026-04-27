@@ -32,6 +32,15 @@ const safeSend = (ws, payload) => {
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const normalizeStatusLabel = (value, fallback = 'Thinking') => {
+  const raw = String(value || '')
+    .replace(/[_:/-]+/g, ' ')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!raw) return fallback;
+  return raw.split(' ').slice(0, 2).join(' ');
+};
 
 const handleStreamConversation = async (ws, packet = {}) => {
   const requestId = String(packet.requestId || Date.now());
@@ -42,6 +51,13 @@ const handleStreamConversation = async (ws, packet = {}) => {
   const userRole = String(payload.userRole || 'GUEST').toUpperCase();
   const threadId = String(payload.threadId || '').trim();
   const accountKey = String(payload.accountKey || '').trim();
+  const sendStatus = (status) => {
+    safeSend(ws, {
+      type: 'chat.stream.status',
+      requestId,
+      status: normalizeStatusLabel(status)
+    });
+  };
 
   if (!message) {
     safeSend(ws, {
@@ -63,6 +79,7 @@ const handleStreamConversation = async (ws, packet = {}) => {
 
   const finalizeMetric = beginAiTimer('websocket_stream');
   try {
+    sendStatus('Context');
     const agentMemoryContext = await getAgentMemoryContext({
       message,
       history,
@@ -75,9 +92,10 @@ const handleStreamConversation = async (ws, packet = {}) => {
     safeSend(ws, {
       type: 'chat.stream.start',
       requestId,
-      meta: { mode: 'agent_graph_stream' }
+      meta: { mode: 'agent_graph_stream', status: 'Analyzing' }
     });
 
+    sendStatus('Reasoning');
     const result = await runSupportWorkflow({
       message,
       userRole,
@@ -88,6 +106,16 @@ const handleStreamConversation = async (ws, packet = {}) => {
       threadId: agentMemoryContext?.threadId || ''
     });
     const answer = String(result?.answer || '').trim();
+    const traceSteps = Array.isArray(result?.meta?.trace) ? result.meta.trace.slice(0, 4) : [];
+    for (const step of traceSteps) {
+      const stepLabel = step?.node || step?.agent || step?.stage || step?.name || '';
+      if (!stepLabel) continue;
+      sendStatus(stepLabel);
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(20);
+    }
+
+    sendStatus('Responding');
     const chunks = chunkText(answer, 34);
 
     for (const token of chunks) {

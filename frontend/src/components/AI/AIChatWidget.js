@@ -49,6 +49,19 @@ const LANGUAGE_OPTIONS = [
   { id: "hi", label: "Hindi" }
 ];
 
+const normalizeThinkingStatusLabel = (value, fallback = "Thinking") => {
+  const raw = String(value || "")
+    .replace(/[_:/-]+/g, " ")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!raw) return fallback;
+  const words = raw.split(" ").slice(0, 2);
+  return words
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+};
+
 const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
 const createMessage = (role, text, extra = {}) => ({
@@ -551,6 +564,7 @@ export default function AIChatWidget({
   const [selectedLanguage, setSelectedLanguage] = useState("auto");
   const [availableVoices, setAvailableVoices] = useState([]);
   const [selectedVoiceName, setSelectedVoiceName] = useState("");
+  const [thinkingStatusLabel, setThinkingStatusLabel] = useState("");
 
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [editingDraft, setEditingDraft] = useState("");
@@ -574,7 +588,7 @@ export default function AIChatWidget({
 
   const chatShellRef = useRef(null);
   const sidebarRef = useRef(null);
-  const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const inputFieldRef = useRef(null);
   const editingInputRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -582,6 +596,7 @@ export default function AIChatWidget({
   const isLiveModeRef = useRef(isLiveMode);
   const activeChatRequestRef = useRef(null);
   const messageRowRefs = useRef(new Map());
+  const pendingPromptViewportRef = useRef(null);
   const sidebarResizeMetaRef = useRef({ dragging: false, startX: 0, startWidth: 250 });
   const threadMenuRefs = useRef(new Map());
 
@@ -808,6 +823,7 @@ export default function AIChatWidget({
   );
 
   const messages = useMemo(() => activeThread?.messages || [], [activeThread]);
+  const thinkingStatusWord = normalizeThinkingStatusLabel(thinkingStatusLabel, "Thinking");
   const sidebarInlineStyle = useMemo(() => {
     if (sidebarHidden || !sidebarOpen || isCompactLayout || !sidebarWidth) return undefined;
     return { "--gemini-sidebar-open-width": `${sidebarWidth}px` };
@@ -1244,9 +1260,23 @@ export default function AIChatWidget({
   }, [activeThreadId, closeConfirmationEditor]);
 
   useEffect(() => {
-    if (pendingSearchJump && pendingSearchJump.threadId === activeThreadId) return;
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading, activeThreadId, pendingSearchJump]);
+    const pendingPromptViewport = pendingPromptViewportRef.current;
+    if (!pendingPromptViewport || pendingPromptViewport.threadId !== activeThreadId) return;
+
+    const containerNode = messagesContainerRef.current;
+    const targetNode = messageRowRefs.current.get(pendingPromptViewport.messageId);
+    if (!(containerNode instanceof Element) || !(targetNode instanceof Element)) return;
+
+    requestAnimationFrame(() => {
+      const containerRect = containerNode.getBoundingClientRect();
+      const targetRect = targetNode.getBoundingClientRect();
+      const offsetY = targetRect.top - containerRect.top;
+      containerNode.scrollTop += offsetY;
+      containerNode.scrollLeft = 0;
+      targetNode.scrollIntoView({ behavior: "auto", block: "start", inline: "nearest" });
+      pendingPromptViewportRef.current = null;
+    });
+  }, [messages, activeThreadId]);
 
   useEffect(() => {
     if (!pendingSearchJump) return;
@@ -1786,7 +1816,6 @@ export default function AIChatWidget({
     const toolCalls = Array.isArray(meta.toolCalls) ? meta.toolCalls.slice(0, 6) : [];
     const trace = Array.isArray(meta.trace) ? meta.trace.slice(0, 4) : [];
     const reviewTask = meta.reviewTask && typeof meta.reviewTask === "object" ? meta.reviewTask : null;
-    const actionIntent = data?.actionIntent || meta.actionIntent || null;
 
     return (
       <div className="ai-agent-panel">
@@ -1813,16 +1842,6 @@ export default function AIChatWidget({
               <span>Risk: {reviewTask.riskLevel || "HIGH"}</span>
               <span>Task ID: {reviewTask.id || "--"}</span>
             </div>
-          </div>
-        )}
-
-        {!reviewTask && actionIntent?.action && !meta.confirmedPendingAction && (
-          <div className="ai-review-card autonomous">
-            <div className="ai-review-card-head">
-              <strong>Prepared Action</strong>
-              <span>{actionIntent.action}</span>
-            </div>
-            <p>{actionIntent.reply || "The agent prepared an executable action intent."}</p>
           </div>
         )}
 
@@ -1853,7 +1872,16 @@ export default function AIChatWidget({
     );
   };
 
-  const streamConversationViaWebSocket = ({ message, history, language, userRole, threadId, accountKey, abortSignal }) =>
+  const streamConversationViaWebSocket = ({
+    message,
+    history,
+    language,
+    userRole,
+    threadId,
+    accountKey,
+    abortSignal,
+    onStatus
+  }) =>
     new Promise((resolve) => {
       const wsUrl = resolveAiWebSocketUrl();
       if (!wsUrl || typeof window === "undefined" || typeof window.WebSocket === "undefined") {
@@ -1864,6 +1892,7 @@ export default function AIChatWidget({
       const requestId = createId();
       let completed = false;
       let accumulated = "";
+      let responseStarted = false;
       let socket;
 
       const finish = (result) => {
@@ -1930,7 +1959,28 @@ export default function AIChatWidget({
           return;
         }
 
+        if (packet?.type === "chat.stream.start") {
+          const statusLabel = packet?.meta?.status || packet?.meta?.mode || "Analyzing";
+          if (typeof onStatus === "function") onStatus(normalizeThinkingStatusLabel(statusLabel, "Analyzing"));
+          return;
+        }
+
+        if (packet?.type === "chat.stream.status") {
+          const statusLabel =
+            packet?.status
+            || packet?.label
+            || packet?.stage
+            || packet?.text
+            || "Thinking";
+          if (typeof onStatus === "function") onStatus(normalizeThinkingStatusLabel(statusLabel, "Thinking"));
+          return;
+        }
+
         if (packet?.type === "chat.stream.delta") {
+          if (!responseStarted) {
+            responseStarted = true;
+            if (typeof onStatus === "function") onStatus("Responding");
+          }
           accumulated += String(packet.token || "");
           return;
         }
@@ -2010,6 +2060,10 @@ export default function AIChatWidget({
     const userMessage = createMessage("user", composedUserText, {
       attachments: userAttachmentMeta
     });
+    pendingPromptViewportRef.current = {
+      threadId: activeThreadId,
+      messageId: userMessage.id
+    };
 
     updateActiveThreadMessages(() => [...historyMessages, userMessage]);
     setInput("");
@@ -2017,6 +2071,7 @@ export default function AIChatWidget({
       setPendingAttachments([]);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
+    setThinkingStatusLabel("Analyzing");
     setIsLoading(true);
     const requestController = new AbortController();
     activeChatRequestRef.current = requestController;
@@ -2037,7 +2092,8 @@ export default function AIChatWidget({
           userRole: roleForStream,
           threadId: activeThreadId,
           accountKey,
-          abortSignal: requestController.signal
+          abortSignal: requestController.signal,
+          onStatus: (nextStatus) => setThinkingStatusLabel(normalizeThinkingStatusLabel(nextStatus))
         });
 
         if (requestController.signal.aborted) return;
@@ -2076,6 +2132,7 @@ export default function AIChatWidget({
         if (streamResult.status === "aborted") return;
       }
 
+      setThinkingStatusLabel("Planning");
       const res = await api.post("/ai/chat", {
         message: composedUserText,
         history: toServerHistory(historyMessages),
@@ -2138,6 +2195,7 @@ export default function AIChatWidget({
       }
 
       if (isAction && normalizedReplyData?.action && !normalizedReplyData?.meta?.awaitingConfirmation) {
+        setThinkingStatusLabel("Executing");
         const exec = await api.post("/ai/execute", {
           intent: normalizedReplyData,
           threadId: activeThreadId,
@@ -2206,6 +2264,7 @@ export default function AIChatWidget({
       if (activeChatRequestRef.current === requestController) {
         activeChatRequestRef.current = null;
       }
+      setThinkingStatusLabel("");
       setIsLoading(false);
     }
   };
@@ -2941,7 +3000,7 @@ export default function AIChatWidget({
 
         {showSettings && renderVoiceSettings("chat-mode-menu")}
 
-        <div className="gemini-messages">
+        <div ref={messagesContainerRef} className="gemini-messages">
           {messages.length === 0 && (
             <div className="gemini-welcome">
               <div className="welcome-icon">
@@ -3071,10 +3130,12 @@ export default function AIChatWidget({
                 <div className="gemini-thinking-swirl"></div>
                 <GeminiDiamondIcon size={22} className="gemini-thinking-star" />
               </div>
+              <div className="ai-thinking-status-text" aria-live="polite">
+                {thinkingStatusWord}
+              </div>
             </div>
           )}
 
-          <div ref={messagesEndRef} />
         </div>
 
         <div className="gemini-input-wrapper">

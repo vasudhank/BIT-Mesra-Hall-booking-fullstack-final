@@ -1328,6 +1328,14 @@ body.dark-mode .message-search-mark {
   align-items: center;
 }
 
+.ai-thinking-status-text {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--gemini-muted-text);
+  user-select: none;
+}
+
 .gemini-loader {
   position: relative;
   width: 32px;
