@@ -17,6 +17,10 @@ const MODELS = {
 };
 
 const MODEL_FALLBACKS = ['eleven_multilingual_v2', 'eleven_turbo_v2_5'];
+const VOICE_DEBUG_ENABLED = String(process.env.ELEVENLABS_DEBUG_ENABLED || 'true').toLowerCase() !== 'false';
+const VOICE_DEBUG_TOKEN = String(process.env.ELEVENLABS_DEBUG_TOKEN || '').trim();
+const RECENT_VOICE_FAILURE_LIMIT = 12;
+const recentVoiceFailures = [];
 
 const parseApiKeys = () => {
   const candidates = [];
@@ -151,6 +155,44 @@ const classifyFailureDetail = (detailText) => {
   }
 };
 
+const redactText = (value, max = 160) => {
+  const raw = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!raw) return '';
+  return raw.length > max ? `${raw.slice(0, max)}...` : raw;
+};
+
+const recordVoiceFailure = (payload) => {
+  const snapshot = {
+    at: new Date().toISOString(),
+    ...payload
+  };
+
+  recentVoiceFailures.unshift(snapshot);
+  if (recentVoiceFailures.length > RECENT_VOICE_FAILURE_LIMIT) {
+    recentVoiceFailures.length = RECENT_VOICE_FAILURE_LIMIT;
+  }
+};
+
+router.get('/debug/tts-failures', (req, res) => {
+  if (!VOICE_DEBUG_ENABLED) {
+    return res.status(404).json({ ok: false, message: 'Voice debug endpoint is disabled.' });
+  }
+
+  if (VOICE_DEBUG_TOKEN) {
+    const provided =
+      String(req.headers['x-voice-debug-token'] || req.query?.token || '').trim();
+    if (provided !== VOICE_DEBUG_TOKEN) {
+      return res.status(403).json({ ok: false, message: 'Invalid debug token.' });
+    }
+  }
+
+  return res.json({
+    ok: true,
+    count: recentVoiceFailures.length,
+    failures: recentVoiceFailures
+  });
+});
+
 router.post('/tts', async (req, res) => {
   try {
     const apiKeys = parseApiKeys();
@@ -266,6 +308,20 @@ router.post('/tts', async (req, res) => {
     );
 
     if (unusualActivityFailure) {
+      if (VOICE_DEBUG_ENABLED) {
+        const debugPayload = {
+          reason: 'ELEVENLABS_UNUSUAL_ACTIVITY',
+          mode,
+          requestedLanguage,
+          voiceCandidates,
+          modelCandidates,
+          textPreview: redactText(safeText),
+          failures: failureReasons
+        };
+        recordVoiceFailure(debugPayload);
+        console.error('[voice/tts][debug]', JSON.stringify(debugPayload, null, 2));
+      }
+
       return res.status(502).json({
         ok: false,
         code: 'ELEVENLABS_UNUSUAL_ACTIVITY',
@@ -276,12 +332,40 @@ router.post('/tts', async (req, res) => {
     }
 
     if (invalidKeyFailure) {
+      if (VOICE_DEBUG_ENABLED) {
+        const debugPayload = {
+          reason: 'ELEVENLABS_AUTH_FAILED',
+          mode,
+          requestedLanguage,
+          voiceCandidates,
+          modelCandidates,
+          textPreview: redactText(safeText),
+          failures: failureReasons
+        };
+        recordVoiceFailure(debugPayload);
+        console.error('[voice/tts][debug]', JSON.stringify(debugPayload, null, 2));
+      }
+
       return res.status(502).json({
         ok: false,
         code: 'ELEVENLABS_AUTH_FAILED',
         message: 'ElevenLabs rejected the configured API key(s). Verify backend ElevenLabs credentials.',
         failures: failureReasons
       });
+    }
+
+    if (VOICE_DEBUG_ENABLED) {
+      const debugPayload = {
+        reason: 'ELEVENLABS_TTS_FAILED',
+        mode,
+        requestedLanguage,
+        voiceCandidates,
+        modelCandidates,
+        textPreview: redactText(safeText),
+        failures: failureReasons
+      };
+      recordVoiceFailure(debugPayload);
+      console.error('[voice/tts][debug]', JSON.stringify(debugPayload, null, 2));
     }
 
     return res.status(502).json({

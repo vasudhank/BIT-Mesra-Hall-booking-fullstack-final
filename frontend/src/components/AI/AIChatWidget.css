@@ -24,6 +24,11 @@ body.dark-mode {
   --gemini-gradient: #0b57d0;
 }
 
+body.ai-mobile-input-focus-lock {
+  overflow: hidden;
+  overscroll-behavior-y: none;
+}
+
 .ai-immersive-page-wrap {
   width: 100%;
   height: 100vh;
@@ -646,6 +651,12 @@ body.dark-mode .thread-delete-modal-card {
   justify-content: space-between;
   gap: 14px;
   flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 14;
+  background: var(--gemini-bg);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  backdrop-filter: blur(10px);
 }
 
 .gemini-header-left {
@@ -794,6 +805,8 @@ body.dark-mode .thread-delete-modal-card {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  scroll-padding-top: 88px;
+  scroll-padding-bottom: 150px;
 }
 
 .gemini-welcome {
@@ -1391,6 +1404,24 @@ body.dark-mode .message-search-mark {
   margin-inline: auto;
   padding: 12px 16px 16px;
   flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 13;
+  background: linear-gradient(
+    180deg,
+    rgba(248, 250, 255, 0) 0%,
+    rgba(248, 250, 255, 0.95) 34%,
+    rgba(248, 250, 255, 1) 100%
+  );
+}
+
+body.dark-mode .gemini-input-wrapper {
+  background: linear-gradient(
+    180deg,
+    rgba(15, 18, 24, 0) 0%,
+    rgba(15, 18, 24, 0.95) 34%,
+    rgba(15, 18, 24, 1) 100%
+  );
 }
 
 .ai-hidden-file-input {
@@ -1910,6 +1941,11 @@ body.dark-mode .attach-files-btn {
     position: relative;
   }
 
+  .gemini-chat-root {
+    min-height: 0;
+    height: 100%;
+  }
+
   .gemini-sidebar.open {
     position: absolute;
     left: 0;
@@ -1946,8 +1982,18 @@ body.dark-mode .attach-files-btn {
     font-size: 0.74rem;
   }
 
+  .gemini-header {
+    padding-top: calc(10px + env(safe-area-inset-top));
+  }
+
   .gemini-messages {
     padding: 12px;
+    scroll-padding-top: 96px;
+    scroll-padding-bottom: 166px;
+  }
+
+  .gemini-input-wrapper {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
   }
 
   .voice-menu-card {

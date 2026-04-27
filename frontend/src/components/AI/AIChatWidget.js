@@ -95,6 +95,31 @@ const createThread = () => ({
 
 const detectHindiScript = (text) => /[\u0900-\u097F]/.test(String(text || ""));
 
+const isEditableTextControl = (target) => {
+  if (typeof HTMLElement === "undefined" || !(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  if (typeof HTMLTextAreaElement !== "undefined" && target instanceof HTMLTextAreaElement) return true;
+
+  if (typeof HTMLInputElement !== "undefined" && target instanceof HTMLInputElement) {
+    const type = String(target.type || "text").toLowerCase();
+    const nonTextTypes = new Set([
+      "button",
+      "checkbox",
+      "color",
+      "file",
+      "hidden",
+      "image",
+      "radio",
+      "range",
+      "reset",
+      "submit"
+    ]);
+    return !nonTextTypes.has(type);
+  }
+
+  return false;
+};
+
 const sanitizeStoredMessages = (rawMessages) => {
   if (!Array.isArray(rawMessages)) return [];
   return rawMessages
@@ -705,6 +730,53 @@ export default function AIChatWidget({
     setRenamingThreadId("");
     setThreadTitleDraft("");
   }, [sidebarOpen]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    if (!isCompactLayout) {
+      document.body.classList.remove("ai-mobile-input-focus-lock");
+      return undefined;
+    }
+
+    const rootNode = chatShellRef.current;
+    if (!(rootNode instanceof Element)) return undefined;
+
+    const clearFocusLock = () => {
+      document.body.classList.remove("ai-mobile-input-focus-lock");
+    };
+
+    const handleFocusIn = (event) => {
+      const target = event.target;
+      if (!isEditableTextControl(target)) return;
+      if (!(target instanceof Element) || !rootNode.contains(target)) return;
+
+      document.body.classList.add("ai-mobile-input-focus-lock");
+      requestAnimationFrame(() => {
+        const containerNode = messagesContainerRef.current;
+        if (!(containerNode instanceof Element)) return;
+        containerNode.scrollTop = containerNode.scrollHeight;
+      });
+    };
+
+    const handleFocusOut = () => {
+      requestAnimationFrame(() => {
+        const active = document.activeElement;
+        if (isEditableTextControl(active) && active instanceof Element && rootNode.contains(active)) {
+          return;
+        }
+        clearFocusLock();
+      });
+    };
+
+    document.addEventListener("focusin", handleFocusIn);
+    document.addEventListener("focusout", handleFocusOut);
+
+    return () => {
+      document.removeEventListener("focusin", handleFocusIn);
+      document.removeEventListener("focusout", handleFocusOut);
+      clearFocusLock();
+    };
+  }, [isCompactLayout]);
 
   const sortedThreads = useMemo(
     () => [...threads].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)),
