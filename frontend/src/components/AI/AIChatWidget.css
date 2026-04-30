@@ -15,8 +15,8 @@
   --gemini-prechat-text-align: left;
   --gemini-prechat-offset-x: 0px;
   --gemini-prechat-gap-above-input: 8px;
-  --gemini-prechat-title-size: clamp(1.9rem, 3vw, 2.5rem);
-  --gemini-prechat-subtitle-size: clamp(1.18rem, 1.95vw, 1.55rem);
+  --gemini-prechat-title-size: clamp(3.9px, 4vw, 3.5rem);
+  --gemini-prechat-subtitle-size: clamp(2.18rem, 1.95vw, 1.55rem);
   --gemini-prechat-title-weight: 780;
   --gemini-prechat-subtitle-weight: 750;
   --gemini-prechat-font-family: "RecklessNeue", "Sora", "IBM Plex Sans", sans-serif;

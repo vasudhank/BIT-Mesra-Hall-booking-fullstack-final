@@ -1030,6 +1030,7 @@ export default function AIChatWidget({
   const titleAnimationTimersRef = useRef(new Map());
   const previouslyVisibleThreadIdsRef = useRef(new Set());
   const hasSeededVisibleThreadsRef = useRef(false);
+  const lastExternalRestoreSignalRef = useRef(0);
 
   const storageKey = useMemo(() => getStorageKey(accountKey), [accountKey]);
 
@@ -1113,11 +1114,16 @@ export default function AIChatWidget({
   }, [onSidebarHiddenChange, sidebarHidden]);
 
   useEffect(() => {
-    if (!externalRestoreSignal) return;
-    if (!sidebarHidden) return;
+    const nextSignal = Number(externalRestoreSignal) || 0;
+    if (!nextSignal) {
+      lastExternalRestoreSignalRef.current = 0;
+      return;
+    }
+    if (nextSignal === lastExternalRestoreSignalRef.current) return;
+    lastExternalRestoreSignalRef.current = nextSignal;
     setSidebarHidden(false);
     setSidebarOpen(false);
-  }, [externalRestoreSignal, sidebarHidden]);
+  }, [externalRestoreSignal]);
 
   useEffect(() => () => stopSidebarResize(), [stopSidebarResize]);
 
@@ -1487,6 +1493,7 @@ export default function AIChatWidget({
     [viewerDisplayName]
   );
   const isPrechatMode = messages.length === 0;
+  const isCenteredPrechatMode = isPrechatMode && Boolean(immersive);
 
   const resizeInputField = useCallback(() => {
     const inputEl = inputFieldRef.current;
@@ -3689,7 +3696,7 @@ export default function AIChatWidget({
         )}
       </aside>
 
-      <div className={`gemini-chat-root ${immersive ? "immersive-container" : ""} ${isPrechatMode ? "prechat-mode" : ""}`.trim()}>
+      <div className={`gemini-chat-root ${immersive ? "immersive-container" : ""} ${isCenteredPrechatMode ? "prechat-mode" : ""}`.trim()}>
         <div className="gemini-header">
           <div className="gemini-header-left">
             {sidebarHidden && showHeaderBrand && (
