@@ -523,6 +523,21 @@ body.dark-mode .thread-delete-modal-card {
   color: var(--gemini-user-text);
 }
 
+.thread-title.typing {
+  position: relative;
+}
+
+.thread-title.typing::after {
+  content: "";
+  display: inline-block;
+  width: 1px;
+  height: 0.82em;
+  margin-left: 2px;
+  vertical-align: -0.08em;
+  background: currentColor;
+  animation: threadTitleCaretBlink 0.9s steps(1, end) infinite;
+}
+
 .thread-title-input {
   width: 100%;
   border: 1px solid rgba(37, 99, 235, 0.35);
@@ -1532,6 +1547,24 @@ body.dark-mode .gemini-input-wrapper {
   color: var(--gemini-muted-text);
 }
 
+.attach-plus-btn {
+  color: #000000 !important;
+}
+
+body.dark-mode .attach-plus-btn {
+  color: #ffffff !important;
+}
+
+.attach-plus-left {
+  margin-right: 3px;
+  flex-shrink: 0;
+}
+
+.gemini-input-pill.expanded .attach-plus-left {
+  align-self: flex-end;
+  margin-bottom: 2px;
+}
+
 .pill-actions {
   display: flex;
   align-items: center;
@@ -1544,14 +1577,6 @@ body.dark-mode .gemini-input-wrapper {
 .gemini-input-pill.expanded .pill-actions {
   align-self: flex-end;
   margin-bottom: 2px;
-}
-
-.attach-files-btn {
-  color: #000000 !important;
-}
-
-body.dark-mode .attach-files-btn {
-  color: #ffffff !important;
 }
 
 .live-pill-btn {
@@ -1898,6 +1923,15 @@ body.dark-mode .attach-files-btn {
   }
 }
 
+@keyframes threadTitleCaretBlink {
+  0%, 45% {
+    opacity: 1;
+  }
+  46%, 100% {
+    opacity: 0;
+  }
+}
+
 @media (max-width: 960px) {
   body.ai-immersive-page {
     overflow: hidden;
@@ -1944,6 +1978,23 @@ body.dark-mode .attach-files-btn {
   .gemini-chat-root {
     min-height: 0;
     height: 100%;
+  }
+
+  .gemini-chat-shell.mobile-composer-focused {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100dvh;
+  }
+
+  .gemini-chat-shell.mobile-composer-focused .gemini-chat-root {
+    height: 100%;
+  }
+
+  .gemini-chat-shell.mobile-composer-focused .gemini-header {
+    position: sticky;
+    top: 0;
+    z-index: 18;
   }
 
   .gemini-sidebar.open {

@@ -22,6 +22,9 @@ import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
 import { useNavigate } from 'react-router-dom';
 import QuickPageMenu from '../Navigation/QuickPageMenu';
 
+const BIT_MESRA_EMAIL_REGEX = /^[a-z0-9._%+-]+@bitmesra\.ac\.in$/i;
+const BIT_MESRA_DOMAIN_ERROR = "Only emails with @bitmesra.ac.in domain are allowed.";
+
 export default function DepartmentRegister() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -32,6 +35,7 @@ export default function DepartmentRegister() {
   const [department, setDepartment] = useState("");
   const [head, setHead] = useState("");
   const [phone, setPhone] = useState("");
+  const isBitMesraEmail = (value) => BIT_MESRA_EMAIL_REGEX.test(String(value || "").trim());
 
   const handleClose = (event, reason) => {
     if (reason === 'clickaway') {
@@ -43,6 +47,11 @@ export default function DepartmentRegister() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!isBitMesraEmail(email)) {
+      setErrorMsg(BIT_MESRA_DOMAIN_ERROR);
+      setOpen(true);
+      return;
+    }
     setSubmitting(true);
     setErrorMsg("");
 
@@ -115,6 +124,12 @@ export default function DepartmentRegister() {
                         <Input
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
+                          onBlur={() => {
+                            if (!email) return;
+                            if (isBitMesraEmail(email)) return;
+                            setErrorMsg(BIT_MESRA_DOMAIN_ERROR);
+                            setOpen(true);
+                          }}
                           disableUnderline={true}
                           type='email'
                           placeholder="Official Email ID"

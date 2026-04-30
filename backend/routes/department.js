@@ -12,6 +12,9 @@ const emailService = require('../services/emailService');
 const smsService = require('../services/smsService');
 require('dotenv').config();
 
+const BIT_MESRA_EMAIL_REGEX = /^[a-z0-9._%+-]+@bitmesra\.ac\.in$/i;
+const BIT_MESRA_DOMAIN_ERROR = 'Only emails with @bitmesra.ac.in domain are allowed.';
+
 // Basic route sanity check
 router.get('/', (req,res)=>{
     res.send({ msg:'Inside Department Router' });
@@ -100,10 +103,14 @@ router.delete('/delete_department/:id', async (req, res) => {
 router.post('/request_department', async (req, res) => {
     try {
         const { email, department, head, phone } = req.body;
+        const normalizedEmail = String(email || '').trim().toLowerCase();
         const normalizedPhone = String(phone || '').trim();
 
-        if (!email || !department || !head || !normalizedPhone) {
+        if (!normalizedEmail || !department || !head || !normalizedPhone) {
             return res.status(400).json({ error: 'Email, department, faculty name and phone number are required' });
+        }
+        if (!BIT_MESRA_EMAIL_REGEX.test(normalizedEmail)) {
+            return res.status(400).json({ error: BIT_MESRA_DOMAIN_ERROR });
         }
 
         if (!/^\d{10,15}$/.test(normalizedPhone)) {
@@ -115,7 +122,7 @@ router.post('/request_department', async (req, res) => {
         const tokenExpiry = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
 
         const newRequest = new Department_Requests({ 
-            email, 
+            email: normalizedEmail, 
             phone: normalizedPhone,
             department, 
             head,
@@ -141,7 +148,7 @@ router.post('/request_department', async (req, res) => {
         if(adminEmails) {
             emailService.sendRegistrationRequestToAdmin({
                 adminEmails,
-                requestData: { email, phone: normalizedPhone, department, head },
+                requestData: { email: normalizedEmail, phone: normalizedPhone, department, head },
                 approveUrl,
                 rejectUrl
             }).catch(err => console.error("Admin Alert Email Failed", err));
@@ -362,7 +369,7 @@ router.post('/create', async (req, res) => {
             actionToken: req.body.actionToken,
             tokenExpiry: { $gt: Date.now() }
         });
-        if (requestDoc && requestDoc.email === req.body.email) {
+        if (requestDoc && requestDoc.email === String(req.body.email || '').trim().toLowerCase()) {
             isAuthorized = true;
         }
     }
@@ -372,16 +379,20 @@ router.post('/create', async (req, res) => {
     }
 
     const { email, password, department, head, phone } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
     const resolvedPhone = String(phone || requestDoc?.phone || '').trim();
 
-    if (!email || !password || !department || !head) {
+    if (!normalizedEmail || !password || !department || !head) {
       return res.status(400).json({ msg: 'All fields are required' });
+    }
+    if (!BIT_MESRA_EMAIL_REGEX.test(normalizedEmail)) {
+      return res.status(400).json({ msg: BIT_MESRA_DOMAIN_ERROR });
     }
     if (resolvedPhone && !/^\d{10,15}$/.test(resolvedPhone)) {
       return res.status(400).json({ msg: 'Phone number must contain 10 to 15 digits' });
     }
 
-    const exists = await Department.findOne({ email });
+    const exists = await Department.findOne({ email: normalizedEmail });
     if (exists) {
       return res.status(409).json({ msg: 'Department already exists' });
     }
@@ -391,7 +402,7 @@ router.post('/create', async (req, res) => {
     const setupTokenExpiry = Date.now() + 3600000;
 
     const newDepartment = new Department({
-      email,
+      email: normalizedEmail,
       password: hashSync(password, 10),
       department,
       head,
@@ -409,7 +420,7 @@ router.post('/create', async (req, res) => {
           $set: {
             name: head,
             number: resolvedPhone,
-            email
+            email: normalizedEmail
           }
         },
         { upsert: true, new: true, setDefaultsOnInsert: true }
@@ -417,14 +428,14 @@ router.post('/create', async (req, res) => {
     }
 
     // Remove the request from Department_Requests since it's now approved
-    await Department_Requests.findOneAndDelete({ email });
+    await Department_Requests.findOneAndDelete({ email: normalizedEmail });
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     const setupUrl = `${frontendUrl}/department/account?token=${setupToken}`;
 
     // --- NOTIFY DEPARTMENT (WELCOME) ---
     emailService.sendDepartmentWelcomeEmail({
-        email,
+        email: normalizedEmail,
         password,
         departmentName: department,
         headName: head,
@@ -432,14 +443,14 @@ router.post('/create', async (req, res) => {
     }).catch(e => console.error("Welcome Email Failed", e));
 
     smsService.sendDepartmentWelcomeSMS({
-        email,
+        email: normalizedEmail,
         password,
         department
     }).catch(e => console.error("Welcome SMS Failed", e));
 
     return res.status(201).json({
       msg: 'Department created successfully & Email sent',
-      department: { email, phone: resolvedPhone, department, head }
+      department: { email: normalizedEmail, phone: resolvedPhone, department, head }
     });
 
   } catch (err) {

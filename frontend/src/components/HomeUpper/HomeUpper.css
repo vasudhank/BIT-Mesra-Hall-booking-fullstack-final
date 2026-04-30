@@ -851,57 +851,117 @@ body.dark-mode .upper-toggle-thumb {
 /* ===== CONTROLS ===== */
 .controls-container {
   position: absolute;
-  bottom: 24px;
-  left: 24px;
+  bottom: 20px;
+  left: 20px;
   z-index: 20;
 }
 .control-btn-initial {
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 30px;
-  padding: 8px 16px;
+  background: linear-gradient(135deg, rgba(17, 24, 39, 0.9), rgba(30, 41, 59, 0.78));
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  border-radius: 999px;
+  padding: 6px 13px 6px 8px;
   cursor: pointer;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  transition: all 0.2s ease;
+  gap: 7px;
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+  font-weight: 600;
+  box-shadow:
+    0 12px 30px rgba(2, 6, 23, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.2s ease;
+}
+.initial-btn-icon-wrap {
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  background: linear-gradient(180deg, #ff4a3d, #d90f1d);
+  box-shadow:
+    0 6px 14px rgba(220, 20, 30, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 .control-btn-initial:hover {
-  background: rgba(255, 255, 255, 0.25);
-  transform: translateY(-2px);
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.94), rgba(15, 23, 42, 0.82));
+  transform: translateY(-1px);
+  box-shadow:
+    0 15px 36px rgba(2, 6, 23, 0.52),
+    inset 0 1px 0 rgba(255, 255, 255, 0.23);
+}
+.control-btn-initial:active {
+  transform: translateY(0) scale(0.98);
 }
 .control-capsule {
   display: flex;
   align-items: center;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(12px);
-  padding: 4px 6px;
-  border-radius: 50px;
-  gap: 4px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.76));
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(14px) saturate(145%);
+  -webkit-backdrop-filter: blur(14px) saturate(145%);
+  padding: 4px 5px;
+  border-radius: 999px;
+  gap: 3px;
+  box-shadow:
+    0 14px 36px rgba(2, 6, 23, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
-.control-divider { width: 1px; height: 16px; background: rgba(255, 255, 255, 0.2); margin: 0 4px; }
+.control-divider {
+  width: 1px;
+  height: 14px;
+  margin: 0 2px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.06));
+}
 .icon-btn {
   background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.9);
-  width: 32px;
-  height: 32px;
+  border: 1px solid transparent;
+  color: rgba(241, 245, 249, 0.94);
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  transition: transform 0.18s ease, background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
-.icon-btn:hover { background: rgba(255, 255, 255, 0.15); color: #fff; }
-.icon-svg { width: 14px; height: 14px; }
-.icon-svg-sm { width: 12px; height: 12px; }
-.icon-svg-stroke { width: 16px; height: 16px; }
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.13);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+.icon-btn:active {
+  transform: translateY(0) scale(0.96);
+}
+.icon-btn:focus-visible {
+  outline: 2px solid rgba(248, 250, 252, 0.92);
+  outline-offset: 2px;
+}
+.icon-btn-active {
+  background: linear-gradient(180deg, #ff4a3d, #d90f1d);
+  border-color: rgba(255, 197, 194, 0.88);
+  color: #ffffff;
+  box-shadow:
+    0 9px 20px rgba(217, 15, 29, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.icon-btn-active:hover {
+  background: linear-gradient(180deg, #ff5748, #e31220);
+  border-color: rgba(255, 221, 219, 0.96);
+}
+.icon-btn-media {
+  margin-left: 1px;
+}
+.icon-svg { width: 13px; height: 13px; }
+.icon-svg-sm { width: 11px; height: 11px; margin-left: 1px; }
+.icon-svg-stroke { width: 15px; height: 15px; }
 
 /* ===== SCROLL DOWN ===== */
 .scroll-down-hero {

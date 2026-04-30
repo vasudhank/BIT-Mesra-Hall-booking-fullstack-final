@@ -1903,67 +1903,82 @@ export default function HomeUpper({
           {!isMobile && (
           <div className="controls-container">
             {!videoEnabled && (
-              <button className="control-btn-initial" onClick={handleInitialClick}>
-                <svg viewBox="0 0 24 24" fill="currentColor" className="icon-svg-sm">
-                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                </svg>
+              <button type="button" className="control-btn-initial" onClick={handleInitialClick}>
+                <span className="initial-btn-icon-wrap" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="currentColor" className="icon-svg-sm">
+                    <polygon points="7 5 19 12 7 19 7 5"></polygon>
+                  </svg>
+                </span>
                 <span>Play Video</span>
               </button>
             )}
 
             {videoEnabled && (
-              <div className="control-capsule">
+              <div className="control-capsule" role="group" aria-label="Hero media controls">
                 {showVideo && (
                   <>
-                    <button className="icon-btn" onClick={togglePlayPause} title={isPlaying ? "Pause" : "Play"}>
+                    <button
+                      type="button"
+                      className={`icon-btn ${isPlaying ? "icon-btn-active" : ""}`}
+                      onClick={togglePlayPause}
+                      title={isPlaying ? "Pause Video" : "Play Video"}
+                      aria-label={isPlaying ? "Pause video" : "Play video"}
+                    >
                       {isPlaying ? (
                         <svg viewBox="0 0 24 24" fill="currentColor" className="icon-svg">
-                          <rect x="6" y="4" width="4" height="16"></rect>
-                          <rect x="14" y="4" width="4" height="16"></rect>
+                          <rect x="7" y="5" width="3.5" height="14" rx="1"></rect>
+                          <rect x="13.5" y="5" width="3.5" height="14" rx="1"></rect>
                         </svg>
                       ) : (
                         <svg viewBox="0 0 24 24" fill="currentColor" className="icon-svg">
-                          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                          <polygon points="7 5 19 12 7 19 7 5"></polygon>
                         </svg>
                       )}
                     </button>
 
-                    <button className="icon-btn" onClick={toggleMute} title={isMuted ? "Unmute" : "Mute"}>
+                    <button
+                      type="button"
+                      className={`icon-btn ${!isMuted ? "icon-btn-active" : ""}`}
+                      onClick={toggleMute}
+                      title={isMuted ? "Unmute" : "Mute"}
+                      aria-label={isMuted ? "Unmute video" : "Mute video"}
+                    >
                       {isMuted ? (
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
-                          <path d="M11 5L6 9H2v6h4l5 4V5z"></path>
-                          <line x1="23" y1="9" x2="17" y2="15"></line>
-                          <line x1="17" y1="9" x2="23" y2="15"></line>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
+                          <path d="M11 7L8 9.75H5v4.5h3L11 17V7"></path>
+                          <line x1="14.5" y1="9.2" x2="19.8" y2="14.5"></line>
+                          <line x1="19.8" y1="9.2" x2="14.5" y2="14.5"></line>
                         </svg>
                       ) : (
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
-                          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
+                          <path d="M11 7L8 9.75H5v4.5h3L11 17V7"></path>
+                          <path d="M14.4 10.2a2.8 2.8 0 0 1 0 3.96"></path>
+                          <path d="M16.8 8a6.1 6.1 0 0 1 0 8.64"></path>
                         </svg>
                       )}
                     </button>
-                      
+                       
                     <div className="control-divider"></div>
                   </>
                 )}
 
-                <button className="icon-btn" onClick={toggleMediaSource} title={showVideo ? "Switch to Image" : "Switch to Video"}>
+                <button
+                  type="button"
+                  className={`icon-btn icon-btn-media ${!showVideo ? "icon-btn-active" : ""}`}
+                  onClick={toggleMediaSource}
+                  title={showVideo ? "Revert to Image" : "Play Video"}
+                  aria-label={showVideo ? "Revert to image background" : "Play video background"}
+                >
                     {showVideo ? (
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                        <polyline points="21 15 16 10 5 21"></polyline>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
+                        <rect x="4.5" y="5.2" width="15" height="13.6" rx="2.4"></rect>
+                        <circle cx="8.5" cy="9.3" r="1.2"></circle>
+                        <path d="M7 16l3.8-3.8 2.8 2.7 2.2-2.2 2.7 3.3"></path>
                       </svg>
                     ) : (
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
-                          <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
-                          <line x1="7" y1="2" x2="7" y2="22"></line>
-                          <line x1="17" y1="2" x2="17" y2="22"></line>
-                          <line x1="2" y1="12" x2="22" y2="12"></line>
-                          <line x1="2" y1="7" x2="7" y2="7"></line>
-                          <line x1="2" y1="17" x2="7" y2="17"></line>
-                          <line x1="17" y1="17" x2="22" y2="17"></line>
-                          <line x1="17" y1="7" x2="22" y2="7"></line>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
+                          <rect x="4.3" y="6.3" width="15.4" height="11.4" rx="3.2"></rect>
+                          <polygon points="10 9.5 15.2 12 10 14.5 10 9.5" fill="currentColor" stroke="none"></polygon>
                       </svg>
                     )}
                 </button>

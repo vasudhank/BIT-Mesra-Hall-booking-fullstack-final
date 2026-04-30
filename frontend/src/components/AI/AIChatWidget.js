@@ -22,7 +22,7 @@ import TranslateRoundedIcon from "@mui/icons-material/TranslateRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
-import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
@@ -47,6 +47,57 @@ const LANGUAGE_OPTIONS = [
   { id: "auto", label: "Auto" },
   { id: "en", label: "English" },
   { id: "hi", label: "Hindi" }
+];
+
+const THREAD_TITLE_STOPWORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "are",
+  "as",
+  "at",
+  "be",
+  "by",
+  "for",
+  "from",
+  "hello",
+  "help",
+  "hey",
+  "hi",
+  "how",
+  "i",
+  "in",
+  "is",
+  "it",
+  "me",
+  "my",
+  "of",
+  "on",
+  "or",
+  "please",
+  "show",
+  "tell",
+  "that",
+  "the",
+  "to",
+  "we",
+  "what",
+  "when",
+  "where",
+  "who",
+  "why",
+  "with",
+  "you"
+]);
+
+const THREAD_TOPIC_PATTERNS = [
+  { pattern: /\b(book|booking|reserve|reservation|hall)\b/i, title: "Hall Booking" },
+  { pattern: /\b(notice|announcement)\b/i, title: "Notice Draft" },
+  { pattern: /\b(calendar|task|schedule|event)\b/i, title: "Calendar Task" },
+  { pattern: /\b(approve|approval|request)\b/i, title: "Approval Flow" },
+  { pattern: /\b(email|mail)\b/i, title: "Email Support" },
+  { pattern: /\b(complaint|issue|problem|error)\b/i, title: "Issue Help" },
+  { pattern: /\b(report|export|download)\b/i, title: "Report Export" }
 ];
 
 const normalizeThinkingStatusLabel = (value, fallback = "Thinking") => {
@@ -79,9 +130,40 @@ const truncateText = (text, limit = 42) => {
   return cleaned.length > limit ? `${cleaned.slice(0, limit)}...` : cleaned;
 };
 
+const toTitleCaseWord = (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+
+const buildShortThreadTitleFromText = (text) => {
+  const source = String(text || "").replace(/\s+/g, " ").trim();
+  if (!source) return "New chat";
+
+  for (const rule of THREAD_TOPIC_PATTERNS) {
+    if (rule.pattern.test(source)) {
+      return rule.title;
+    }
+  }
+
+  const normalizedWords = source
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .filter((word) => word && !THREAD_TITLE_STOPWORDS.has(word) && word.length > 1);
+
+  if (normalizedWords.length >= 2) {
+    return `${toTitleCaseWord(normalizedWords[0])} ${toTitleCaseWord(normalizedWords[1])}`;
+  }
+  if (normalizedWords.length === 1) {
+    return toTitleCaseWord(normalizedWords[0]);
+  }
+
+  return truncateText(source, 24);
+};
+
 const getThreadTitleFromMessages = (messages) => {
-  const firstUser = (messages || []).find((msg) => msg?.role === "user" && msg?.text);
-  return firstUser ? truncateText(firstUser.text) : "New chat";
+  const firstUser = (messages || []).find((msg) => {
+    if (msg?.role !== "user" || !msg?.text) return false;
+    return !/^uploaded\s+\d+\s+attachment\(s\)\.?$/i.test(String(msg.text || "").trim());
+  });
+  return firstUser ? buildShortThreadTitleFromText(firstUser.text) : "New chat";
 };
 
 const createThread = () => ({
@@ -382,6 +464,35 @@ const looksLikeActionJsonLeak = (text) => {
   return /"type"\s*:\s*"ACTION"|"\s*action\s*"\s*:|"payload"\s*:/.test(raw);
 };
 
+const isLikelyMetadataLeakLine = (line) => {
+  const compact = String(line || "").toLowerCase().replace(/\s+/g, "");
+  if (!compact) return false;
+
+  if (compact.includes("agenticmodel")) return true;
+  if (compact.includes("toolsopenai")) return true;
+  if (compact.includes("planneragent")) return true;
+  if (compact.includes("toolcoordinatoragent")) return true;
+  if (compact.includes("reviewagent")) return true;
+  if (compact.startsWith("acknowledgethegreeting")) return true;
+  if (/^(planneragent|toolcoordinatoragent|reviewagent)+$/.test(compact)) return true;
+
+  return false;
+};
+
+const sanitizeAiMessageText = (text) => {
+  const raw = String(text || "").replace(/\r/g, "").trim();
+  if (!raw) return "";
+
+  const cleaned = raw
+    .split("\n")
+    .filter((line) => !isLikelyMetadataLeakLine(line))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return cleaned;
+};
+
 const downloadBase64Artifact = (artifact) => {
   if (!artifact || !artifact.base64) return;
   try {
@@ -590,6 +701,7 @@ export default function AIChatWidget({
   const [availableVoices, setAvailableVoices] = useState([]);
   const [selectedVoiceName, setSelectedVoiceName] = useState("");
   const [thinkingStatusLabel, setThinkingStatusLabel] = useState("");
+  const [isMobileComposerFocused, setIsMobileComposerFocused] = useState(false);
 
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [editingDraft, setEditingDraft] = useState("");
@@ -610,6 +722,7 @@ export default function AIChatWidget({
   const [renamingThreadId, setRenamingThreadId] = useState("");
   const [threadTitleDraft, setThreadTitleDraft] = useState("");
   const [deleteConfirmThreadId, setDeleteConfirmThreadId] = useState("");
+  const [animatedThreadTitles, setAnimatedThreadTitles] = useState({});
   const [freshViewportPromptId, setFreshViewportPromptId] = useState("");
   const [freshViewportSpacerHeight, setFreshViewportSpacerHeight] = useState(0);
 
@@ -631,6 +744,9 @@ export default function AIChatWidget({
   const lastVoiceFailureRef = useRef("");
   const sidebarResizeMetaRef = useRef({ dragging: false, startX: 0, startWidth: 250 });
   const threadMenuRefs = useRef(new Map());
+  const titleAnimationTimersRef = useRef(new Map());
+  const previouslyVisibleThreadIdsRef = useRef(new Set());
+  const hasSeededVisibleThreadsRef = useRef(false);
 
   const storageKey = useMemo(() => getStorageKey(accountKey), [accountKey]);
 
@@ -735,6 +851,7 @@ export default function AIChatWidget({
     if (typeof document === "undefined") return undefined;
     if (!isCompactLayout) {
       document.body.classList.remove("ai-mobile-input-focus-lock");
+      setIsMobileComposerFocused(false);
       return undefined;
     }
 
@@ -743,6 +860,7 @@ export default function AIChatWidget({
 
     const clearFocusLock = () => {
       document.body.classList.remove("ai-mobile-input-focus-lock");
+      setIsMobileComposerFocused(false);
     };
 
     const handleFocusIn = (event) => {
@@ -751,6 +869,7 @@ export default function AIChatWidget({
       if (!(target instanceof Element) || !rootNode.contains(target)) return;
 
       document.body.classList.add("ai-mobile-input-focus-lock");
+      setIsMobileComposerFocused(true);
       requestAnimationFrame(() => {
         const containerNode = messagesContainerRef.current;
         if (!(containerNode instanceof Element)) return;
@@ -782,6 +901,20 @@ export default function AIChatWidget({
     () => [...threads].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)),
     [threads]
   );
+  const visibleThreads = useMemo(
+    () =>
+      sortedThreads.filter((thread) =>
+        (thread?.messages || []).some(
+          (message) =>
+            message?.role === "ai"
+            && (
+              String(message?.text || "").trim()
+              || (message?.data && typeof message.data === "object")
+            )
+        )
+      ),
+    [sortedThreads]
+  );
 
   const normalizedSidebarSearch = useMemo(
     () => normalizeSearchValue(sidebarSearchTerm),
@@ -790,14 +923,14 @@ export default function AIChatWidget({
 
   const sidebarSearchResults = useMemo(() => {
     if (!normalizedSidebarSearch) {
-      return sortedThreads.map((thread) => ({
+      return visibleThreads.map((thread) => ({
         thread,
         matchedMessageId: "",
         snippet: ""
       }));
     }
 
-    return sortedThreads
+    return visibleThreads
       .map((thread) => {
         const matchInfo = findThreadSearchMatch(thread, normalizedSidebarSearch);
         if (!matchInfo.matched) return null;
@@ -808,7 +941,76 @@ export default function AIChatWidget({
         };
       })
       .filter(Boolean);
-  }, [normalizedSidebarSearch, sortedThreads]);
+  }, [normalizedSidebarSearch, visibleThreads]);
+
+  useEffect(() => {
+    const previousVisible = previouslyVisibleThreadIdsRef.current;
+    const nextVisible = new Set(visibleThreads.map((thread) => thread.id));
+
+    if (!hasSeededVisibleThreadsRef.current) {
+      const seededTitles = {};
+      visibleThreads.forEach((thread) => {
+        if (thread?.id) seededTitles[thread.id] = String(thread.title || "");
+      });
+      setAnimatedThreadTitles(seededTitles);
+      previouslyVisibleThreadIdsRef.current = nextVisible;
+      hasSeededVisibleThreadsRef.current = true;
+      return;
+    }
+
+    visibleThreads.forEach((thread) => {
+      const finalTitle = String(thread?.title || "").trim();
+      if (!thread?.id || !finalTitle) return;
+
+      if (previousVisible.has(thread.id)) {
+        if (!titleAnimationTimersRef.current.has(thread.id)) {
+          setAnimatedThreadTitles((prev) => {
+            if (prev[thread.id] === finalTitle) return prev;
+            return { ...prev, [thread.id]: finalTitle };
+          });
+        }
+        return;
+      }
+
+      const existingTimer = titleAnimationTimersRef.current.get(thread.id);
+      if (existingTimer) {
+        window.clearInterval(existingTimer);
+        titleAnimationTimersRef.current.delete(thread.id);
+      }
+
+      if (thread.isTitleManuallySet) {
+        setAnimatedThreadTitles((prev) => ({ ...prev, [thread.id]: finalTitle }));
+        return;
+      }
+
+      let charIndex = 0;
+      setAnimatedThreadTitles((prev) => ({ ...prev, [thread.id]: "" }));
+
+      const intervalId = window.setInterval(() => {
+        charIndex += 1;
+        const nextTitle = finalTitle.slice(0, charIndex);
+        setAnimatedThreadTitles((prev) => ({ ...prev, [thread.id]: nextTitle }));
+        if (charIndex >= finalTitle.length) {
+          window.clearInterval(intervalId);
+          titleAnimationTimersRef.current.delete(thread.id);
+        }
+      }, 24);
+
+      titleAnimationTimersRef.current.set(thread.id, intervalId);
+    });
+
+    previouslyVisibleThreadIdsRef.current = nextVisible;
+  }, [visibleThreads]);
+
+  useEffect(
+    () => () => {
+      titleAnimationTimersRef.current.forEach((timerId) => window.clearInterval(timerId));
+      titleAnimationTimersRef.current.clear();
+      previouslyVisibleThreadIdsRef.current = new Set();
+      hasSeededVisibleThreadsRef.current = false;
+    },
+    []
+  );
 
   const selectThreadFromSidebar = useCallback(
     (threadId, matchedMessageId = "") => {
@@ -1096,9 +1298,10 @@ export default function AIChatWidget({
   };
 
   const appendAiMessage = (text) => {
+    const sanitizedText = sanitizeAiMessageText(text) || "I am ready to help.";
     updateActiveThreadMessages((existingMessages) => [
       ...existingMessages,
-      createMessage("ai", text)
+      createMessage("ai", sanitizedText)
     ]);
   };
 
@@ -1241,6 +1444,12 @@ export default function AIChatWidget({
   useEffect(() => {
     if (!identityReady) return;
 
+    titleAnimationTimersRef.current.forEach((timerId) => window.clearInterval(timerId));
+    titleAnimationTimersRef.current.clear();
+    previouslyVisibleThreadIdsRef.current = new Set();
+    hasSeededVisibleThreadsRef.current = false;
+    setAnimatedThreadTitles({});
+
     let loadedThreads = [];
     let loadedActiveId = "";
 
@@ -1322,6 +1531,27 @@ export default function AIChatWidget({
       setDeleteConfirmThreadId("");
     }
   }, [threads, openThreadMenuId, renamingThreadId, deleteConfirmThreadId]);
+
+  useEffect(() => {
+    const existingIds = new Set(threads.map((thread) => thread.id));
+    setAnimatedThreadTitles((prev) => {
+      const next = {};
+      let changed = false;
+      Object.entries(prev).forEach(([threadId, title]) => {
+        if (existingIds.has(threadId)) {
+          next[threadId] = title;
+        } else {
+          changed = true;
+          const timerId = titleAnimationTimersRef.current.get(threadId);
+          if (timerId) {
+            window.clearInterval(timerId);
+            titleAnimationTimersRef.current.delete(threadId);
+          }
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [threads]);
 
   useEffect(() => {
     if (!openThreadMenuId) return undefined;
@@ -2038,75 +2268,7 @@ export default function AIChatWidget({
     return buildAgentMessageData(meta, { actionIntent });
   };
 
-  const formatAgentLabel = (value) =>
-    String(value || "")
-      .split(/[_:/-]+/g)
-      .filter(Boolean)
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-      .join(" ");
-
-  const renderAgentMeta = (data) => {
-    const meta = data?.agentMeta || data?.streamMeta || null;
-    if (!meta || typeof meta !== "object") return null;
-
-    const toolCalls = Array.isArray(meta.toolCalls) ? meta.toolCalls.slice(0, 6) : [];
-    const trace = Array.isArray(meta.trace) ? meta.trace.slice(0, 4) : [];
-    const reviewTask = meta.reviewTask && typeof meta.reviewTask === "object" ? meta.reviewTask : null;
-
-    return (
-      <div className="ai-agent-panel">
-        <div className="ai-agent-badges">
-          {meta.mode && <span className="ai-agent-badge">{formatAgentLabel(meta.mode)}</span>}
-          {meta.provider && <span className="ai-agent-badge">{formatAgentLabel(meta.provider)}</span>}
-          {meta.complexity && <span className="ai-agent-badge">{formatAgentLabel(meta.complexity)}</span>}
-          {meta.queryMode && <span className="ai-agent-badge">{formatAgentLabel(meta.queryMode)}</span>}
-          {meta.humanReviewRecommended && (
-            <span className="ai-agent-badge warning">Human Review</span>
-          )}
-        </div>
-
-        {meta.planSummary && <div className="ai-agent-summary">{meta.planSummary}</div>}
-
-        {reviewTask && (
-          <div className="ai-review-card">
-            <div className="ai-review-card-head">
-              <strong>{reviewTask.title || "Review Task Created"}</strong>
-              <span>{reviewTask.status || "PENDING"}</span>
-            </div>
-            <p>{reviewTask.summary || "This action is waiting for human approval before execution."}</p>
-            <div className="ai-review-card-meta">
-              <span>Risk: {reviewTask.riskLevel || "HIGH"}</span>
-              <span>Task ID: {reviewTask.id || "--"}</span>
-            </div>
-          </div>
-        )}
-
-        {toolCalls.length > 0 && (
-          <div className="ai-agent-call-list">
-            {toolCalls.map((call, index) => (
-              <div key={`${call.name || "tool"}-${index}`} className="ai-agent-call">
-                <div className="ai-agent-call-head">
-                  <strong>{formatAgentLabel(call.name || "tool")}</strong>
-                  <span>{formatAgentLabel(call.status || "ok")}</span>
-                </div>
-                {call.summary && <p>{call.summary}</p>}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {trace.length > 0 && (
-          <div className="ai-agent-trace">
-            {trace.map((step, index) => (
-              <span key={`${step.node || step.agent || "trace"}-${index}`}>
-                {formatAgentLabel(step.node || step.agent || "stage")}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
+  const renderAgentMeta = () => null;
 
   const streamConversationViaWebSocket = ({
     message,
@@ -2356,17 +2518,21 @@ export default function AIChatWidget({
           } else if (looksLikeActionJsonLeak(streamResult.text)) {
             // Continue to HTTP fallback path below.
           } else {
-            updateActiveThreadMessages((existingMessages) => [
-              ...existingMessages,
-              createMessage("ai", streamResult.text, {
-                data: buildAgentMessageData(streamResult.meta)
-              })
-            ]);
+            const sanitizedStreamText = sanitizeAiMessageText(streamResult.text);
+            if (sanitizedStreamText) {
+              updateActiveThreadMessages((existingMessages) => [
+                ...existingMessages,
+                createMessage("ai", sanitizedStreamText, {
+                  data: buildAgentMessageData(streamResult.meta)
+                })
+              ]);
 
-            if (isLiveModeRef.current) {
-              speak(streamResult.text);
+              if (isLiveModeRef.current) {
+                speak(sanitizedStreamText);
+              }
+              return;
             }
-            return;
+            // Continue to HTTP fallback path below.
           }
         }
 
@@ -2403,6 +2569,7 @@ export default function AIChatWidget({
       } else {
         aiText = String(normalizedReplyData || "Communication error.");
       }
+      aiText = sanitizeAiMessageText(aiText);
 
       if (!isAction) {
         const leakedAction = extractActionIntentFromText(aiText);
@@ -2420,6 +2587,12 @@ export default function AIChatWidget({
 
       if (!isAction && looksLikeActionJsonLeak(aiText)) {
         aiText = "I understood your request. Processing it now.";
+      }
+      if (isAction && !aiText) {
+        aiText = "Processing your request.";
+      }
+      if (!isAction && !aiText) {
+        aiText = "I am ready to help.";
       }
 
       if (aiText) {
@@ -2478,16 +2651,19 @@ export default function AIChatWidget({
           }
         }
 
-        if (execResultText || execResultData) {
+        const sanitizedExecResultText = sanitizeAiMessageText(execResultText);
+        const sanitizedExecSpeechText = sanitizeAiMessageText(execSpeechText);
+        if (sanitizedExecResultText || execResultData) {
           updateActiveThreadMessages((existingMessages) => [
             ...existingMessages,
-            createMessage("ai", execResultText, {
+            createMessage("ai", sanitizedExecResultText, {
               data: execResultData
             })
           ]);
 
-          if (isLiveModeRef.current) {
-            speak(execSpeechText || execResultText);
+          const speechOutput = sanitizedExecSpeechText || sanitizedExecResultText;
+          if (isLiveModeRef.current && speechOutput) {
+            speak(speechOutput);
           }
         }
       }
@@ -2942,7 +3118,10 @@ export default function AIChatWidget({
   const showInputLiveButton = !showImmersiveLiveButton;
 
   return (
-    <div ref={chatShellRef} className={`gemini-chat-shell ${immersive ? "immersive-shell" : ""}`}>
+    <div
+      ref={chatShellRef}
+      className={`gemini-chat-shell ${immersive ? "immersive-shell" : ""} ${isMobileComposerFocused ? "mobile-composer-focused" : ""}`.trim()}
+    >
       <aside
         ref={sidebarRef}
         className={`gemini-sidebar ${sidebarHidden ? "hidden" : sidebarOpen ? "open" : "collapsed"} ${isResizingSidebar ? "resizing" : ""}`.trim()}
@@ -3025,6 +3204,9 @@ export default function AIChatWidget({
                 const searchSnippet = result.snippet;
                 const isRenaming = renamingThreadId === thread.id;
                 const isMenuOpen = openThreadMenuId === thread.id;
+                const hasAnimatedTitle = Object.prototype.hasOwnProperty.call(animatedThreadTitles, thread.id);
+                const displayThreadTitle = hasAnimatedTitle ? animatedThreadTitles[thread.id] : thread.title;
+                const isTitleAnimating = hasAnimatedTitle && displayThreadTitle !== thread.title;
                 return (
                   <div
                     key={thread.id}
@@ -3061,7 +3243,9 @@ export default function AIChatWidget({
                           aria-label="Rename chat title"
                         />
                       ) : (
-                        <span className="thread-title">{thread.title}</span>
+                        <span className={`thread-title ${isTitleAnimating ? "typing" : ""}`.trim()}>
+                          {displayThreadTitle || thread.title}
+                        </span>
                       )}
                       {searchSnippet && <span className="thread-snippet">{searchSnippet}</span>}
                       <span className="thread-time">{formatThreadTime(thread.updatedAt)}</span>
@@ -3256,6 +3440,7 @@ export default function AIChatWidget({
             const isUser = message.role === "user";
             const isEditing = editingMessageId === message.id;
             const copied = copiedMessageId === message.id;
+            const messageText = isUser ? String(message.text || "") : sanitizeAiMessageText(message.text);
             const isSearchHit = Boolean(
               searchHighlight
               && searchHighlight.threadId === activeThreadId
@@ -3293,9 +3478,9 @@ export default function AIChatWidget({
                         />
                       ) : (
                         <>
-                          {message.text ? (
+                          {messageText ? (
                             <pre className="msg-text-pre">
-                              {isSearchHit ? renderHighlightedText(message.text, searchHighlight?.query) : message.text}
+                              {isSearchHit ? renderHighlightedText(messageText, searchHighlight?.query) : messageText}
                             </pre>
                           ) : null}
 
@@ -3342,7 +3527,7 @@ export default function AIChatWidget({
                           <button
                             type="button"
                             className="msg-action-btn"
-                            onClick={() => copyToClipboard(message.text, message.id)}
+                            onClick={() => copyToClipboard(messageText, message.id)}
                           >
                             <ContentCopyRoundedIcon fontSize="inherit" /> {copied ? "Copied" : ""}
                           </button>
@@ -3417,6 +3602,18 @@ export default function AIChatWidget({
           )}
 
           <div className={`gemini-input-pill ${isInputExpanded ? "expanded" : ""}`.trim()}>
+            <Tooltip title="Add files or images">
+              <IconButton
+                className="attach-plus-btn attach-plus-left"
+                size="small"
+                onClick={openAttachmentPicker}
+                disabled={isLoading || pendingAttachments.length >= MAX_ATTACHMENT_COUNT}
+                aria-label="Add files or images"
+              >
+                <AddRoundedIcon />
+              </IconButton>
+            </Tooltip>
+
             <textarea
               ref={inputFieldRef}
               className="gemini-input-field"
@@ -3438,18 +3635,6 @@ export default function AIChatWidget({
             />
 
             <div className="pill-actions">
-              <Tooltip title="Attach files or images">
-                <IconButton
-                  className="attach-files-btn"
-                  size="small"
-                  onClick={openAttachmentPicker}
-                  disabled={isLoading || pendingAttachments.length >= MAX_ATTACHMENT_COUNT}
-                  aria-label="Attach files or images"
-                >
-                  <AttachFileRoundedIcon />
-                </IconButton>
-              </Tooltip>
-
               {showInputLiveButton && (
                 <Tooltip title={isLiveMode ? "End live chat" : "Start live chat"}>
                   <IconButton

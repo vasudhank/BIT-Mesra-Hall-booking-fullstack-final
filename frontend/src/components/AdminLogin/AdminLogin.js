@@ -179,13 +179,7 @@ export default function AdminLogin() {
                           </InputAdornment>
                         }
                         inputProps={{
-                          autoComplete: "email",
-                          style: {
-                            padding: 0,
-                            height: "100%",
-                            display: "block",
-                            lineHeight: "1.2"
-                          },
+                          autoComplete: "email"
                         }}
                       />
                     </FormControl>
@@ -210,13 +204,7 @@ export default function AdminLogin() {
                           </InputAdornment>
                         }
                         inputProps={{
-                          autoComplete: "current-password",
-                          style: {
-                            padding: 0,
-                            height: "100%",
-                            display: "block",
-                            lineHeight: "1.2"
-                          },
+                          autoComplete: "current-password"
                         }}
                       />
                     </FormControl>
