@@ -844,12 +844,28 @@ body.dark-mode .thread-delete-modal-card {
   width: min(100%, var(--gemini-content-width));
   margin-inline: auto;
   margin-top: auto;
+  margin-bottom: 0;
   padding: 4px 16px var(--gemini-prechat-gap-above-input);
   display: flex;
   flex-direction: column;
   align-items: var(--gemini-prechat-align);
   text-align: var(--gemini-prechat-text-align);
   transform: translateX(var(--gemini-prechat-offset-x));
+}
+
+.gemini-chat-root.prechat-mode .gemini-messages {
+  display: none;
+}
+
+.gemini-chat-root.prechat-mode .gemini-input-wrapper {
+  position: static;
+  bottom: auto;
+  width: min(100%, var(--gemini-content-width));
+  margin-inline: auto;
+  margin-top: 0;
+  margin-bottom: auto;
+  padding-top: 4px;
+  background: transparent;
 }
 
 .gemini-prechat-title-row {
@@ -992,6 +1008,75 @@ body.dark-mode .thread-delete-modal-card {
   line-height: 1.5;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.msg-text-rich {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.58;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.msg-text-rich > *:first-child {
+  margin-top: 0;
+}
+
+.msg-text-rich > *:last-child {
+  margin-bottom: 0;
+}
+
+.msg-md-paragraph {
+  margin: 0 0 10px;
+}
+
+.msg-md-list {
+  margin: 0 0 10px;
+  padding-left: 1.2rem;
+}
+
+.msg-md-list li {
+  margin: 0 0 4px;
+}
+
+.msg-md-heading {
+  margin: 0 0 8px;
+  color: var(--gemini-user-text);
+  line-height: 1.25;
+  font-weight: 760;
+}
+
+.msg-md-heading.h1 {
+  font-size: 1.22rem;
+}
+
+.msg-md-heading.h2 {
+  font-size: 1.16rem;
+}
+
+.msg-md-heading.h3 {
+  font-size: 1.08rem;
+}
+
+.msg-md-heading.h4,
+.msg-md-heading.h5,
+.msg-md-heading.h6 {
+  font-size: 1rem;
+}
+
+.msg-md-inline-code {
+  font-family: "Consolas", "Menlo", "Monaco", monospace;
+  font-size: 0.86em;
+  padding: 0.06rem 0.34rem;
+  border-radius: 6px;
+  border: 1px solid var(--gemini-border);
+  background: var(--gemini-muted-surface);
+}
+
+.msg-text-rich a {
+  color: var(--gemini-brand);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .msg-attachment-list {
@@ -2118,6 +2203,10 @@ body.dark-mode .attach-plus-btn {
   .gemini-prechat-logo {
     width: calc(var(--gemini-prechat-logo-size) * 0.88);
     height: calc(var(--gemini-prechat-logo-size) * 0.88);
+  }
+
+  .gemini-chat-root.prechat-mode .gemini-input-wrapper {
+    padding: 4px 12px calc(12px + env(safe-area-inset-bottom));
   }
 
   .gemini-input-wrapper {

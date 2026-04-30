@@ -381,6 +381,244 @@ const renderHighlightedText = (text, query) => {
   return nodes.length ? nodes : source;
 };
 
+const MARKDOWN_INLINE_TOKEN_PATTERN =
+  "(`[^`\\n]+`|\\[[^\\]\\n]+\\]\\((?:https?:\\/\\/|mailto:)[^)]+\\)|\\*\\*[\\s\\S]+?\\*\\*|__[\\s\\S]+?__|\\*[^*\\n][\\s\\S]*?\\*|_[^_\\n][\\s\\S]*?_)";
+
+const isMarkdownHeadingLine = (line) => /^\s{0,3}#{1,6}\s+/.test(String(line || ""));
+const isMarkdownUnorderedLine = (line) => /^\s*[-*]\s+/.test(String(line || ""));
+const isMarkdownOrderedLine = (line) => /^\s*\d+\.\s+/.test(String(line || ""));
+
+const sanitizeMarkdownLinkHref = (href) => {
+  const raw = String(href || "").trim();
+  if (!raw) return "";
+  if (/^(https?:\/\/|mailto:)/i.test(raw)) return raw;
+  return "";
+};
+
+const parseInlineMarkdownToken = (token) => {
+  const source = String(token || "");
+  if (!source) return null;
+
+  if (source.startsWith("`") && source.endsWith("`") && source.length >= 3) {
+    return { type: "code", content: source.slice(1, -1) };
+  }
+
+  const linkMatch = source.match(/^\[([^\]\n]+)\]\(([^)]+)\)$/);
+  if (linkMatch) {
+    const href = sanitizeMarkdownLinkHref(linkMatch[2]);
+    if (href) {
+      return {
+        type: "link",
+        label: linkMatch[1],
+        href
+      };
+    }
+  }
+
+  if (source.startsWith("**") && source.endsWith("**") && source.length >= 5) {
+    return { type: "strong", content: source.slice(2, -2) };
+  }
+
+  if (source.startsWith("__") && source.endsWith("__") && source.length >= 5) {
+    return { type: "strong", content: source.slice(2, -2) };
+  }
+
+  if (source.startsWith("*") && source.endsWith("*") && source.length >= 3) {
+    return { type: "em", content: source.slice(1, -1) };
+  }
+
+  if (source.startsWith("_") && source.endsWith("_") && source.length >= 3) {
+    return { type: "em", content: source.slice(1, -1) };
+  }
+
+  return null;
+};
+
+const renderInlineMarkdown = (text, keyPrefix = "md-inline") => {
+  const source = String(text || "");
+  if (!source) return "";
+
+  const inlineTokenRegex = new RegExp(MARKDOWN_INLINE_TOKEN_PATTERN, "g");
+  const nodes = [];
+  let cursor = 0;
+  let tokenIndex = 0;
+  let match;
+
+  while ((match = inlineTokenRegex.exec(source)) !== null) {
+    const token = match[0];
+    const start = match.index;
+    const end = start + token.length;
+
+    if (start > cursor) {
+      nodes.push(source.slice(cursor, start));
+    }
+
+    const parsedToken = parseInlineMarkdownToken(token);
+    if (!parsedToken) {
+      nodes.push(token);
+      cursor = end;
+      tokenIndex += 1;
+      continue;
+    }
+
+    const tokenKey = `${keyPrefix}-${tokenIndex}`;
+    if (parsedToken.type === "code") {
+      nodes.push(
+        <code key={tokenKey} className="msg-md-inline-code">
+          {parsedToken.content}
+        </code>
+      );
+    } else if (parsedToken.type === "strong") {
+      nodes.push(
+        <strong key={tokenKey}>
+          {renderInlineMarkdown(parsedToken.content, `${tokenKey}-strong`)}
+        </strong>
+      );
+    } else if (parsedToken.type === "em") {
+      nodes.push(
+        <em key={tokenKey}>
+          {renderInlineMarkdown(parsedToken.content, `${tokenKey}-em`)}
+        </em>
+      );
+    } else if (parsedToken.type === "link") {
+      nodes.push(
+        <a
+          key={tokenKey}
+          href={parsedToken.href}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {renderInlineMarkdown(parsedToken.label, `${tokenKey}-link`)}
+        </a>
+      );
+    } else {
+      nodes.push(token);
+    }
+
+    cursor = end;
+    tokenIndex += 1;
+  }
+
+  if (cursor < source.length) {
+    nodes.push(source.slice(cursor));
+  }
+
+  return nodes.length ? nodes : source;
+};
+
+const parseMarkdownBlocks = (text) => {
+  const lines = String(text || "").replace(/\r/g, "").split("\n");
+  const blocks = [];
+  let lineIndex = 0;
+
+  while (lineIndex < lines.length) {
+    const line = lines[lineIndex] || "";
+    if (!line.trim()) {
+      lineIndex += 1;
+      continue;
+    }
+
+    const headingMatch = line.match(/^\s{0,3}(#{1,6})\s+(.*)$/);
+    if (headingMatch) {
+      blocks.push({
+        type: "heading",
+        level: headingMatch[1].length,
+        text: headingMatch[2].trim()
+      });
+      lineIndex += 1;
+      continue;
+    }
+
+    if (isMarkdownUnorderedLine(line)) {
+      const items = [];
+      while (lineIndex < lines.length && isMarkdownUnorderedLine(lines[lineIndex])) {
+        items.push(String(lines[lineIndex]).replace(/^\s*[-*]\s+/, "").trim());
+        lineIndex += 1;
+      }
+      blocks.push({ type: "ul", items });
+      continue;
+    }
+
+    if (isMarkdownOrderedLine(line)) {
+      const items = [];
+      while (lineIndex < lines.length && isMarkdownOrderedLine(lines[lineIndex])) {
+        items.push(String(lines[lineIndex]).replace(/^\s*\d+\.\s+/, "").trim());
+        lineIndex += 1;
+      }
+      blocks.push({ type: "ol", items });
+      continue;
+    }
+
+    const paragraphLines = [line.trim()];
+    lineIndex += 1;
+    while (lineIndex < lines.length) {
+      const nextLine = lines[lineIndex] || "";
+      if (!nextLine.trim()) break;
+      if (isMarkdownHeadingLine(nextLine) || isMarkdownUnorderedLine(nextLine) || isMarkdownOrderedLine(nextLine)) {
+        break;
+      }
+      paragraphLines.push(nextLine.trim());
+      lineIndex += 1;
+    }
+
+    blocks.push({
+      type: "paragraph",
+      text: paragraphLines.join(" ")
+    });
+  }
+
+  return blocks;
+};
+
+const renderRichMarkdownMessage = (text, keyPrefix = "md-block") => {
+  const blocks = parseMarkdownBlocks(text);
+  if (!blocks.length) return null;
+
+  return blocks.map((block, index) => {
+    const blockKey = `${keyPrefix}-${index}`;
+
+    if (block.type === "heading") {
+      const headingLevel = Math.max(1, Math.min(6, Number(block.level) || 1));
+      const HeadingTag = `h${headingLevel}`;
+      return (
+        <HeadingTag key={blockKey} className={`msg-md-heading h${headingLevel}`}>
+          {renderInlineMarkdown(block.text, `${blockKey}-heading`)}
+        </HeadingTag>
+      );
+    }
+
+    if (block.type === "ul") {
+      return (
+        <ul key={blockKey} className="msg-md-list unordered">
+          {(block.items || []).map((item, itemIndex) => (
+            <li key={`${blockKey}-item-${itemIndex}`}>
+              {renderInlineMarkdown(item, `${blockKey}-item-${itemIndex}`)}
+            </li>
+          ))}
+        </ul>
+      );
+    }
+
+    if (block.type === "ol") {
+      return (
+        <ol key={blockKey} className="msg-md-list ordered">
+          {(block.items || []).map((item, itemIndex) => (
+            <li key={`${blockKey}-item-${itemIndex}`}>
+              {renderInlineMarkdown(item, `${blockKey}-item-${itemIndex}`)}
+            </li>
+          ))}
+        </ol>
+      );
+    }
+
+    return (
+      <p key={blockKey} className="msg-md-paragraph">
+        {renderInlineMarkdown(block.text, `${blockKey}-paragraph`)}
+      </p>
+    );
+  });
+};
+
 const formatBytes = (bytes) => {
   const size = Number(bytes) || 0;
   if (size < 1024) return `${size} B`;
@@ -1248,6 +1486,7 @@ export default function AIChatWidget({
     () => humanizeIdentityName(viewerDisplayName) || "Guest",
     [viewerDisplayName]
   );
+  const isPrechatMode = messages.length === 0;
 
   const resizeInputField = useCallback(() => {
     const inputEl = inputFieldRef.current;
@@ -3450,7 +3689,7 @@ export default function AIChatWidget({
         )}
       </aside>
 
-      <div className={`gemini-chat-root ${immersive ? "immersive-container" : ""}`}>
+      <div className={`gemini-chat-root ${immersive ? "immersive-container" : ""} ${isPrechatMode ? "prechat-mode" : ""}`.trim()}>
         <div className="gemini-header">
           <div className="gemini-header-left">
             {sidebarHidden && showHeaderBrand && (
@@ -3502,6 +3741,9 @@ export default function AIChatWidget({
               && searchHighlight.threadId === activeThreadId
               && searchHighlight.messageId === message.id
             );
+            const aiRichMessageContent = !isUser
+              ? renderRichMarkdownMessage(messageText, `ai-md-${message.id}`)
+              : null;
 
             return (
               <React.Fragment key={message.id}>
@@ -3535,9 +3777,17 @@ export default function AIChatWidget({
                       ) : (
                         <>
                           {messageText ? (
-                            <pre className="msg-text-pre">
-                              {isSearchHit ? renderHighlightedText(messageText, searchHighlight?.query) : messageText}
-                            </pre>
+                            isUser ? (
+                              <pre className="msg-text-pre">
+                                {isSearchHit ? renderHighlightedText(messageText, searchHighlight?.query) : messageText}
+                              </pre>
+                            ) : (
+                              <div className="msg-text-rich">
+                                {aiRichMessageContent || (
+                                  <p className="msg-md-paragraph">{messageText}</p>
+                                )}
+                              </div>
+                            )
                           ) : null}
 
                           {renderStructuredData(message.data?.agentResult || message.data, message)}
@@ -3628,7 +3878,7 @@ export default function AIChatWidget({
 
         </div>
 
-        {messages.length === 0 && (
+        {isPrechatMode && (
           <div className="gemini-prechat-intro">
             <div className="gemini-prechat-title-row">
               <GeminiDiamondIcon
