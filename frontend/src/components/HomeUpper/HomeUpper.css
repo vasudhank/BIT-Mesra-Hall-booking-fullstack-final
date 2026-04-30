@@ -1689,14 +1689,11 @@ body.dark-mode .modal-icon-action-btn:hover {
 
 .gemini-card-body .gemini-chat-shell {
   min-height: 0;
-  --gemini-bg: var(--gemini-popup-surface);
   --gemini-surface: var(--gemini-popup-surface);
-  background: var(--gemini-popup-surface);
+  background: var(--gemini-shell-gradient);
 }
 
-.gemini-card-body .gemini-chat-shell .gemini-sidebar,
-.gemini-card-body .gemini-chat-shell .gemini-header,
-.gemini-card-body .gemini-chat-shell .gemini-chat-root {
+.gemini-card-body .gemini-chat-shell .gemini-sidebar {
   background: var(--gemini-popup-surface);
 }
 

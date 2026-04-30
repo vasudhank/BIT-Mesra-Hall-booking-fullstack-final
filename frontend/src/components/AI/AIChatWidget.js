@@ -40,8 +40,7 @@ const MAX_INPUT_HEIGHT = 140;
 const MAX_EDIT_QUERY_HEIGHT = 220;
 const MAX_ATTACHMENT_COUNT = 4;
 const MAX_ATTACHMENT_BYTES = 6 * 1024 * 1024;
-const WELCOME_HEADLINE = "How can I help you today?";
-const WELCOME_SUBTITLE = "Chat, ask in Hindi or English, or run booking actions.";
+const PRECHAT_SUBTITLE = "Have a query or book a hall?";
 
 const LANGUAGE_OPTIONS = [
   { id: "auto", label: "Auto" },
@@ -128,6 +127,38 @@ const truncateText = (text, limit = 42) => {
   const cleaned = String(text || "").replace(/\s+/g, " ").trim();
   if (!cleaned) return "New chat";
   return cleaned.length > limit ? `${cleaned.slice(0, limit)}...` : cleaned;
+};
+
+const humanizeIdentityName = (value) =>
+  String(value || "")
+    .replace(/@.*$/, "")
+    .replace(/[._-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+
+const resolveIdentityDisplayName = (details) => {
+  if (!details || typeof details !== "object") return "";
+  const directName =
+    details.name
+    || details.fullName
+    || details.displayName
+    || details.username
+    || details.head
+    || details.department
+    || details.email;
+  return humanizeIdentityName(directName);
+};
+
+const resolveAccountRoleSlug = (roleRaw) => {
+  const role = String(roleRaw || "").toUpperCase();
+  if (role === "ADMIN") return "admin";
+  if (role === "DEPARTMENT") return "department";
+  if (role === "DEVELOPER") return "developer";
+  return "";
 };
 
 const toTitleCaseWord = (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
@@ -631,8 +662,20 @@ const buildNoticePdfDocument = (notice) => {
   };
 };
 
-const GeminiDiamondIcon = ({ size = 22, className = "" }) => {
+const GeminiDiamondIcon = ({ size = 22, className = "", variant = "brand" }) => {
   const gradientId = useId();
+  const gradientStops = variant === "multicolor"
+    ? [
+      { offset: "0%", color: "#ea4335" },
+      { offset: "32%", color: "#4285f4" },
+      { offset: "66%", color: "#fbbc04" },
+      { offset: "100%", color: "#34a853" }
+    ]
+    : [
+      { offset: "0%", color: "#4285f4" },
+      { offset: "100%", color: "#24c1e0" }
+    ];
+
   return (
     <svg
       className={className}
@@ -643,8 +686,9 @@ const GeminiDiamondIcon = ({ size = 22, className = "" }) => {
     >
       <defs>
         <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#4285f4" />
-          <stop offset="100%" stopColor="#24c1e0" />
+          {gradientStops.map((stop) => (
+            <stop key={`${gradientId}-${stop.offset}`} offset={stop.offset} stopColor={stop.color} />
+          ))}
         </linearGradient>
       </defs>
       <path
@@ -681,6 +725,7 @@ export default function AIChatWidget({
   const [historyReady, setHistoryReady] = useState(false);
 
   const [accountKey, setAccountKey] = useState("GUEST:local");
+  const [viewerDisplayName, setViewerDisplayName] = useState("Guest");
   const [identityReady, setIdentityReady] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -706,7 +751,6 @@ export default function AIChatWidget({
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [editingDraft, setEditingDraft] = useState("");
   const [copiedMessageId, setCopiedMessageId] = useState("");
-  const [animatedWelcomeText, setAnimatedWelcomeText] = useState("");
   const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [showSidebarSearch, setShowSidebarSearch] = useState(false);
   const [sidebarSearchTerm, setSidebarSearchTerm] = useState("");
@@ -725,6 +769,7 @@ export default function AIChatWidget({
   const [animatedThreadTitles, setAnimatedThreadTitles] = useState({});
   const [freshViewportPromptId, setFreshViewportPromptId] = useState("");
   const [freshViewportSpacerHeight, setFreshViewportSpacerHeight] = useState(0);
+  const [mobileViewportMetrics, setMobileViewportMetrics] = useState({ top: 0, height: 0 });
 
   const chatShellRef = useRef(null);
   const sidebarRef = useRef(null);
@@ -896,6 +941,64 @@ export default function AIChatWidget({
       clearFocusLock();
     };
   }, [isCompactLayout]);
+
+  useEffect(() => {
+    if (!isCompactLayout || !isMobileComposerFocused) {
+      setMobileViewportMetrics((prev) => {
+        if (prev.top === 0 && prev.height === 0) return prev;
+        return { top: 0, height: 0 };
+      });
+      return undefined;
+    }
+
+    let rafId = 0;
+    const visualViewport = window.visualViewport;
+
+    const commitMetrics = () => {
+      const fallbackHeight = Math.round(window.innerHeight || document.documentElement?.clientHeight || 0);
+      const nextTop = Math.max(0, Math.round(visualViewport?.offsetTop || 0));
+      const nextHeight = Math.max(0, Math.round(visualViewport?.height || fallbackHeight));
+      setMobileViewportMetrics((prev) => {
+        if (prev.top === nextTop && prev.height === nextHeight) return prev;
+        return { top: nextTop, height: nextHeight };
+      });
+    };
+
+    const scheduleCommit = () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+      rafId = window.requestAnimationFrame(() => {
+        rafId = 0;
+        commitMetrics();
+      });
+    };
+
+    commitMetrics();
+    window.addEventListener("resize", scheduleCommit);
+    if (visualViewport) {
+      visualViewport.addEventListener("resize", scheduleCommit);
+      visualViewport.addEventListener("scroll", scheduleCommit);
+    }
+
+    return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", scheduleCommit);
+      if (visualViewport) {
+        visualViewport.removeEventListener("resize", scheduleCommit);
+        visualViewport.removeEventListener("scroll", scheduleCommit);
+      }
+    };
+  }, [isCompactLayout, isMobileComposerFocused]);
+
+  const mobileComposerShellStyle = useMemo(() => {
+    if (!isCompactLayout) return undefined;
+    const style = {
+      "--mobile-composer-offset-top": `${mobileViewportMetrics.top}px`
+    };
+    if (mobileViewportMetrics.height > 0) {
+      style["--mobile-composer-viewport-height"] = `${mobileViewportMetrics.height}px`;
+    }
+    return style;
+  }, [isCompactLayout, mobileViewportMetrics.height, mobileViewportMetrics.top]);
 
   const sortedThreads = useMemo(
     () => [...threads].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)),
@@ -1141,11 +1244,10 @@ export default function AIChatWidget({
     if (sidebarHidden || !sidebarOpen || isCompactLayout || !sidebarWidth) return undefined;
     return { "--gemini-sidebar-open-width": `${sidebarWidth}px` };
   }, [isCompactLayout, sidebarHidden, sidebarOpen, sidebarWidth]);
-
-  const [welcomeHeadlineText, welcomeSubtitleText] = useMemo(() => {
-    const parts = String(animatedWelcomeText || "").split("\n");
-    return [parts[0] || "", parts.slice(1).join("\n") || ""];
-  }, [animatedWelcomeText]);
+  const normalizedViewerName = useMemo(
+    () => humanizeIdentityName(viewerDisplayName) || "Guest",
+    [viewerDisplayName]
+  );
 
   const resizeInputField = useCallback(() => {
     const inputEl = inputFieldRef.current;
@@ -1177,62 +1279,6 @@ export default function AIChatWidget({
     if (!editingMessageId) return;
     resizeEditingField();
   }, [editingDraft, editingMessageId, resizeEditingField]);
-
-  useEffect(() => {
-    const fullWelcomeText = `${WELCOME_HEADLINE}\n${WELCOME_SUBTITLE}`;
-
-    if (messages.length > 0) {
-      setAnimatedWelcomeText(fullWelcomeText);
-      return undefined;
-    }
-
-    let cursor = 0;
-    let deleting = false;
-    let holdCount = 0;
-    let timeoutId = null;
-    let cancelled = false;
-
-    setAnimatedWelcomeText("");
-
-    const step = () => {
-      if (cancelled) return;
-
-      if (!deleting) {
-        cursor = Math.min(fullWelcomeText.length, cursor + 1);
-        setAnimatedWelcomeText(fullWelcomeText.slice(0, cursor));
-
-        if (cursor === fullWelcomeText.length) {
-          holdCount += 1;
-          if (holdCount >= 7) {
-            deleting = true;
-            holdCount = 0;
-          }
-        }
-      } else {
-        cursor = Math.max(0, cursor - 1);
-        setAnimatedWelcomeText(fullWelcomeText.slice(0, cursor));
-
-        if (cursor === 0) {
-          deleting = false;
-        }
-      }
-
-      const delay = cursor === fullWelcomeText.length && !deleting
-        ? 120
-        : deleting
-          ? 24
-          : 46;
-
-      timeoutId = setTimeout(step, delay);
-    };
-
-    timeoutId = setTimeout(step, 260);
-
-    return () => {
-      cancelled = true;
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [activeThreadId, messages.length]);
 
   const filteredVoices = useMemo(() => {
     if (!Array.isArray(availableVoices) || availableVoices.length === 0) return [];
@@ -1424,15 +1470,34 @@ export default function AIChatWidget({
           const details = res.data.details || {};
           const roleRaw = String(details.type || "").toUpperCase();
           const role = roleRaw === "ADMIN" ? "ADMIN" : roleRaw === "DEPARTMENT" ? "DEPARTMENT" : "USER";
+          const accountRoleSlug = resolveAccountRoleSlug(roleRaw);
 
           const emailLike = String(details.email || details._id || "unknown").toLowerCase();
 
           setAccountKey(`${role}:${emailLike}`);
+          let displayName = resolveIdentityDisplayName(details) || "Guest";
+
+          if (accountRoleSlug) {
+            try {
+              const profileRes = await api.get(`/account/${accountRoleSlug}`);
+              const accountProfile = profileRes?.data?.account || {};
+              const profileDisplayName = resolveIdentityDisplayName(accountProfile);
+              if (profileDisplayName) {
+                displayName = profileDisplayName;
+              }
+            } catch (profileErr) {
+              // Ignore profile fetch errors and keep fallback display name.
+            }
+          }
+
+          setViewerDisplayName(displayName);
         } else {
           setAccountKey("GUEST:local");
+          setViewerDisplayName("Guest");
         }
       } catch (err) {
         setAccountKey("GUEST:local");
+        setViewerDisplayName("Guest");
       } finally {
         setIdentityReady(true);
       }
@@ -3121,6 +3186,7 @@ export default function AIChatWidget({
     <div
       ref={chatShellRef}
       className={`gemini-chat-shell ${immersive ? "immersive-shell" : ""} ${isMobileComposerFocused ? "mobile-composer-focused" : ""}`.trim()}
+      style={mobileComposerShellStyle}
     >
       <aside
         ref={sidebarRef}
@@ -3426,16 +3492,6 @@ export default function AIChatWidget({
         {showSettings && renderVoiceSettings("chat-mode-menu")}
 
         <div ref={messagesContainerRef} className="gemini-messages">
-          {messages.length === 0 && (
-            <div className="gemini-welcome">
-              <div className="welcome-icon">
-                <AutoAwesomeIcon sx={{ fontSize: 40 }} />
-              </div>
-              <h3>{welcomeHeadlineText || "\u00A0"}</h3>
-              <p>{welcomeSubtitleText || "\u00A0"}</p>
-            </div>
-          )}
-
           {messages.map((message, index) => {
             const isUser = message.role === "user";
             const isEditing = editingMessageId === message.id;
@@ -3571,6 +3627,21 @@ export default function AIChatWidget({
           )}
 
         </div>
+
+        {messages.length === 0 && (
+          <div className="gemini-prechat-intro">
+            <div className="gemini-prechat-title-row">
+              <GeminiDiamondIcon
+                className="gemini-prechat-logo"
+                variant="multicolor"
+              />
+              <h3 className="gemini-prechat-title">
+                Hi, {normalizedViewerName}
+              </h3>
+            </div>
+            <p className="gemini-prechat-subtitle">{PRECHAT_SUBTITLE}</p>
+          </div>
+        )}
 
         <div className="gemini-input-wrapper">
           <input

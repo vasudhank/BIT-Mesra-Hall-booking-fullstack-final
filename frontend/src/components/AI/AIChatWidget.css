@@ -9,6 +9,18 @@
   --gemini-brand: #2563eb;
   --gemini-brand-soft: rgba(37, 99, 235, 0.12);
   --gemini-gradient: #0b57d0;
+  --gemini-shell-gradient: linear-gradient(180deg, #ffffff 0%, #f9fafb 52%, #f3f5f7 100%);
+  /* Manual pre-chat controls (edit these values to tune alignment/size/style) */
+  --gemini-prechat-align: flex-start;
+  --gemini-prechat-text-align: left;
+  --gemini-prechat-offset-x: 0px;
+  --gemini-prechat-gap-above-input: 8px;
+  --gemini-prechat-title-size: clamp(1.9rem, 3vw, 2.5rem);
+  --gemini-prechat-subtitle-size: clamp(1.18rem, 1.95vw, 1.55rem);
+  --gemini-prechat-title-weight: 780;
+  --gemini-prechat-subtitle-weight: 750;
+  --gemini-prechat-font-family: "RecklessNeue", "Sora", "IBM Plex Sans", sans-serif;
+  --gemini-prechat-logo-size: 42px;
 }
 
 body.dark-mode {
@@ -22,6 +34,7 @@ body.dark-mode {
   --gemini-brand: #6aa5ff;
   --gemini-brand-soft: rgba(106, 165, 255, 0.18);
   --gemini-gradient: #0b57d0;
+  --gemini-shell-gradient: linear-gradient(180deg, #020202 0%, #080808 52%, #111111 100%);
 }
 
 body.ai-mobile-input-focus-lock {
@@ -34,16 +47,18 @@ body.ai-mobile-input-focus-lock {
   height: 100vh;
   height: 100dvh;
   max-height: 100dvh;
-  background: var(--gemini-bg);
+  background: var(--gemini-shell-gradient);
   overflow: hidden;
 }
 
 .gemini-chat-shell {
+  --mobile-composer-offset-top: 0px;
+  --mobile-composer-viewport-height: 100dvh;
   display: flex;
   height: 100%;
   min-height: 0;
   min-width: 0;
-  background: radial-gradient(circle at top left, rgba(37, 99, 235, 0.06), transparent 35%), var(--gemini-bg);
+  background: var(--gemini-shell-gradient);
   color: var(--gemini-user-text);
   font-family: "Sora", "IBM Plex Sans", sans-serif;
   position: relative;
@@ -669,9 +684,10 @@ body.dark-mode .thread-delete-modal-card {
   position: sticky;
   top: 0;
   z-index: 14;
-  background: var(--gemini-bg);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
-  backdrop-filter: blur(10px);
+  background: transparent;
+  border-bottom: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .gemini-header-left {
@@ -822,6 +838,55 @@ body.dark-mode .thread-delete-modal-card {
   gap: 16px;
   scroll-padding-top: 88px;
   scroll-padding-bottom: 150px;
+}
+
+.gemini-prechat-intro {
+  width: min(100%, var(--gemini-content-width));
+  margin-inline: auto;
+  margin-top: auto;
+  padding: 4px 16px var(--gemini-prechat-gap-above-input);
+  display: flex;
+  flex-direction: column;
+  align-items: var(--gemini-prechat-align);
+  text-align: var(--gemini-prechat-text-align);
+  transform: translateX(var(--gemini-prechat-offset-x));
+}
+
+.gemini-prechat-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 100%;
+}
+
+.gemini-prechat-logo {
+  width: var(--gemini-prechat-logo-size);
+  height: var(--gemini-prechat-logo-size);
+  flex-shrink: 0;
+  display: block;
+}
+
+.gemini-prechat-title {
+  margin: 0;
+  max-width: 100%;
+  font-family: var(--gemini-prechat-font-family);
+  font-size: var(--gemini-prechat-title-size);
+  font-weight: var(--gemini-prechat-title-weight);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  color: var(--gemini-user-text);
+}
+
+.gemini-prechat-subtitle {
+  margin: 7px 0 0;
+  max-width: 100%;
+  font-family: var(--gemini-prechat-font-family);
+  font-size: var(--gemini-prechat-subtitle-size);
+  font-weight: var(--gemini-prechat-subtitle-weight);
+  line-height: 1.2;
+  letter-spacing: -0.012em;
+  color: var(--gemini-user-text);
 }
 
 .gemini-welcome {
@@ -1982,9 +2047,12 @@ body.dark-mode .attach-plus-btn {
 
   .gemini-chat-shell.mobile-composer-focused {
     position: fixed;
-    inset: 0;
+    left: 0;
+    right: 0;
+    top: var(--mobile-composer-offset-top);
     width: 100%;
-    height: 100dvh;
+    height: var(--mobile-composer-viewport-height);
+    max-height: var(--mobile-composer-viewport-height);
   }
 
   .gemini-chat-shell.mobile-composer-focused .gemini-chat-root {
@@ -2041,6 +2109,15 @@ body.dark-mode .attach-plus-btn {
     padding: 12px;
     scroll-padding-top: 96px;
     scroll-padding-bottom: 166px;
+  }
+
+  .gemini-prechat-intro {
+    padding: 0 12px var(--gemini-prechat-gap-above-input);
+  }
+
+  .gemini-prechat-logo {
+    width: calc(var(--gemini-prechat-logo-size) * 0.88);
+    height: calc(var(--gemini-prechat-logo-size) * 0.88);
   }
 
   .gemini-input-wrapper {
