@@ -17,4 +17,6 @@ const developerSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+developerSchema.index({ pendingEmail: 1 }, { sparse: true });
+
 module.exports = mongoose.model('Developer', developerSchema);

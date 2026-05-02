@@ -52,4 +52,10 @@ const bookingrequestSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
+bookingrequestSchema.index({ hall: 1, startDateTime: 1, endDateTime: 1 });
+bookingrequestSchema.index({ status: 1, startDateTime: 1, createdAt: -1 });
+bookingrequestSchema.index({ status: 1, endDateTime: 1 });
+bookingrequestSchema.index({ department: 1, createdAt: -1 });
+bookingrequestSchema.index({ approvalToken: 1 }, { sparse: true });
+
 module.exports = mongoose.model('Booking_Requests', bookingrequestSchema);

@@ -8,6 +8,12 @@ services:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "mongodb://127.0.0.1:27017/admin", "--eval", "quit(db.runCommand({ ping: 1 }).ok ? 0 : 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   weaviate:
     image: cr.weaviate.io/semitechnologies/weaviate:1.27.10
@@ -31,15 +37,25 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
+    stop_grace_period: 20s
     env_file:
       - ./backend/.env
     environment:
+      - NODE_ENV=production
       - PORT=8000
       - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/bit-booking}
+      - SESSION_STORE_USE_MONGO=true
     ports:
       - "8000:8000"
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:8000/api/ops/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1));"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   frontend:
     build:
@@ -49,7 +65,8 @@ services:
     ports:
       - "3000:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
   prometheus:
     image: prom/prometheus:v2.55.1

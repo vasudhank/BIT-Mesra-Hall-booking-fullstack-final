@@ -5,6 +5,11 @@ const Booking_Requests = require('../models/booking_requests');
 const Hall = require('../models/hall');
 const Department = require('../models/department');
 const { safeExecute } = require('../utils/safeNotify');
+const {
+  isTimeOverlap,
+  reserveHallSlotAtomically,
+  pullHallBookingsByRequestIds
+} = require('../services/bookingMutationService');
 require('dotenv').config();
 
 const {
@@ -22,10 +27,6 @@ const { runBookingCleanup } = require('../services/bookingCleanupService');
 const { getNoticeConflictsForRange } = require('../services/noticeService');
 
 const { generateApprovalToken, getTokenExpiry } = require('../utils/token');
-
-const isTimeOverlap = (startA, endA, startB, endB) =>
-  new Date(startA).getTime() < new Date(endB).getTime() &&
-  new Date(endA).getTime() > new Date(startB).getTime();
 
 const serializeBookingConflicts = async (bookings) => {
   const deptIds = Array.from(
@@ -51,14 +52,6 @@ const serializeBookingConflicts = async (bookings) => {
     };
   });
 };
-
-const buildHallBooking = (requestDoc, departmentId) => ({
-  bookingRequest: requestDoc._id,
-  department: departmentId,
-  event: requestDoc.event,
-  startDateTime: requestDoc.startDateTime,
-  endDateTime: requestDoc.endDateTime
-});
 
 const normalizeDecision = (decision) => String(decision || '').trim().toUpperCase();
 
@@ -207,8 +200,9 @@ router.post('/create_booking', async (req, res) => {
     const approvalToken = generateApprovalToken();
     const tokenExpiry = getTokenExpiry(15);
 
+    let shouldAutoBook = !hasConflict;
     const newRequest = new Booking_Requests({
-      hall,
+      hall: hallDoc.name,
       department: req.user.id,
       event,
       description,
@@ -222,7 +216,7 @@ router.post('/create_booking', async (req, res) => {
       endDate,
       approvalToken,
       tokenExpiry,
-      status: hasConflict ? 'PENDING' : 'AUTO_BOOKED',
+      status: shouldAutoBook ? 'AUTO_BOOKED' : 'PENDING',
       forceRequested: Boolean(force && hasConflict),
       conflictDetails: hasConflict
         ? {
@@ -232,14 +226,44 @@ router.post('/create_booking', async (req, res) => {
         : {}
     });
 
-    const saved = await newRequest.save();
+    let reservationCreated = false;
+    if (shouldAutoBook) {
+      const reservationResult = await reserveHallSlotAtomically({
+        hallName: hallDoc.name,
+        bookingRequestId: newRequest._id,
+        departmentId: req.user.id,
+        event,
+        startDateTime: startDT,
+        endDateTime: endDT
+      });
+
+      if (!reservationResult.reserved) {
+        shouldAutoBook = false;
+        newRequest.status = 'PENDING';
+        newRequest.forceRequested = false;
+        newRequest.conflictDetails = {
+          runtimeConflict: reservationResult.reason || 'OVERLAP'
+        };
+      } else {
+        reservationCreated = true;
+      }
+    }
+
+    let saved;
+    try {
+      saved = await newRequest.save();
+    } catch (saveError) {
+      if (reservationCreated) {
+        await pullHallBookingsByRequestIds({
+          hallName: hallDoc.name,
+          requestIds: [newRequest._id]
+        });
+      }
+      throw saveError;
+    }
     const approvalBaseUrl = `${process.env.PUBLIC_BASE_URL}/api/approval`;
 
-    if (!hasConflict) {
-      hallDoc.bookings.push(buildHallBooking(saved, req.user.id));
-      hallDoc.status = hallDoc.isFilledAt(new Date()) ? 'Filled' : 'Not Filled';
-      await hallDoc.save();
-
+    if (shouldAutoBook) {
       safeExecute(
         () => sendBookingAutoBookedMail({
           adminEmail: process.env.EMAIL,
@@ -349,29 +373,24 @@ router.post('/change_booking_request', async (req, res) => {
       }
 
       if (isApproveDecision(parsedDecision)) {
-        const hallDoc = await Hall.findOne({ name: requestDoc.hall });
-        if (!hallDoc) {
+        const reservationResult = await reserveHallSlotAtomically({
+          hallName: requestDoc.hall,
+          bookingRequestId: requestDoc._id,
+          departmentId: requestDoc.department?._id || requestDoc.department || null,
+          event: requestDoc.event,
+          startDateTime: requestDoc.startDateTime,
+          endDateTime: requestDoc.endDateTime
+        });
+
+        if (!reservationResult.reserved && reservationResult.reason === 'HALL_NOT_FOUND') {
           return res.status(404).json({ msg: `Hall not found: ${requestDoc.hall}` });
         }
 
-        const hasOverlap = (hallDoc.bookings || []).some((booking) =>
-          isTimeOverlap(
-            requestDoc.startDateTime,
-            requestDoc.endDateTime,
-            booking.startDateTime,
-            booking.endDateTime
-          )
-        );
-
-        if (hasOverlap) {
+        if (!reservationResult.reserved) {
           return res.status(409).json({
             msg: 'Cannot approve because the hall is already booked for this time range.'
           });
         }
-
-        hallDoc.bookings.push(buildHallBooking(requestDoc, requestDoc.department._id));
-        hallDoc.status = hallDoc.isFilledAt(new Date()) ? 'Filled' : 'Not Filled';
-        await hallDoc.save();
 
         requestDoc.status = 'APPROVED';
         requestDoc.approvalToken = null;
@@ -387,10 +406,10 @@ router.post('/change_booking_request', async (req, res) => {
 
     if (requestDoc.status === 'AUTO_BOOKED') {
       if (isVacateDecision(parsedDecision)) {
-        await Hall.findOneAndUpdate(
-          { name: requestDoc.hall },
-          { $pull: { bookings: { bookingRequest: requestDoc._id } } }
-        );
+        await pullHallBookingsByRequestIds({
+          hallName: requestDoc.hall,
+          requestIds: [requestDoc._id]
+        });
 
         requestDoc.status = 'VACATED';
         requestDoc.approvalToken = null;

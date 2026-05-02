@@ -94,5 +94,7 @@ const querySchema = new mongoose.Schema(
 );
 
 querySchema.index({ title: 'text', message: 'text', email: 'text' });
+querySchema.index({ status: 1, createdAt: -1 });
+querySchema.index({ lastActivityAt: -1 });
 
 module.exports = mongoose.model('Query', querySchema);

@@ -3,7 +3,10 @@ const mongoose = require('mongoose');
 const departmentSchema = new mongoose.Schema({
     email: {
         type: String,
-        required: true
+        required: true,
+        lowercase: true,
+        trim: true,
+        index: true
     },
     password: {
         type: String,
@@ -29,6 +32,7 @@ const departmentSchema = new mongoose.Schema({
     // OTP fields
     otp: { type: String, default: null },
     otpExpiry: { type: Date, default: null },
+    pendingEmail: { type: String, default: null },
 
     // New Account Setup fields
     setupToken: { type: String, default: null },
@@ -37,6 +41,10 @@ const departmentSchema = new mongoose.Schema({
     // Optional per-account session duration preference (in milliseconds).
     sessionTimeoutMs: { type: Number, default: null }
 });
+
+departmentSchema.index({ setupToken: 1 }, { sparse: true });
+departmentSchema.index({ resetToken: 1 }, { sparse: true });
+departmentSchema.index({ pendingEmail: 1 }, { sparse: true });
 
 const Department = mongoose.model('Department', departmentSchema);
 

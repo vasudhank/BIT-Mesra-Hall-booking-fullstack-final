@@ -30,6 +30,10 @@ const {
   sendBookingAutoBookedSMS,
   sendDecisionSMSDepartment
 } = require('../services/smsService');
+const {
+  reserveHallSlotAtomically,
+  pullHallBookingsByRequestIds
+} = require('../services/bookingMutationService');
 const { createNotice, getNoticeClosures, listNotices } = require('../services/noticeService');
 const { clearPendingAction } = require('../services/agentPendingActionService');
 
@@ -519,24 +523,23 @@ const analyzeRequestConflict = async (requestDoc, allPending) => {
 };
 
 const approveRequest = async (requestDoc) => {
-  await Hall.findOneAndUpdate(
-    { name: requestDoc.hall },
-    {
-      $push: {
-        bookings: {
-          bookingRequest: requestDoc._id,
-          department: requestDoc.department._id || requestDoc.department,
-          event: requestDoc.event,
-          startDateTime: requestDoc.startDateTime,
-          endDateTime: requestDoc.endDateTime
-        }
-      }
-    }
-  );
+  const reservationResult = await reserveHallSlotAtomically({
+    hallName: requestDoc.hall,
+    bookingRequestId: requestDoc._id,
+    departmentId: requestDoc.department?._id || requestDoc.department || null,
+    event: requestDoc.event,
+    startDateTime: requestDoc.startDateTime,
+    endDateTime: requestDoc.endDateTime
+  });
+
+  if (!reservationResult.reserved) {
+    return { approved: false, reason: reservationResult.reason || 'OVERLAP' };
+  }
 
   requestDoc.status = 'APPROVED';
   await requestDoc.save();
   notifyDepartmentDecision(requestDoc, 'APPROVED');
+  return { approved: true, reason: 'OK' };
 };
 
 const rejectRequest = async (requestDoc) => {
@@ -769,7 +772,7 @@ router.post('/execute', async (req, res) => {
 
             const approvalToken = generateApprovalToken();
             const tokenExpiry = getTokenExpiry(15);
-            const requestDoc = await Booking_Requests.create({
+            const requestDoc = new Booking_Requests({
               hall: hallDoc.name,
               department: null,
               event,
@@ -787,15 +790,32 @@ router.post('/execute', async (req, res) => {
               status: 'AUTO_BOOKED'
             });
 
-            hallDoc.bookings.push({
-              bookingRequest: requestDoc._id,
-              department: null,
+            const reservationResult = await reserveHallSlotAtomically({
+              hallName: hallDoc.name,
+              bookingRequestId: requestDoc._id,
+              departmentId: null,
               event,
               startDateTime,
               endDateTime
             });
-            hallDoc.status = hallDoc.isFilledAt(new Date()) ? 'Filled' : 'Not Filled';
-            await hallDoc.save();
+
+            if (!reservationResult.reserved) {
+              const reason = reservationResult.reason === 'HALL_NOT_FOUND'
+                ? `Hall not found: ${hallDoc.name}.`
+                : `${hallDoc.name} is already booked for the requested time range.`;
+              failMessages.push(reason);
+              continue;
+            }
+
+            try {
+              await requestDoc.save();
+            } catch (saveErr) {
+              await pullHallBookingsByRequestIds({
+                hallName: hallDoc.name,
+                requestIds: [requestDoc._id]
+              });
+              throw saveErr;
+            }
             successCount += 1;
             autoBookedCount += 1;
 
@@ -898,8 +918,9 @@ router.post('/execute', async (req, res) => {
           const approvalToken = generateApprovalToken();
           const tokenExpiry = getTokenExpiry(15);
 
+          let finalHasConflict = hasConflict;
           const newRequest = new Booking_Requests({
-            hall,
+            hall: hallDoc.name,
             department: user.id,
             event,
             description: 'Booked via AI Assistant',
@@ -913,9 +934,9 @@ router.post('/execute', async (req, res) => {
             endDate: date,
             approvalToken,
             tokenExpiry,
-            status: hasConflict ? 'PENDING' : 'AUTO_BOOKED',
+            status: finalHasConflict ? 'PENDING' : 'AUTO_BOOKED',
             forceRequested: false,
-            conflictDetails: hasConflict
+            conflictDetails: finalHasConflict
               ? {
                   bookings: overlappingBookings.map((booking) => ({
                     bookingRequest: booking.bookingRequest || null,
@@ -928,10 +949,43 @@ router.post('/execute', async (req, res) => {
               : {}
           });
 
-          const saved = await newRequest.save();
+          let reservationCreated = false;
+          if (!finalHasConflict) {
+            const reservationResult = await reserveHallSlotAtomically({
+              hallName: hallDoc.name,
+              bookingRequestId: newRequest._id,
+              departmentId: user.id,
+              event,
+              startDateTime,
+              endDateTime
+            });
+
+            if (!reservationResult.reserved) {
+              finalHasConflict = true;
+              newRequest.status = 'PENDING';
+              newRequest.conflictDetails = {
+                runtimeConflict: reservationResult.reason || 'OVERLAP'
+              };
+            } else {
+              reservationCreated = true;
+            }
+          }
+
+          let saved;
+          try {
+            saved = await newRequest.save();
+          } catch (saveErr) {
+            if (reservationCreated) {
+              await pullHallBookingsByRequestIds({
+                hallName: hallDoc.name,
+                requestIds: [newRequest._id]
+              });
+            }
+            throw saveErr;
+          }
           const baseUrl = `${process.env.PUBLIC_BASE_URL}/api/approval`;
 
-          if (hasConflict) {
+          if (finalHasConflict) {
             const overlappingRequestIds = overlappingBookings
               .map((booking) => booking.bookingRequest)
               .filter(Boolean);
@@ -966,16 +1020,6 @@ router.post('/execute', async (req, res) => {
 
             pendingApprovalCount += 1;
           } else {
-            hallDoc.bookings.push({
-              bookingRequest: saved._id,
-              department: user.id,
-              event,
-              startDateTime,
-              endDateTime
-            });
-            hallDoc.status = hallDoc.isFilledAt(new Date()) ? 'Filled' : 'Not Filled';
-            await hallDoc.save();
-
             safeExecute(
               () => sendBookingAutoBookedMail({
                 adminEmail: process.env.EMAIL,
@@ -1252,19 +1296,42 @@ router.post('/execute', async (req, res) => {
         });
       }
 
-      const matchingSubdocIds = new Set(matchingBookings.map((booking) => String(booking._id || '')));
+      const matchingSubdocIds = matchingBookings
+        .map((booking) => String(booking._id || '').trim())
+        .filter(Boolean);
       const matchingRequestIds = matchingBookings
         .map((booking) => booking.bookingRequest)
         .filter(Boolean);
 
-      hallDoc.bookings = (hallDoc.bookings || []).filter((booking) => {
-        const subdocId = String(booking._id || '');
-        return !matchingSubdocIds.has(subdocId);
-      });
-      hallDoc.status = hallDoc.isFilledAt(new Date()) ? 'Filled' : 'Not Filled';
-      hallDoc.department = null;
-      hallDoc.event = '';
-      await hallDoc.save();
+      if (matchingRequestIds.length > 0) {
+        await pullHallBookingsByRequestIds({
+          hallName: hallDoc.name,
+          requestIds: matchingRequestIds
+        });
+      }
+
+      if (matchingSubdocIds.length > 0) {
+        await Hall.updateOne(
+          { _id: hallDoc._id },
+          {
+            $pull: {
+              bookings: {
+                _id: { $in: matchingSubdocIds }
+              }
+            }
+          }
+        );
+      }
+
+      const refreshedHall = await Hall.findById(hallDoc._id);
+      if (refreshedHall) {
+        refreshedHall.status = refreshedHall.isFilledAt(new Date()) ? 'Filled' : 'Not Filled';
+        if (!refreshedHall.isFilledAt(new Date())) {
+          refreshedHall.department = null;
+          refreshedHall.event = '';
+        }
+        await refreshedHall.save();
+      }
 
       if (matchingRequestIds.length > 0) {
         await Booking_Requests.updateMany(
@@ -1343,8 +1410,12 @@ router.post('/execute', async (req, res) => {
             (subAction === 'REJECT_CONFLICTS' && isConflicting);
 
           if (shouldApprove) {
-            await approveRequest(requestDoc);
-            stats.approved += 1;
+            const approvalResult = await approveRequest(requestDoc);
+            if (approvalResult.approved) {
+              stats.approved += 1;
+            } else {
+              stats.skipped += 1;
+            }
             continue;
           }
 

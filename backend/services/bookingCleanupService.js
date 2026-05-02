@@ -8,25 +8,54 @@ const MIN_CLEANUP_INTERVAL_MS = 30 * 1000;
 const DEFAULT_SCHEDULE_INTERVAL_MS = 60 * 1000;
 
 const cleanupExpiredBookings = async (cutoff) => {
-  const halls = await Hall.find({ 'bookings.endDateTime': { $lte: cutoff } });
-  let hallsTouched = 0;
-  let removedBookings = 0;
+  const halls = await Hall.find({ 'bookings.endDateTime': { $lte: cutoff } })
+    .select('_id bookings')
+    .lean();
 
-  for (const hall of halls) {
-    const before = hall.bookings.length;
-    hall.bookings = (hall.bookings || []).filter(
-      (booking) => new Date(booking.endDateTime) > cutoff
-    );
-    const removed = before - hall.bookings.length;
-    if (removed > 0) {
-      removedBookings += removed;
-      hallsTouched += 1;
-      hall.status = hall.isFilledAt(new Date()) ? 'Filled' : 'Not Filled';
-      await hall.save();
-    }
+  if (!halls.length) {
+    return { hallsTouched: 0, removedBookings: 0 };
   }
 
-  return { hallsTouched, removedBookings };
+  const hallIds = halls.map((hall) => hall._id);
+  const removedBookings = halls.reduce((total, hall) => {
+    const removed = (hall.bookings || []).filter(
+      (booking) => new Date(booking.endDateTime) <= cutoff
+    ).length;
+    return total + removed;
+  }, 0);
+
+  await Hall.updateMany(
+    { _id: { $in: hallIds } },
+    {
+      $pull: {
+        bookings: {
+          endDateTime: { $lte: cutoff }
+        }
+      }
+    }
+  );
+
+  const refreshed = await Hall.find({ _id: { $in: hallIds } })
+    .select('_id bookings')
+    .lean();
+  const now = new Date();
+  const statusUpdates = refreshed.map((hall) => {
+    const isFilled = (hall.bookings || []).some(
+      (booking) => new Date(booking.startDateTime) <= now && new Date(booking.endDateTime) > now
+    );
+    return {
+      updateOne: {
+        filter: { _id: hall._id },
+        update: { $set: { status: isFilled ? 'Filled' : 'Not Filled' } }
+      }
+    };
+  });
+
+  if (statusUpdates.length > 0) {
+    await Hall.bulkWrite(statusUpdates, { ordered: false });
+  }
+
+  return { hallsTouched: hallIds.length, removedBookings };
 };
 
 const cleanupExpiredRequests = async (cutoff) => {

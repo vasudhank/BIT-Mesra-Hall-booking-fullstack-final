@@ -93,6 +93,7 @@ Live frontend: https://hall-booking-frontend-4o04.onrender.com/
 ## Deployment
 
 - Render blueprint updated for both backend + frontend in `render.yaml`.
+- Production deployment runbook for institute/on-prem servers: [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md)
 - GitHub Actions CI:
   - backend syntax + AI intent regression
   - frontend build

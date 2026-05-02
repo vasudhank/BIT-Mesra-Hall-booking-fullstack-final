@@ -98,5 +98,7 @@ const complaintSchema = new mongoose.Schema(
 );
 
 complaintSchema.index({ title: 'text', message: 'text', email: 'text' });
+complaintSchema.index({ status: 1, createdAt: -1 });
+complaintSchema.index({ lastActivityAt: -1 });
 
 module.exports = mongoose.model('Complaint', complaintSchema);

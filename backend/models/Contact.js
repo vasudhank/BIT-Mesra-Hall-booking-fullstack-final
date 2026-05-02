@@ -20,6 +20,9 @@ const contactSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+contactSchema.index({ order: 1, createdAt: 1 });
+contactSchema.index({ email: 1 });
+
 const Contact = mongoose.model('Contact', contactSchema);
 
 module.exports = Contact;

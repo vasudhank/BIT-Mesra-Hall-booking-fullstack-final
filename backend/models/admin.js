@@ -7,7 +7,10 @@ const adminSchema = new mongoose.Schema({
     },
     email:{
         type:String,
-        required:true
+        required:true,
+        lowercase: true,
+        trim: true,
+        index: true
     },
     password:{
         type:String,
@@ -36,6 +39,8 @@ const adminSchema = new mongoose.Schema({
     sessionTimeoutMs: { type: Number, default: null }
 
 });
+
+adminSchema.index({ pendingEmail: 1 }, { sparse: true });
 
 
 const Admin = mongoose.model('Admin',adminSchema);

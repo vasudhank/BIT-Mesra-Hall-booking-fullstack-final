@@ -8,6 +8,7 @@ const { getLlmRuntimeProfile } = require('../services/llmGatewayService');
 const { getReviewQueueSnapshot } = require('../services/agentReviewService');
 const { getVectorStoreRuntimeStatus } = require('../services/vectorStoreService');
 const { getVectorKnowledgeSyncStatus } = require('../services/vectorKnowledgeSyncService');
+const { getRequestControlSnapshot } = require('../services/requestControlService');
 
 const router = express.Router();
 
@@ -417,6 +418,7 @@ router.get('/monitoring', requireTrusted, async (req, res) => {
       dbReady
     },
     metrics: snapshot,
+    requestControl: getRequestControlSnapshot(),
     aiRuntime: providerOverview,
     vectorRuntime: {
       ...vectorRuntime,

@@ -24,6 +24,6 @@ const faqSchema = new mongoose.Schema(
 );
 
 faqSchema.index({ question: 'text', answer: 'text', intentKey: 'text' });
+faqSchema.index({ active: 1, updatedAt: -1, createdAt: -1 });
 
 module.exports = mongoose.model('FAQ', faqSchema);
-

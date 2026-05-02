@@ -23,6 +23,7 @@ const feedbackSchema = new mongoose.Schema(
 );
 
 feedbackSchema.index({ message: 'text', email: 'text', type: 'text' });
+feedbackSchema.index({ visibility: 1, status: 1, createdAt: -1 });
+feedbackSchema.index({ status: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Feedback', feedbackSchema);
-

@@ -23,6 +23,9 @@ const hallSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
+hallSchema.index({ 'bookings.startDateTime': 1, 'bookings.endDateTime': 1 });
+hallSchema.index({ 'bookings.bookingRequest': 1 });
+
 // instance method: is the hall filled at 'date'?
 hallSchema.methods.isFilledAt = function(date = new Date()) {
   return this.bookings.some(b => new Date(b.startDateTime) <= date && new Date(b.endDateTime) > date);

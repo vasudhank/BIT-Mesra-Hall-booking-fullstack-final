@@ -12,6 +12,13 @@ Module._load = function patchedLoad(request, parent, isMain) {
       throw err;
     };
   }
+  if (request === '../services/noticeService') {
+    return {
+      createNotice: async () => null,
+      getNoticeClosures: async () => [],
+      listNotices: async () => []
+    };
+  }
   return originalLoad.apply(this, arguments);
 };
 
@@ -37,7 +44,8 @@ const makeBooking = ({ id, requestId, start, end, event = 'Regression Booking' }
   endDateTime: new Date(end)
 });
 
-const makeHall = ({ name, bookings = [] }) => ({
+const makeHall = ({ id, name, bookings = [] }) => ({
+  _id: id || `hall-${String(name || '').toLowerCase()}`,
   name,
   bookings: [...bookings],
   status: 'Not Filled',
@@ -65,7 +73,11 @@ const resetFakeDb = () => {
 };
 
 const originalHallFindOne = Hall.findOne;
+const originalHallFindById = Hall.findById;
+const originalHallUpdateOne = Hall.updateOne;
+const originalHallExists = Hall.exists;
 const originalBookingUpdateMany = BookingRequests.updateMany;
+const originalBookingSave = BookingRequests.prototype.save;
 
 Hall.findOne = async (query = {}) => {
   if (query.name instanceof RegExp) {
@@ -76,9 +88,77 @@ Hall.findOne = async (query = {}) => {
   return fakeDb.halls.get(name) || null;
 };
 
+Hall.findById = async (id) =>
+  Array.from(fakeDb.halls.values()).find((hall) => String(hall._id) === String(id)) || null;
+
+Hall.exists = async (query = {}) => {
+  const name = String(query.name || '').toLowerCase();
+  const hall = fakeDb.halls.get(name);
+  return hall ? { _id: hall._id } : null;
+};
+
+Hall.updateOne = async (query = {}, update = {}) => {
+  let hall = null;
+  if (query.name) {
+    hall = fakeDb.halls.get(String(query.name).toLowerCase()) || null;
+  } else if (query._id) {
+    hall = Array.from(fakeDb.halls.values()).find((entry) => String(entry._id) === String(query._id)) || null;
+  }
+
+  if (!hall) return { acknowledged: true, modifiedCount: 0 };
+
+  const overlapRule = query?.bookings?.$not?.$elemMatch;
+  if (overlapRule) {
+    const requestedStart = overlapRule?.endDateTime?.$gt ? new Date(overlapRule.endDateTime.$gt) : null;
+    const requestedEnd = overlapRule?.startDateTime?.$lt ? new Date(overlapRule.startDateTime.$lt) : null;
+    if (requestedStart && requestedEnd) {
+      const hasOverlap = (hall.bookings || []).some((booking) =>
+        new Date(booking.startDateTime) < requestedEnd && new Date(booking.endDateTime) > requestedStart
+      );
+      if (hasOverlap) {
+        return { acknowledged: true, modifiedCount: 0 };
+      }
+    }
+  }
+
+  let modified = false;
+  if (update?.$push?.bookings) {
+    hall.bookings.push({
+      _id: `booking-${hall.bookings.length + 1}`,
+      ...update.$push.bookings
+    });
+    modified = true;
+  }
+
+  if (update?.$pull?.bookings?.bookingRequest?.$in) {
+    const requestIds = update.$pull.bookings.bookingRequest.$in.map((value) => String(value));
+    const before = hall.bookings.length;
+    hall.bookings = hall.bookings.filter((booking) => !requestIds.includes(String(booking.bookingRequest)));
+    modified = modified || hall.bookings.length !== before;
+  }
+
+  if (update?.$pull?.bookings?._id?.$in) {
+    const bookingIds = update.$pull.bookings._id.$in.map((value) => String(value));
+    const before = hall.bookings.length;
+    hall.bookings = hall.bookings.filter((booking) => !bookingIds.includes(String(booking._id)));
+    modified = modified || hall.bookings.length !== before;
+  }
+
+  if (update?.$set) {
+    Object.assign(hall, update.$set);
+    modified = true;
+  }
+
+  return { acknowledged: true, modifiedCount: modified ? 1 : 0 };
+};
+
 BookingRequests.updateMany = async (filter, update) => {
   fakeDb.bookingUpdates.push({ filter, update });
   return { acknowledged: true, modifiedCount: 1 };
+};
+
+BookingRequests.prototype.save = async function saveMock() {
+  return this;
 };
 
 const invokeExecute = async ({ role = 'Admin', action, payload }) => {
@@ -136,7 +216,7 @@ const tests = [
 
       assert.strictEqual(result.statusCode, 200);
       assert.strictEqual(result.body.status, 'DONE');
-      assert.match(result.body.message, /Admin booked 1 hall slot/i);
+      assert.match(result.body.message, /booked 1 hall slot/i);
       assert.strictEqual(fakeDb.halls.get('hall23').bookings.length, 1);
     }
   },
@@ -288,7 +368,11 @@ const run = async () => {
   }
 
   Hall.findOne = originalHallFindOne;
+  Hall.findById = originalHallFindById;
+  Hall.updateOne = originalHallUpdateOne;
+  Hall.exists = originalHallExists;
   BookingRequests.updateMany = originalBookingUpdateMany;
+  BookingRequests.prototype.save = originalBookingSave;
 
   if (failures.length > 0) {
     console.log(`\nAutonomous regression failed: ${failures.length}/${tests.length}`);
@@ -301,7 +385,11 @@ const run = async () => {
 
 run().catch((err) => {
   Hall.findOne = originalHallFindOne;
+  Hall.findById = originalHallFindById;
+  Hall.updateOne = originalHallUpdateOne;
+  Hall.exists = originalHallExists;
   BookingRequests.updateMany = originalBookingUpdateMany;
+  BookingRequests.prototype.save = originalBookingSave;
   console.error('Autonomous regression crashed:', err);
   process.exit(1);
 });
