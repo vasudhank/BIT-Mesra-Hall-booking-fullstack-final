@@ -402,7 +402,7 @@ body.dark-mode .admin-login-body .login-input input::placeholder {
 
 /* 5. Login Button Text */
 body.dark-mode .admin-login-body .login-btn {
-  color: #ffffff !important;
+  color: #000000 !important;
 }
 
 /* 6. Force Link Colors to Black/Dark */

@@ -211,7 +211,7 @@ export default function AdminLogin() {
                   </div>
 
                   <Button type="submit" fullWidth className="login-btn">
-                    Login Here
+                    LOGIN
                   </Button>
 
                   <div className="forgot-wrap">

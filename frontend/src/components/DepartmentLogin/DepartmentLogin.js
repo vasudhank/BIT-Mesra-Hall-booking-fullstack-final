@@ -294,7 +294,7 @@ export default function DepartmentLogin() {
 
                   <Button type="submit" fullWidth className="login-btn">
 
-                    Login Here
+                    LOGIN
 
                   </Button>
 
