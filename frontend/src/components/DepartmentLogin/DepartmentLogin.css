@@ -18,7 +18,12 @@
   position:relative;
   overflow:hidden;
   font-family:'Inter', sans-serif;
-  background:#05080c;
+  background:
+    linear-gradient(rgba(5, 8, 12, 0.34), rgba(5, 8, 12, 0.34)),
+    url('https://res.cloudinary.com/dkgbflzrc/image/upload/v1777815888/pexels-steve-29708306_aypvzj.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .department-login-menu-anchor {
@@ -113,32 +118,7 @@ body.dark-mode .department-login-menu-panel .quick-page-menu-shortcut {
 
 .department-login-body::before,
 .department-login-body::after{
-  content:"";
-  position:absolute;
-  inset:-40%;
-  background:
-    conic-gradient(
-      from 0deg,
-      cyan,
-      #FF00FF,
-      yellow,
-      black
-    );
-  animation:
-    spin 90s linear infinite,
-    drift 60s ease-in-out infinite alternate,
-    hue 30s linear infinite;
-  filter: blur(140px) saturate(200%);
-  opacity:0.75;
-  mix-blend-mode: screen;
-}
-
-.department-login-body::after{
-  animation:
-    spin 140s linear infinite reverse,
-    drift 90s ease-in-out infinite alternate-reverse,
-    hue 45s linear infinite;
-  opacity:0.65;
+  content: none;
 }
 
 @keyframes spin{ to{ transform: rotate(360deg); } }
@@ -277,7 +257,7 @@ body.dark-mode .department-login-menu-panel .quick-page-menu-shortcut {
 /* =========================================================
    BUTTON (UNTOUCHED)
    ========================================================= */
-.login-btn{
+.department-login-body .login-btn{
   margin-top:22px !important;
   padding:16px !important;
   border-radius:28px !important;
@@ -285,28 +265,29 @@ body.dark-mode .department-login-menu-panel .quick-page-menu-shortcut {
   font-size:1rem !important;
   font-weight:600 !important;
   color:#ffffff !important;
-
-  background: linear-gradient(135deg,#ff8a00,#e52e71) !important;
-
-  box-shadow:
-    inset 6px 6px 14px rgba(0,0,0,0.4),
-    inset -3px -3px 8px rgba(255,255,255,0.25);
-
-  transition: box-shadow 280ms ease, transform 200ms ease !important;
+  border: 1px solid rgba(255, 255, 255, 0.36) !important;
+  background: transparent !important;
+  backdrop-filter: blur(20px) saturate(145%);
+  -webkit-backdrop-filter: blur(20px) saturate(145%);
+  box-shadow: none;
+  transition: transform 200ms ease, background 220ms ease, box-shadow 220ms ease !important;
 }
 
-.login-btn:hover{
-  transform: translateY(-6px);
+.department-login-body .login-btn:hover{
+  transform: translateY(-3px);
+  background: rgba(255,255,255,0.08) !important;
   box-shadow:
-    8px 8px 14px rgba(0,0,0,0.85),
-    -3px -3px 12px rgba(255,255,255,0.45);
+    inset 0 1px 0 rgba(255,255,255,0.55),
+    inset 0 0 0 1px rgba(255,255,255,0.11),
+    0 16px 34px rgba(0,0,0,0.40);
 }
 
-.login-btn:active{
+.department-login-body .login-btn:active{
   transform: translateY(0);
+  background: rgba(255,255,255,0.04) !important;
   box-shadow:
-    inset 12px 12px 28px rgba(0,0,0,0.6),
-    inset -4px -4px 12px rgba(255,255,255,0.3);
+    inset 0 2px 10px rgba(0,0,0,0.30),
+    0 6px 18px rgba(0,0,0,0.3);
 }
 
 /* =========================================================
@@ -366,13 +347,13 @@ body.dark-mode .department-login-menu-panel .quick-page-menu-shortcut {
    MOBILE RESPONSIVENESS
    ========================================================= */
 @media (max-width: 768px) {
-  .department-login-body::before,
-  .department-login-body::after {
-    animation: none;
-    background: radial-gradient(circle at 50% 50%, #FF00FF, cyan, yellow);
-    filter: blur(90px) saturate(160%);
-    opacity: 0.7;
-    inset: -20%;
+  .department-login-body {
+    background:
+      linear-gradient(rgba(5, 8, 12, 0.34), rgba(5, 8, 12, 0.34)),
+      url('https://res.cloudinary.com/dkgbflzrc/image/upload/v1777816868/pexels-steve-27594597_mj5wby.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
   }
 
   .login-card {
@@ -433,9 +414,9 @@ body.dark-mode .department-login-body .login-input input::placeholder {
   text-shadow: none !important;
 }
 
-/* 5. Login Button Text -> Black/Dark */
+/* 5. Login Button Text */
 body.dark-mode .department-login-body .login-btn {
-  color: #000000 !important;
+  color: #ffffff !important;
 }
 
 /* 6. Force Link Colors to Black/Dark */

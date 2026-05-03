@@ -20,10 +20,10 @@ dayjs.extend(isoWeek);
 
 const SCHEDULE_SORT_OPTIONS = [
   { value: 'NONE', label: 'Sort' },
-  { value: 'NAME_ASC', label: 'Name (A-Z)' },
-  { value: 'NAME_DESC', label: 'Name (Z-A)' },
-  { value: 'CAPACITY_ASC', label: 'Capacity (Low-High)' },
-  { value: 'CAPACITY_DESC', label: 'Capacity (High-Low)' },
+  { value: 'NAME_ASC', label: 'Name ↑' },
+  { value: 'NAME_DESC', label: 'Name ↓' },
+  { value: 'CAPACITY_ASC', label: 'Cap ↑' },
+  { value: 'CAPACITY_DESC', label: 'Cap ↓' },
   { value: 'STATUS_FILLED_FIRST', label: 'Filled First' },
   { value: 'STATUS_UNFILLED_FIRST', label: 'Unfilled First' }
 ];
