@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useRef, useState, useEffect, useLayoutEffect } from "react";
+import React, { Suspense, lazy, useRef, useState, useEffect, useLayoutEffect, useCallback } from "react";
 import "./HomeUpper.css";
 import Grid from "@mui/material/Grid";
 import Box from "@mui/material/Box";
@@ -30,6 +30,37 @@ const AIChatWidget = lazy(() => import("../AI/AIChatWidget"));
 const FOLD_PHASE_MS = 250;
 const UNFOLD_PHASE_MS = 340;
 const DESKTOP_BREAKPOINT = 1364;
+const MOBILE_AI_FAB_CONFIG = Object.freeze({
+  size: 50,
+  iconSize: 20,
+  bottom: 24,
+  right: 10
+});
+const MOBILE_FLOATING_BUTTON_DRAG_CONFIG = Object.freeze({
+  longPressMs: 520,
+  dragStartDistancePx: 8,
+  viewportEdgePaddingPx: 4,
+  defaultButtonSizePx: 50
+});
+const MOBILE_DATETIME_RESTORE_DOT_CONFIG = Object.freeze({
+  // Manual tuning for collapsed-circle controls inside the mobile datetime bar.
+  sizePx: 20,
+  slotWidthPx: 46,
+  gapPx: 6.5,
+  offsetXPx: 0,
+  offsetYPx: 0
+});
+
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+const findTouchByIdentifier = (touchList, identifier) => {
+  if (!touchList || typeof touchList.length !== "number") return null;
+  for (let idx = 0; idx < touchList.length; idx += 1) {
+    const touch = touchList[idx];
+    if (touch && touch.identifier === identifier) return touch;
+  }
+  return null;
+};
 
 const FlipDigit = ({ value }) => {
   const normalized = String(value ?? "00").padStart(2, "0");
@@ -137,7 +168,8 @@ const ThemeButton = ({ className, lightMode, toggleTheme }) => (
 
 export default function HomeUpper({
   lightMode = true,
-  toggleTheme = () => {}
+  toggleTheme = () => {},
+  compact = false
 }) {
   const auth = useSelector((state) => state.user);
   const location = useLocation();
@@ -150,6 +182,13 @@ export default function HomeUpper({
   const navQuickButtonRef = useRef(null);
   const navQuickCardRef = useRef(null);
   const selectAllContactsRef = useRef(null);
+  const mobileAiModalScrollLockRef = useRef({
+    active: false,
+    scrollY: 0,
+    prevHtmlOverflow: "",
+    prevHtmlOverscrollBehavior: "",
+    prevBodyTouchAction: ""
+  });
 
   // === RESPONSIVE STATE ===
   const [isMobile, setIsMobile] = useState(window.innerWidth <= DESKTOP_BREAKPOINT);
@@ -157,6 +196,28 @@ export default function HomeUpper({
   const [showDeepDiveAnim, setShowDeepDiveAnim] = useState(false);
   const [navQuickMenuOpen, setNavQuickMenuOpen] = useState(false);
   const [navQuickMenuStyle, setNavQuickMenuStyle] = useState({ left: 0, width: 420 });
+  const [mobileFloatingButtonPositions, setMobileFloatingButtonPositions] = useState({ menu: null, ai: null });
+  const [mobileFloatingDraggingKey, setMobileFloatingDraggingKey] = useState('');
+  const [mobileFloatingHidden, setMobileFloatingHidden] = useState({ menu: false, ai: false });
+  const [mobileFloatingHideTarget, setMobileFloatingHideTarget] = useState('');
+  const mobileFloatingButtonNodeRef = useRef({ menu: null, ai: null });
+  const mobileFloatingLongPressTimerRef = useRef(null);
+  const mobileFloatingSuppressClickRef = useRef('');
+  const mobileFloatingDragRef = useRef({
+    key: '',
+    sourceType: '',
+    pointerId: null,
+    touchId: null,
+    active: false,
+    armed: false,
+    dragging: false,
+    startX: 0,
+    startY: 0,
+    offsetX: 0,
+    offsetY: 0,
+    width: MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx,
+    height: MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx
+  });
   
   // Scroll & UI States
   const [showArrow, setShowArrow] = useState(true);
@@ -231,7 +292,360 @@ export default function HomeUpper({
     }
   }, []);
 
+  const clearMobileFloatingLongPressTimer = useCallback(() => {
+    if (!mobileFloatingLongPressTimerRef.current) return;
+    window.clearTimeout(mobileFloatingLongPressTimerRef.current);
+    mobileFloatingLongPressTimerRef.current = null;
+  }, []);
+
+  const resetMobileFloatingDrag = useCallback(() => {
+    mobileFloatingDragRef.current = {
+      key: '',
+      sourceType: '',
+      pointerId: null,
+      touchId: null,
+      active: false,
+      armed: false,
+      dragging: false,
+      startX: 0,
+      startY: 0,
+      offsetX: 0,
+      offsetY: 0,
+      width: MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx,
+      height: MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx
+    };
+    setMobileFloatingDraggingKey('');
+  }, []);
+
+  const clampMobileFloatingPosition = useCallback((rawX, rawY, width, height) => {
+    if (typeof window === 'undefined') return { x: rawX, y: rawY };
+    const safeWidth = Math.max(1, Number(width) || MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx);
+    const safeHeight = Math.max(1, Number(height) || MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx);
+    const edge = Math.max(0, Number(MOBILE_FLOATING_BUTTON_DRAG_CONFIG.viewportEdgePaddingPx) || 0);
+    const maxX = Math.max(edge, window.innerWidth - safeWidth - edge);
+    const maxY = Math.max(edge, window.innerHeight - safeHeight - edge);
+    return {
+      x: clamp(Number(rawX) || 0, edge, maxX),
+      y: clamp(Number(rawY) || 0, edge, maxY)
+    };
+  }, []);
+
+  const getMobileFloatingButtonSize = useCallback((targetKey) => {
+    const node = mobileFloatingButtonNodeRef.current?.[targetKey];
+    if (!(node instanceof Element)) {
+      const fallback = MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx;
+      return { width: fallback, height: fallback };
+    }
+    const rect = node.getBoundingClientRect();
+    const fallback = MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx;
+    return {
+      width: Math.max(1, Math.round(rect.width || fallback)),
+      height: Math.max(1, Math.round(rect.height || fallback))
+    };
+  }, []);
+
+  useEffect(() => () => {
+    clearMobileFloatingLongPressTimer();
+    resetMobileFloatingDrag();
+  }, [clearMobileFloatingLongPressTimer, resetMobileFloatingDrag]);
+
+  useEffect(() => {
+    if (isMobile) return;
+    setMobileFloatingHidden({ menu: false, ai: false });
+    setMobileFloatingHideTarget('');
+    mobileFloatingSuppressClickRef.current = '';
+    clearMobileFloatingLongPressTimer();
+    resetMobileFloatingDrag();
+  }, [clearMobileFloatingLongPressTimer, isMobile, resetMobileFloatingDrag]);
+
+  useEffect(() => {
+    if (!mobileFloatingHideTarget) return undefined;
+    const handlePointerDown = (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest('.mobile-floating-action')) return;
+      setMobileFloatingHideTarget('');
+    };
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => document.removeEventListener('pointerdown', handlePointerDown, true);
+  }, [mobileFloatingHideTarget]);
+
+  useEffect(() => {
+    if (!isMobile) return undefined;
+
+    const processDragMove = (clientX, clientY, rawEvent) => {
+      const drag = mobileFloatingDragRef.current;
+      if (!drag.active || !drag.armed) return;
+
+      const dx = clientX - drag.startX;
+      const dy = clientY - drag.startY;
+      const distance = Math.hypot(dx, dy);
+      const threshold = Math.max(3, Number(MOBILE_FLOATING_BUTTON_DRAG_CONFIG.dragStartDistancePx) || 8);
+
+      if (!drag.dragging) {
+        if (distance < threshold) return;
+        drag.dragging = true;
+        mobileFloatingSuppressClickRef.current = drag.key;
+        setMobileFloatingDraggingKey(drag.key);
+        setMobileFloatingHideTarget('');
+      }
+
+      const next = clampMobileFloatingPosition(
+        clientX - drag.offsetX,
+        clientY - drag.offsetY,
+        drag.width,
+        drag.height
+      );
+      setMobileFloatingButtonPositions((prev) => {
+        const existing = prev?.[drag.key];
+        if (existing && Math.abs(existing.x - next.x) < 0.5 && Math.abs(existing.y - next.y) < 0.5) return prev;
+        return { ...prev, [drag.key]: next };
+      });
+
+      rawEvent?.preventDefault?.();
+      rawEvent?.stopPropagation?.();
+    };
+
+    const finalizeDragSession = () => {
+      const drag = mobileFloatingDragRef.current;
+      if (!drag.active) return;
+      clearMobileFloatingLongPressTimer();
+      mobileFloatingDragRef.current = {
+        key: '',
+        sourceType: '',
+        pointerId: null,
+        touchId: null,
+        active: false,
+        armed: false,
+        dragging: false,
+        startX: 0,
+        startY: 0,
+        offsetX: 0,
+        offsetY: 0,
+        width: MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx,
+        height: MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx
+      };
+      if (drag.dragging) setMobileFloatingDraggingKey('');
+    };
+
+    const handlePointerMove = (event) => {
+      const drag = mobileFloatingDragRef.current;
+      if (!drag.active || drag.sourceType !== 'pointer') return;
+      if (event.pointerId !== drag.pointerId) return;
+      processDragMove(event.clientX, event.clientY, event);
+    };
+
+    const handlePointerDone = (event) => {
+      const drag = mobileFloatingDragRef.current;
+      if (!drag.active || drag.sourceType !== 'pointer') return;
+      if (event.pointerId !== drag.pointerId) return;
+      finalizeDragSession();
+    };
+
+    const handleTouchMove = (event) => {
+      const drag = mobileFloatingDragRef.current;
+      if (!drag.active || drag.sourceType !== 'touch') return;
+      const touch = findTouchByIdentifier(event.touches, drag.touchId);
+      if (!touch) return;
+      processDragMove(touch.clientX, touch.clientY, event);
+    };
+
+    const handleTouchDone = (event) => {
+      const drag = mobileFloatingDragRef.current;
+      if (!drag.active || drag.sourceType !== 'touch') return;
+      const touch = findTouchByIdentifier(event.changedTouches, drag.touchId);
+      if (!touch) return;
+      finalizeDragSession();
+    };
+
+    const handleMouseMove = (event) => {
+      const drag = mobileFloatingDragRef.current;
+      if (!drag.active || drag.sourceType !== 'mouse') return;
+      processDragMove(event.clientX, event.clientY, event);
+    };
+
+    const handleMouseDone = () => {
+      const drag = mobileFloatingDragRef.current;
+      if (!drag.active || drag.sourceType !== 'mouse') return;
+      finalizeDragSession();
+    };
+
+    const touchMoveListenerOptions = { capture: true, passive: false };
+    window.addEventListener('pointermove', handlePointerMove, true);
+    window.addEventListener('pointerup', handlePointerDone, true);
+    window.addEventListener('pointercancel', handlePointerDone, true);
+    window.addEventListener('touchmove', handleTouchMove, touchMoveListenerOptions);
+    window.addEventListener('touchend', handleTouchDone, true);
+    window.addEventListener('touchcancel', handleTouchDone, true);
+    window.addEventListener('mousemove', handleMouseMove, true);
+    window.addEventListener('mouseup', handleMouseDone, true);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove, true);
+      window.removeEventListener('pointerup', handlePointerDone, true);
+      window.removeEventListener('pointercancel', handlePointerDone, true);
+      window.removeEventListener('touchmove', handleTouchMove, touchMoveListenerOptions);
+      window.removeEventListener('touchend', handleTouchDone, true);
+      window.removeEventListener('touchcancel', handleTouchDone, true);
+      window.removeEventListener('mousemove', handleMouseMove, true);
+      window.removeEventListener('mouseup', handleMouseDone, true);
+    };
+  }, [clampMobileFloatingPosition, clearMobileFloatingLongPressTimer, isMobile]);
+
+  useEffect(() => {
+    if (!isMobile) return undefined;
+    const keepFloatingButtonsInViewport = () => {
+      setMobileFloatingButtonPositions((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        ['menu', 'ai'].forEach((key) => {
+          const pos = prev?.[key];
+          if (!pos) return;
+          const size = getMobileFloatingButtonSize(key);
+          const clamped = clampMobileFloatingPosition(pos.x, pos.y, size.width, size.height);
+          if (Math.abs(clamped.x - pos.x) > 0.5 || Math.abs(clamped.y - pos.y) > 0.5) {
+            next[key] = clamped;
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    };
+
+    window.addEventListener('resize', keepFloatingButtonsInViewport);
+    window.addEventListener('orientationchange', keepFloatingButtonsInViewport);
+    return () => {
+      window.removeEventListener('resize', keepFloatingButtonsInViewport);
+      window.removeEventListener('orientationchange', keepFloatingButtonsInViewport);
+    };
+  }, [clampMobileFloatingPosition, getMobileFloatingButtonSize, isMobile]);
+
   // --- Handlers ---
+  const setMobileFloatingButtonNode = useCallback((targetKey, node) => {
+    mobileFloatingButtonNodeRef.current = { ...mobileFloatingButtonNodeRef.current, [targetKey]: node };
+  }, []);
+
+  const startMobileFloatingButtonLongPress = useCallback((targetKey, event) => {
+    if (!isMobile) return;
+    const activeDrag = mobileFloatingDragRef.current;
+    if (activeDrag.active) return;
+
+    const nativeEvent = event?.nativeEvent || event;
+    if (!nativeEvent) return;
+
+    const buttonEl = event?.currentTarget;
+    const rect = buttonEl instanceof Element ? buttonEl.getBoundingClientRect() : null;
+    const width = Math.max(1, Math.round(rect?.width || MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx));
+    const height = Math.max(1, Math.round(rect?.height || MOBILE_FLOATING_BUTTON_DRAG_CONFIG.defaultButtonSizePx));
+    let sourceType = '';
+    let pointerId = null;
+    let touchId = null;
+    let clientX = 0;
+    let clientY = 0;
+
+    if (nativeEvent.touches?.length) {
+      const touch = nativeEvent.changedTouches?.[0] || nativeEvent.touches[0];
+      if (!touch) return;
+      sourceType = 'touch';
+      touchId = touch.identifier;
+      clientX = Number(touch.clientX) || 0;
+      clientY = Number(touch.clientY) || 0;
+    } else if (typeof nativeEvent.pointerId !== 'undefined') {
+      sourceType = 'pointer';
+      pointerId = nativeEvent.pointerId;
+      clientX = Number(nativeEvent.clientX) || 0;
+      clientY = Number(nativeEvent.clientY) || 0;
+    } else if (typeof nativeEvent.clientX === 'number' || typeof nativeEvent.clientY === 'number') {
+      if (typeof nativeEvent.button === 'number' && nativeEvent.button !== 0) return;
+      sourceType = 'mouse';
+      clientX = Number(nativeEvent.clientX) || 0;
+      clientY = Number(nativeEvent.clientY) || 0;
+    } else {
+      return;
+    }
+
+    const offsetX = clientX - Number(rect?.left || 0);
+    const offsetY = clientY - Number(rect?.top || 0);
+
+    mobileFloatingDragRef.current = {
+      key: targetKey,
+      sourceType,
+      pointerId,
+      touchId,
+      active: true,
+      armed: false,
+      dragging: false,
+      startX: clientX,
+      startY: clientY,
+      offsetX: Number.isFinite(offsetX) ? offsetX : Math.round(width / 2),
+      offsetY: Number.isFinite(offsetY) ? offsetY : Math.round(height / 2),
+      width,
+      height
+    };
+
+    if (sourceType === 'pointer' && typeof pointerId !== 'undefined' && pointerId !== null) {
+      try {
+        buttonEl?.setPointerCapture?.(pointerId);
+      } catch (_) {
+        // Pointer capture is optional on some browsers.
+      }
+    }
+
+    clearMobileFloatingLongPressTimer();
+    mobileFloatingLongPressTimerRef.current = window.setTimeout(() => {
+      const drag = mobileFloatingDragRef.current;
+      if (!drag.active || drag.key !== targetKey) return;
+      drag.armed = true;
+      mobileFloatingSuppressClickRef.current = targetKey;
+      setMobileFloatingHideTarget(targetKey);
+    }, Math.max(320, Number(MOBILE_FLOATING_BUTTON_DRAG_CONFIG.longPressMs) || 520));
+  }, [clearMobileFloatingLongPressTimer, isMobile]);
+
+  const endMobileFloatingButtonLongPress = useCallback(() => {
+    clearMobileFloatingLongPressTimer();
+  }, [clearMobileFloatingLongPressTimer]);
+
+  const getMobileFloatingActionStyle = useCallback((targetKey) => {
+    const pos = mobileFloatingButtonPositions?.[targetKey];
+    if (!pos || !Number.isFinite(pos?.x) || !Number.isFinite(pos?.y)) return undefined;
+    return {
+      left: `${pos.x}px`,
+      top: `${pos.y}px`,
+      right: 'auto',
+      bottom: 'auto'
+    };
+  }, [mobileFloatingButtonPositions]);
+
+  const collapseMobileFloatingButton = useCallback((targetKey, event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    clearMobileFloatingLongPressTimer();
+    mobileFloatingSuppressClickRef.current = '';
+    setMobileFloatingHidden((prev) => ({ ...prev, [targetKey]: true }));
+    setMobileFloatingHideTarget('');
+    if (targetKey === 'menu') {
+      setMobileMenuOpen(false);
+    }
+  }, [clearMobileFloatingLongPressTimer]);
+
+  const restoreMobileFloatingButton = useCallback((targetKey, event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    setMobileFloatingHidden((prev) => ({ ...prev, [targetKey]: false }));
+    setMobileFloatingHideTarget('');
+  }, []);
+
+  const handleMobileFloatingButtonTap = useCallback((targetKey, event, onTap) => {
+    if (mobileFloatingSuppressClickRef.current === targetKey) {
+      mobileFloatingSuppressClickRef.current = '';
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      return;
+    }
+    setMobileFloatingHideTarget('');
+    onTap?.(event);
+  }, []);
+
   const openContactsModal = async () => {
     setShowWishModal(true);
     setLoadingContacts(true);
@@ -311,7 +725,7 @@ export default function HomeUpper({
   };
 
   const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
+    setMobileMenuOpen((prev) => !prev);
   };
 
   const handleNavQuickNotices = () => {
@@ -620,6 +1034,90 @@ export default function HomeUpper({
   }, []);
 
   useEffect(() => {
+    if (!isMobile) return undefined;
+    const updateArrowVisibility = () => {
+      const scrollY = Number(window.scrollY || window.pageYOffset || 0);
+      setShowArrow(scrollY <= 12);
+    };
+    updateArrowVisibility();
+    window.addEventListener('scroll', updateArrowVisibility, { passive: true });
+    window.addEventListener('resize', updateArrowVisibility);
+    return () => {
+      window.removeEventListener('scroll', updateArrowVisibility);
+      window.removeEventListener('resize', updateArrowVisibility);
+    };
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!isMobile || !showAIModal) {
+      if (mobileAiModalScrollLockRef.current.active) {
+        const lockedY = Number(mobileAiModalScrollLockRef.current.scrollY) || 0;
+        const htmlEl = document.documentElement;
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.right = '';
+        document.body.style.width = '';
+        document.body.style.overflow = '';
+        document.body.style.touchAction = mobileAiModalScrollLockRef.current.prevBodyTouchAction || '';
+        htmlEl.style.overflow = mobileAiModalScrollLockRef.current.prevHtmlOverflow || '';
+        htmlEl.style.overscrollBehavior = mobileAiModalScrollLockRef.current.prevHtmlOverscrollBehavior || '';
+        window.scrollTo({ top: lockedY, behavior: 'auto' });
+        mobileAiModalScrollLockRef.current = {
+          active: false,
+          scrollY: 0,
+          prevHtmlOverflow: "",
+          prevHtmlOverscrollBehavior: "",
+          prevBodyTouchAction: ""
+        };
+      }
+      return undefined;
+    }
+
+    const htmlEl = document.documentElement;
+    const scrollY = Number(window.scrollY || window.pageYOffset || 0);
+    mobileAiModalScrollLockRef.current = {
+      active: true,
+      scrollY,
+      prevHtmlOverflow: htmlEl.style.overflow || "",
+      prevHtmlOverscrollBehavior: htmlEl.style.overscrollBehavior || "",
+      prevBodyTouchAction: document.body.style.touchAction || ""
+    };
+    htmlEl.style.overflow = 'hidden';
+    htmlEl.style.overscrollBehavior = 'none';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+
+    return () => {
+      if (!mobileAiModalScrollLockRef.current.active) return;
+      const lockedY = Number(mobileAiModalScrollLockRef.current.scrollY) || 0;
+      const cleanupHtmlEl = document.documentElement;
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+      document.body.style.touchAction = mobileAiModalScrollLockRef.current.prevBodyTouchAction || '';
+      cleanupHtmlEl.style.overflow = mobileAiModalScrollLockRef.current.prevHtmlOverflow || '';
+      cleanupHtmlEl.style.overscrollBehavior = mobileAiModalScrollLockRef.current.prevHtmlOverscrollBehavior || '';
+      window.scrollTo({ top: lockedY, behavior: 'auto' });
+      mobileAiModalScrollLockRef.current = {
+        active: false,
+        scrollY: 0,
+        prevHtmlOverflow: "",
+        prevHtmlOverscrollBehavior: "",
+        prevBodyTouchAction: ""
+      };
+    };
+  }, [isMobile, showAIModal]);
+
+  useEffect(() => {
     if (!navQuickMenuOpen) return;
     const onPointerDown = (event) => {
       const target = event.target;
@@ -634,6 +1132,8 @@ export default function HomeUpper({
   useEffect(() => {
     setNavQuickMenuOpen(false);
   }, [location.pathname, isMobile]);
+
+  const effectiveScrolled = compact || scrolled;
 
   useLayoutEffect(() => {
     if (isMobile) return;
@@ -650,7 +1150,7 @@ export default function HomeUpper({
     updateQuickMenuPosition();
     window.addEventListener('resize', updateQuickMenuPosition);
     return () => window.removeEventListener('resize', updateQuickMenuPosition);
-  }, [isMobile, scrolled, navQuickMenuOpen]);
+  }, [effectiveScrolled, isMobile, navQuickMenuOpen]);
 
   /* ================= DATE & TIME LOGIC ================= */
   useEffect(() => {
@@ -747,7 +1247,6 @@ export default function HomeUpper({
     }
   };
   const handleScrollDown = () => {
-    setShowArrow(false);
     const target =
       document.querySelector(".section-top-anchor") ||
       document.querySelector(".lower-div");
@@ -782,6 +1281,16 @@ export default function HomeUpper({
     selectAllContactsRef.current.indeterminate = isPartiallyVisibleContactsSelected;
   }, [isPartiallyVisibleContactsSelected, isAllVisibleContactsSelected, visibleContactKeys.length]);
 
+  const mobileDateTimeBarStyle = isMobile
+    ? {
+      "--mobile-restore-dot-size": `${MOBILE_DATETIME_RESTORE_DOT_CONFIG.sizePx}px`,
+      "--mobile-restore-slot-width": `${MOBILE_DATETIME_RESTORE_DOT_CONFIG.slotWidthPx}px`,
+      "--mobile-restore-dot-gap": `${MOBILE_DATETIME_RESTORE_DOT_CONFIG.gapPx}px`,
+      "--mobile-restore-slot-offset-x": `${MOBILE_DATETIME_RESTORE_DOT_CONFIG.offsetXPx}px`,
+      "--mobile-restore-slot-offset-y": `${MOBILE_DATETIME_RESTORE_DOT_CONFIG.offsetYPx}px`
+    }
+    : undefined;
+
   /* ================= RENDER ================= */
   return (
     <>
@@ -791,7 +1300,7 @@ export default function HomeUpper({
 
       {/* 1. FLIP CLOCK COMPONENT (Desktop Only) */}
       {!isMobile && (
-        <div className={`flip-clock-wrapper ${scrolled ? 'clock-scrolled' : ''}`}>
+        <div className={`flip-clock-wrapper ${effectiveScrolled ? 'clock-scrolled' : ''}`}>
           
           {/* Theme Toggle: Left in Unscrolled (order:-1), Right in Scrolled (order:5) */}
           <div className="clock-toggle-wrapper">
@@ -826,10 +1335,10 @@ export default function HomeUpper({
 
       {/* 2. Navbar (DESKTOP) */}
       {!isMobile && (
-        <Box className={`navbar-wrapper ${scrolled ? "navbar-wrapper--scrolled" : ""}`}>
+        <Box className={`navbar-wrapper ${effectiveScrolled ? "navbar-wrapper--scrolled" : ""}`}>
           <Grid container justifyContent="center">
             <Grid item display="flex" justifyContent="center">
-              <div ref={navShellRef} className={`navbar-shell ${scrolled ? "navbar-shell--scrolled" : ""}`}>
+              <div ref={navShellRef} className={`navbar-shell ${effectiveScrolled ? "navbar-shell--scrolled" : ""}`}>
                 <div className="navbar">
                   {/* Date on Navbar (Scrolled Only) */}
                   <div className="nav-date">{timeData.navDateStr}</div>
@@ -867,7 +1376,7 @@ export default function HomeUpper({
                 {navQuickMenuOpen && (
                   <div
                     ref={navQuickCardRef}
-                    className={`nav-quick-card ${scrolled ? 'nav-quick-card--scrolled' : ''}`}
+                    className={`nav-quick-card ${effectiveScrolled ? 'nav-quick-card--scrolled' : ''}`}
                     style={{ left: `${navQuickMenuStyle.left}px`, width: `${navQuickMenuStyle.width}px` }}
                   >
                     <button type="button" onClick={handleNavQuickNotices}>NOTICES</button>
@@ -884,29 +1393,127 @@ export default function HomeUpper({
 
       {/* 3. Mobile Date Time Bar (Fixed Top) */}
       {isMobile && (
-        <div className="mobile-datetime-bar mobile-datetime-bar--expanded">
+        <div className="mobile-datetime-bar mobile-datetime-bar--expanded" style={mobileDateTimeBarStyle}>
           <ThemeButton
             className="mobile-toggle-in-bar"
             lightMode={lightMode}
             toggleTheme={toggleTheme}
           />
           <span className="mobile-datetime-text">{timeData.mobileDateTimeStr}</span>
+          <div className="mobile-datetime-restore-slot">
+            {mobileFloatingHidden.menu && (
+              <button
+                type="button"
+                className="mobile-datetime-restore-dot menu-dot"
+                aria-label="Restore menu button"
+                onClick={(event) => restoreMobileFloatingButton('menu', event)}
+              />
+            )}
+            {mobileFloatingHidden.ai && (
+              <button
+                type="button"
+                className="mobile-datetime-restore-dot ai-dot"
+                aria-label="Restore AI button"
+                onClick={(event) => restoreMobileFloatingButton('ai', event)}
+              />
+            )}
+          </div>
         </div>
       )}
 
       {/* 4. Mobile Menu Button */}
-      {isMobile && (
-        <button className="mobile-menu-toggle" onClick={toggleMobileMenu}>
-          {/* Color set to inherit so CSS can control it */}
-          <MenuIcon style={{ fontSize: '1.8rem', color: 'inherit' }} />
-        </button>
+      {isMobile && !mobileFloatingHidden.menu && (
+        <div
+          className={`mobile-floating-action menu-action${getMobileFloatingActionStyle('menu') ? ' is-floating' : ''}`.trim()}
+          style={getMobileFloatingActionStyle('menu')}
+        >
+          <button
+            ref={(node) => setMobileFloatingButtonNode('menu', node)}
+            className={`mobile-menu-toggle${mobileFloatingDraggingKey === 'menu' ? ' is-dragging' : ''}`.trim()}
+            onClick={(event) => handleMobileFloatingButtonTap('menu', event, toggleMobileMenu)}
+            onPointerDown={(event) => startMobileFloatingButtonLongPress('menu', event)}
+            onPointerUp={endMobileFloatingButtonLongPress}
+            onPointerCancel={endMobileFloatingButtonLongPress}
+            onTouchStart={(event) => startMobileFloatingButtonLongPress('menu', event)}
+            onTouchEnd={endMobileFloatingButtonLongPress}
+            onTouchCancel={endMobileFloatingButtonLongPress}
+            onMouseDown={(event) => startMobileFloatingButtonLongPress('menu', event)}
+            onMouseUp={endMobileFloatingButtonLongPress}
+            onMouseLeave={endMobileFloatingButtonLongPress}
+            onContextMenu={(event) => event.preventDefault()}
+          >
+            {/* Color set to inherit so CSS can control it */}
+            <MenuIcon style={{ fontSize: '1.8rem', color: 'inherit' }} />
+          </button>
+          {mobileFloatingHideTarget === 'menu' && (
+            <button
+              type="button"
+              className="mobile-floating-hide-btn"
+              aria-label="Hide menu button"
+              onClick={(event) => collapseMobileFloatingButton('menu', event)}
+            >
+              x
+            </button>
+          )}
+        </div>
       )}
 
       {/* 5. Mobile AI FAB */}
-      {isMobile && (
-        <button className="mobile-ai-fab" onClick={handleAIClick}>
-          <AutoAwesomeIcon sx={{ fontSize: 26, color: 'white' }} />
-        </button>
+      {isMobile && !mobileFloatingHidden.ai && !showAIModal && (
+        <div
+          className={`mobile-floating-action ai-action${getMobileFloatingActionStyle('ai') ? ' is-floating' : ''}`.trim()}
+          style={{
+            ...getMobileFloatingActionStyle('ai'),
+            "--mobile-ai-fab-size": `${MOBILE_AI_FAB_CONFIG.size}px`,
+            "--mobile-ai-fab-icon-size": `${MOBILE_AI_FAB_CONFIG.iconSize}px`,
+            "--mobile-ai-fab-bottom": `${MOBILE_AI_FAB_CONFIG.bottom}px`,
+            "--mobile-ai-fab-right": `${MOBILE_AI_FAB_CONFIG.right}px`
+          }}
+        >
+          <button
+            ref={(node) => setMobileFloatingButtonNode('ai', node)}
+            className={`mobile-ai-fab${mobileFloatingDraggingKey === 'ai' ? ' is-dragging' : ''}`.trim()}
+            onClick={(event) => handleMobileFloatingButtonTap('ai', event, handleAIClick)}
+            onPointerDown={(event) => startMobileFloatingButtonLongPress('ai', event)}
+            onPointerUp={endMobileFloatingButtonLongPress}
+            onPointerCancel={endMobileFloatingButtonLongPress}
+            onTouchStart={(event) => startMobileFloatingButtonLongPress('ai', event)}
+            onTouchEnd={endMobileFloatingButtonLongPress}
+            onTouchCancel={endMobileFloatingButtonLongPress}
+            onMouseDown={(event) => startMobileFloatingButtonLongPress('ai', event)}
+            onMouseUp={endMobileFloatingButtonLongPress}
+            onMouseLeave={endMobileFloatingButtonLongPress}
+            onContextMenu={(event) => event.preventDefault()}
+            aria-label="Open AI assistant"
+          >
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path
+                d="M4 4H20C21.1046 4 22 4.89543 22 6V18C22 19.1046 21.1046 20 20 20H8L4 24V4Z"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M12 8L13.122 10.878L16 12L13.122 13.122L12 16L10.878 13.122L8 12L10.878 10.878L12 8Z"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          {mobileFloatingHideTarget === 'ai' && (
+            <button
+              type="button"
+              className="mobile-floating-hide-btn"
+              aria-label="Hide AI button"
+              onClick={(event) => collapseMobileFloatingButton('ai', event)}
+            >
+              x
+            </button>
+          )}
+        </div>
       )}
 
       {/* 6. Mobile Menu Overlay */}
@@ -1102,7 +1709,15 @@ export default function HomeUpper({
                   onClick={async () => {
                     const played = await playElevenLabsSpeech({
                       text: "Deep diving in immersive mode",
-                      mode: "immersive_intro"
+                      mode: "immersive_intro",
+                      onError: (err) => {
+                        const status = Number(err?.status) || 0;
+                        const code = String(err?.code || "").trim().toUpperCase();
+                        const detail = String(err?.message || "Unknown voice error");
+                        console.warn(
+                          `[Immersive voice] ElevenLabs failed (${status || "status-unknown"}${code ? `, ${code}` : ""}). ${detail}`
+                        );
+                      }
                     });
 
                     if (!played && 'speechSynthesis' in window) {
@@ -1166,217 +1781,222 @@ export default function HomeUpper({
       {/* =========================================================
           HERO SECTION
           ========================================================= */}
-      <section
-        ref={sectionRef}
-        className="hero-video-wrapper no-horizontal-scroll"
-        style={{
-          backgroundImage: bgImage,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      >
-        {/* --- DESKTOP: VIDEO ELEMENT --- */}
-        {!isMobile && videoEnabled && showVideo && (
-          <video
-            ref={videoRef}
-            className="hero-video"
-            src="https://res.cloudinary.com/dkgbflzrc/video/upload/f_auto,q_auto/v1768165340/hero-video_xatba1.mp4"
-            loop
-            playsInline
-            muted={isMuted}
-            preload="metadata"
-          />
-        )}
+      {!compact && (
+        <section
+          ref={sectionRef}
+          className="hero-video-wrapper no-horizontal-scroll"
+          style={{
+            backgroundImage: bgImage,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        >
+          {/* --- DESKTOP: VIDEO ELEMENT --- */}
+          {!isMobile && videoEnabled && showVideo && (
+            <video
+              ref={videoRef}
+              className="hero-video"
+              src="https://res.cloudinary.com/dkgbflzrc/video/upload/f_auto,q_auto/v1768165340/hero-video_xatba1.mp4"
+              loop
+              playsInline
+              muted={isMuted}
+              preload="metadata"
+            />
+          )}
 
-        <div className="hero-overlay" />
-          
-        {/* --- DESKTOP: STEAM & CALENDAR --- */}
-        {!isMobile && !showVideo && (
-          <>
-          <div className="steam-layer">
-            <span></span><span></span><span></span><span></span>
-            <span></span><span></span><span></span><span></span>
-          </div>
+          <div className="hero-overlay" />
+            
+          {/* --- DESKTOP: STEAM & CALENDAR --- */}
+          {!isMobile && !showVideo && (
+            <>
+            <div className="steam-layer">
+              <span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span>
+            </div>
 
-          <div className="calendar-3d-wrapper">
-            <div className="calendar-page">
-              <div className="cal-body-row">
-                <div className="cal-grid">
-                  {["S","M","T","W","T","F","S"].map((d, i) => (
-                    <div key={`head-${i}`} className="cal-header-day">{d}</div>
-                  ))}
-                  {daysArray.map((d, i) => (
-                    <div 
-                      key={i} 
-                      className={`cal-date ${d === currentDay ? 'today' : ''} ${d === null ? 'empty' : ''}`}
-                      onClick={() => handleDateClick(d)}
-                    >
-                      {d}
-                    </div>
-                  ))}
+            <div className="calendar-3d-wrapper">
+              <div className="calendar-page">
+                <div className="cal-body-row">
+                  <div className="cal-grid">
+                    {["S","M","T","W","T","F","S"].map((d, i) => (
+                      <div key={`head-${i}`} className="cal-header-day">{d}</div>
+                    ))}
+                    {daysArray.map((d, i) => (
+                      <div 
+                        key={i} 
+                        className={`cal-date ${d === currentDay ? 'today' : ''} ${d === null ? 'empty' : ''}`}
+                        onClick={() => handleDateClick(d)}
+                      >
+                        {d}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="cal-side-header">
+                    <span className="cal-side-month">{currentMonthName}</span>
+                    <span className="cal-side-year">{shortYear}</span>
+                  </div>
                 </div>
-                <div className="cal-side-header">
-                  <span className="cal-side-month">{currentMonthName}</span>
-                  <span className="cal-side-year">{shortYear}</span>
+                <div className="cal-actions">
+                  <button className="cal-btn btn-wish" onClick={handleWishClick}>
+                    Wish Your Day
+                  </button>
+                  <button className="cal-btn btn-ai" onClick={handleAIClick}>
+                    AI Mode
+                  </button>
                 </div>
-              </div>
-              <div className="cal-actions">
-                <button className="cal-btn btn-wish" onClick={handleWishClick}>
-                  Wish Your Day
-                </button>
-                <button className="cal-btn btn-ai" onClick={handleAIClick}>
-                  AI Mode
-                </button>
               </div>
             </div>
-          </div>
-          </>
-        )}
+            </>
+          )}
 
-        {/* ================= MOBILE SPECIFIC CONTENT ================= */}
-        {/* Wish Button */}
-        {isMobile && (
-          <button className="mobile-wish-btn" onClick={handleWishClick}>
-            <CakeIcon sx={{ fontSize: 18 }} />
-            <span>Wish your day</span>
-          </button>
-        )}
-
-        {/* ================= UI ELEMENTS (LOGOS & TEXT) ================= */}
-        <div className="logo-container">
-         <img
-    src="https://res.cloudinary.com/dkgbflzrc/image/upload/f_auto,q_auto,w_300/v1769371273/BIT-Mesra_dmz9iz.png"
-    alt="Logo"
-    className="logo-img"
-    fetchpriority="high"
-    width="70"
-    height="70"
-  />
-        </div>
-        <div className="logo-container2">
-         <img
-    src="https://res.cloudinary.com/dkgbflzrc/image/upload/f_auto,q_auto,w_200/v1769371285/images_uotatw.png"
-    alt="Logo"
-    className="logo-img2"
-    fetchpriority="high"
-    width="80"
-    height="80"
-  />
-        </div>
-
-        {/* Hero Text Content */}
-        <div className={`hero-content ${!isMobile ? 'hero-content-lowered' : 'hero-content-mobile'}`}>
-          <h1>
-            Book your hall <br />
-            <span>before your coffee gets cold</span>
-          </h1>
-          <p>
-            Our <span className="highlight">Hall Booking System</span> is the home
-            to all your hall bookings. <br />
-            Seamless Experience. Centralized Platform. Easy Bookings
-          </p>
-        </div>
-
-        {/* ================= CONTROLS (Desktop Only) ================= */}
-        {!isMobile && (
-        <div className="controls-container">
-          {!videoEnabled && (
-            <button className="control-btn-initial" onClick={handleInitialClick}>
-              <svg viewBox="0 0 24 24" fill="currentColor" className="icon-svg-sm">
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-              </svg>
-              <span>Play Video</span>
+          {/* ================= MOBILE SPECIFIC CONTENT ================= */}
+          {/* Wish Button */}
+          {isMobile && (
+            <button className="mobile-wish-btn" onClick={handleWishClick}>
+              <CakeIcon sx={{ fontSize: 18 }} />
+              <span>Wish your day</span>
             </button>
           )}
 
-          {videoEnabled && (
-            <div className="control-capsule">
-              {showVideo && (
-                <>
-                  <button className="icon-btn" onClick={togglePlayPause} title={isPlaying ? "Pause" : "Play"}>
-                    {isPlaying ? (
-                      <svg viewBox="0 0 24 24" fill="currentColor" className="icon-svg">
-                        <rect x="6" y="4" width="4" height="16"></rect>
-                        <rect x="14" y="4" width="4" height="16"></rect>
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" fill="currentColor" className="icon-svg">
-                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                      </svg>
-                    )}
-                  </button>
+          {/* ================= UI ELEMENTS (LOGOS & TEXT) ================= */}
+          <div className="logo-container">
+           <img
+      src="https://res.cloudinary.com/dkgbflzrc/image/upload/f_auto,q_auto,w_300/v1769371273/BIT-Mesra_dmz9iz.png"
+      alt="Logo"
+      className="logo-img"
+      fetchpriority="high"
+      width="70"
+      height="70"
+    />
+          </div>
+          <div className="logo-container2">
+           <img
+      src="https://res.cloudinary.com/dkgbflzrc/image/upload/f_auto,q_auto,w_200/v1769371285/images_uotatw.png"
+      alt="Logo"
+      className="logo-img2"
+      fetchpriority="high"
+      width="80"
+      height="80"
+    />
+          </div>
 
-                  <button className="icon-btn" onClick={toggleMute} title={isMuted ? "Unmute" : "Mute"}>
-                    {isMuted ? (
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
-                        <path d="M11 5L6 9H2v6h4l5 4V5z"></path>
-                        <line x1="23" y="9" x2="17" y2="15"></line>
-                        <line x1="17" y="9" x2="23" y2="15"></line>
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
-                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-                      </svg>
-                    )}
-                  </button>
-                    
-                  <div className="control-divider"></div>
-                </>
-              )}
+          {/* Hero Text Content */}
+          <div className={`hero-content ${!isMobile ? 'hero-content-lowered' : 'hero-content-mobile'}`}>
+            <h1>
+              <span className="hero-title-primary">
+                <span className="hero-title-word">Book your</span>
+                <span className="hero-title-word">hall</span>
+              </span>
+              <span className="hero-title-secondary">
+                <span className="hero-title-word">before your coffee</span>
+                <span className="hero-title-word">gets cold</span>
+              </span>
+            </h1>
+            <p>
+              Our <span className="highlight">Hall Booking System</span> is the home
+              to all your hall bookings. <br />
+              Seamless Experience. Centralized Platform. Easy Bookings
+            </p>
+          </div>
 
-              <button className="icon-btn" onClick={toggleMediaSource} title={showVideo ? "Switch to Image" : "Switch to Video"}>
-                  {showVideo ? (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                      <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                      <polyline points="21 15 16 10 5 21"></polyline>
-                    </svg>
-                  ) : (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
-                        <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
-                        <line x1="7" y1="2" x2="7" y2="22"></line>
-                        <line x1="17" y1="2" x2="17" y2="22"></line>
-                        <line x1="2" y1="12" x2="22" y2="12"></line>
-                        <line x1="2" y1="7" x2="7" y2="7"></line>
-                        <line x1="2" y1="17" x2="7" y2="17"></line>
-                        <line x1="17" y1="17" x2="22" y2="17"></line>
-                        <line x1="17" y1="7" x2="22" y2="7"></line>
-                    </svg>
-                  )}
+          {/* ================= CONTROLS (Desktop Only) ================= */}
+          {!isMobile && (
+          <div className="controls-container">
+            {/* Primary Play Button */}
+            {!videoEnabled && (
+              <button className="control-btn-initial" onClick={handleInitialClick}>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="icon-svg-sm">
+                  <path d="M6 4.5l14 7.5-14 7.5v-15z" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" />
+                </svg>
+                <span>Play Video</span>
               </button>
-            </div>
-          )}
-        </div>
-        )}
+            )}
 
-        {/* ================= CONSENT MODAL ================= */}
-        {!isMobile && showConsent && (
-          <div className="hero-consent-backdrop">
-            <div className="hero-consent-card">
-              <h3>Play Background Video?</h3>
-              <p>
-                This video will play with sound. It may consume data and affect performance.
-              </p>
-              <div className="consent-actions">
-                <button onClick={handleConsentOk}>OK</button>
-                <button onClick={handleConsentCancel}>Cancel</button>
+            {/* Controls Capsule */}
+            {videoEnabled && (
+              <div className="control-capsule">
+                {showVideo && (
+                  <>
+                    <button className="icon-btn" onClick={togglePlayPause} title="Pause / Play">
+                      {isPlaying ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="icon-svg">
+                          <rect x="5" y="4" width="4" height="16" rx="1" />
+                          <rect x="15" y="4" width="4" height="16" rx="1" />
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="icon-svg">
+                          <path d="M6 4.5l14 7.5-14 7.5v-15z" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </button>
+
+                    <button className="icon-btn" onClick={toggleMute} title="Mute / Unmute">
+                      {isMuted ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
+                          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                          <line x1="23" y1="9" x2="17" y2="15" />
+                          <line x1="17" y1="9" x2="23" y2="15" />
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
+                          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                          <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                          <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                        </svg>
+                      )}
+                    </button>
+                      
+                    <div className="control-divider"></div>
+                  </>
+                )}
+
+                <button className="icon-btn" onClick={toggleMediaSource} title="Switch to Image / Video">
+                    {showVideo ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-svg-stroke">
+                          <polygon points="23 7 16 12 23 17 23 7" />
+                          <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                      </svg>
+                    )}
+                </button>
+              </div>
+            )}
+          </div>
+          )}
+
+          {/* ================= CONSENT MODAL ================= */}
+          {!isMobile && showConsent && (
+            <div className="hero-consent-backdrop">
+              <div className="hero-consent-card">
+                <h3>Play Background Video?</h3>
+                <p>
+                  This video will play with sound. It may consume data and affect performance.
+                </p>
+                <div className="consent-actions">
+                  <button onClick={handleConsentOk}>OK</button>
+                  <button onClick={handleConsentCancel}>Cancel</button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* ================= SCROLL ARROW ================= */}
-        {showArrow && (
-          <div className="scroll-down-hero" onClick={handleScrollDown}>
-            <span className="scroll-text">Scroll down</span>
-            <svg className="double-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <polyline points="7 8 12 13 17 8" />
-              <polyline points="7 12 12 17 17 12" />
-            </svg>
-          </div>
-        )}
-      </section>
+          {/* ================= SCROLL ARROW ================= */}
+          {showArrow && (
+            <div className="scroll-down-hero" onClick={handleScrollDown}>
+              <span className="scroll-text">Scroll down</span>
+              <svg className="double-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <polyline points="7 8 12 13 17 8" />
+                <polyline points="7 12 12 17 17 12" />
+              </svg>
+            </div>
+          )}
+        </section>
+      )}
       
       {/* DEEP DIVE ANIMATION OVERLAY */}
       {showDeepDiveAnim && (
