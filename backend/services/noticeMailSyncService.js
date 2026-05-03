@@ -15,6 +15,7 @@ const SENT_BOX_CANDIDATES = [
 let syncTimer = null;
 let syncRunning = false;
 let lastDnsFailureLogAt = 0;
+let missingCredentialWarningPrinted = false;
 
 const maskEmail = (email) => {
   const value = String(email || '').trim();
@@ -89,8 +90,9 @@ const isAutomatedMailboxMessage = (parsed, fromEmail) => {
 };
 
 const getMailboxConfig = () => {
-  const targetRecipient = String(process.env.NOTICE_TARGET_TO || DEFAULT_TARGET_RECIPIENT).toLowerCase().trim();
-  const user = String(process.env.NOTICE_MAIL_USER || targetRecipient || DEFAULT_TARGET_RECIPIENT).trim();
+  const adminMailbox = String(process.env.EMAIL || '').toLowerCase().trim();
+  const user = String(process.env.NOTICE_MAIL_USER || adminMailbox || DEFAULT_TARGET_RECIPIENT).trim();
+  const targetRecipient = String(process.env.NOTICE_TARGET_TO || user || DEFAULT_TARGET_RECIPIENT).toLowerCase().trim();
   const password = String(process.env.NOTICE_MAIL_APP_PASSWORD || process.env.EMAIL_APP_PASSWORD || '').trim();
   const host = String(process.env.NOTICE_MAIL_IMAP_HOST || process.env.MAIL_IMAP_HOST || 'imap.gmail.com').trim();
   const allowedSender = String(process.env.NOTICE_ALLOWED_FROM || '').toLowerCase().trim();
@@ -181,7 +183,15 @@ const processMessagesFromBox = async ({ conn, boxName, searchCriteria, cfg, mark
 
 const syncMailbox = async () => {
   const cfg = getMailboxConfig();
-  if (!cfg.user || !cfg.password) return;
+  if (!cfg.user || !cfg.password) {
+    if (!missingCredentialWarningPrinted) {
+      missingCredentialWarningPrinted = true;
+      console.warn(
+        '[NoticeMailSync] disabled: missing mailbox credentials. Set NOTICE_MAIL_USER and NOTICE_MAIL_APP_PASSWORD (or EMAIL and EMAIL_APP_PASSWORD).'
+      );
+    }
+    return;
+  }
 
   const sinceDays = Math.max(Number(process.env.NOTICE_MAIL_SYNC_LOOKBACK_DAYS || 5), 1);
   const sinceDate = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);

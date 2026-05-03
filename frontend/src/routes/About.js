@@ -30,28 +30,47 @@ function getExternalId(url) {
   return normalizedUrl.replace(/^https?:\/\//i, '').replace(/\/$/, '');
 }
 
-const teamProfiles = [
-  {
-    badge: 'Developer',
-    name: String(process.env.REACT_APP_ABOUT_DEV_NAME || '').trim(),
-    role: String(process.env.REACT_APP_ABOUT_DEV_ROLE || 'Project Developer').trim(),
-    image: String(process.env.REACT_APP_ABOUT_DEV_IMAGE || '').trim(),
-    profileUrl: normalizeExternalUrl(process.env.REACT_APP_ABOUT_DEV_LINKEDIN),
-    profileId: getExternalId(process.env.REACT_APP_ABOUT_DEV_LINKEDIN),
-    profileLabel: String(process.env.REACT_APP_ABOUT_DEV_PROFILE_LABEL || 'LinkedIn').trim(),
-    email: String(process.env.REACT_APP_ABOUT_DEV_EMAIL || '').trim()
-  },
-  {
-    badge: 'Guide',
-    name: String(process.env.REACT_APP_ABOUT_GUIDE_NAME || '').trim(),
-    role: String(process.env.REACT_APP_ABOUT_GUIDE_ROLE || 'Project Guide').trim(),
-    image: String(process.env.REACT_APP_ABOUT_GUIDE_IMAGE || '').trim(),
-    profileUrl: normalizeExternalUrl(process.env.REACT_APP_ABOUT_GUIDE_LINKEDIN),
-    profileId: getExternalId(process.env.REACT_APP_ABOUT_GUIDE_LINKEDIN),
-    profileLabel: String(process.env.REACT_APP_ABOUT_GUIDE_PROFILE_LABEL || 'LinkedIn').trim(),
-    email: String(process.env.REACT_APP_ABOUT_GUIDE_EMAIL || '').trim()
-  }
-].filter((profile) => profile.name && profile.image);
+const isAboutTeamEnabled = String(process.env.REACT_APP_ABOUT_TEAM_ENABLED || 'true').toLowerCase() !== 'false';
+
+const valueOrFallback = (value, fallback = '') => {
+  const trimmedValue = String(value || '').trim();
+  return trimmedValue || fallback;
+};
+
+const teamProfiles = isAboutTeamEnabled
+  ? [
+      {
+        badge: 'Developer',
+        name: valueOrFallback(process.env.REACT_APP_ABOUT_DEV_NAME, 'Nirbhay Kumar Jha'),
+        role: valueOrFallback(process.env.REACT_APP_ABOUT_DEV_ROLE, 'Project Developer'),
+        image: valueOrFallback(
+          process.env.REACT_APP_ABOUT_DEV_IMAGE,
+          'https://res.cloudinary.com/dkgbflzrc/image/upload/q_auto/f_auto/v1776521493/User_1_5_mqzcrm.jpg'
+        ),
+        profileUrl: normalizeExternalUrl(
+          valueOrFallback(process.env.REACT_APP_ABOUT_DEV_LINKEDIN, 'www.linkedin.com/in/nirbhay-jha-020a96204')
+        ),
+        profileLabel: valueOrFallback(process.env.REACT_APP_ABOUT_DEV_PROFILE_LABEL, 'LinkedIn'),
+        email: valueOrFallback(process.env.REACT_APP_ABOUT_DEV_EMAIL, 'vasudhank440@gmail.com')
+      },
+      {
+        badge: 'Guide',
+        name: valueOrFallback(process.env.REACT_APP_ABOUT_GUIDE_NAME, 'Dr Sandip Ghosal'),
+        role: valueOrFallback(process.env.REACT_APP_ABOUT_GUIDE_ROLE, 'Project Guide'),
+        image: valueOrFallback(
+          process.env.REACT_APP_ABOUT_GUIDE_IMAGE,
+          'https://res.cloudinary.com/dkgbflzrc/image/upload/q_auto/f_auto/v1776521453/FacImge7d4bcb96dae43a79942154f6dd18edfsandip_dz6crv.jpg'
+        ),
+        profileUrl: normalizeExternalUrl(
+          valueOrFallback(process.env.REACT_APP_ABOUT_GUIDE_LINKEDIN, 'https://www.linkedin.com/in/sandipghosal/')
+        ),
+        profileLabel: valueOrFallback(process.env.REACT_APP_ABOUT_GUIDE_PROFILE_LABEL, 'LinkedIn'),
+        email: valueOrFallback(process.env.REACT_APP_ABOUT_GUIDE_EMAIL, 'sandip.ghosal@bitmesra.ac.in')
+      }
+    ]
+      .map((profile) => ({ ...profile, profileId: getExternalId(profile.profileUrl) }))
+      .filter((profile) => profile.name && profile.image)
+  : [];
 
 export default function About({ lightMode, toggleTheme }) {
   return (
