@@ -1138,7 +1138,7 @@ export default function AIChatWidget({
 
   useEffect(() => {
     if (typeof document === "undefined") return undefined;
-    if (!isCompactLayout) {
+    if (!isCompactLayout || !immersive) {
       document.body.classList.remove("ai-mobile-input-focus-lock");
       setIsMobileComposerFocused(false);
       return undefined;
@@ -1184,10 +1184,10 @@ export default function AIChatWidget({
       document.removeEventListener("focusout", handleFocusOut);
       clearFocusLock();
     };
-  }, [isCompactLayout]);
+  }, [immersive, isCompactLayout]);
 
   useEffect(() => {
-    if (!isCompactLayout || !isMobileComposerFocused) {
+    if (!immersive || !isCompactLayout || !isMobileComposerFocused) {
       setMobileViewportMetrics((prev) => {
         if (prev.top === 0 && prev.height === 0) return prev;
         return { top: 0, height: 0 };
@@ -1231,10 +1231,10 @@ export default function AIChatWidget({
         visualViewport.removeEventListener("scroll", scheduleCommit);
       }
     };
-  }, [isCompactLayout, isMobileComposerFocused]);
+  }, [immersive, isCompactLayout, isMobileComposerFocused]);
 
   const mobileComposerShellStyle = useMemo(() => {
-    if (!isCompactLayout) return undefined;
+    if (!immersive || !isCompactLayout || !isMobileComposerFocused) return undefined;
     const style = {
       "--mobile-composer-offset-top": `${mobileViewportMetrics.top}px`
     };
@@ -1242,7 +1242,7 @@ export default function AIChatWidget({
       style["--mobile-composer-viewport-height"] = `${mobileViewportMetrics.height}px`;
     }
     return style;
-  }, [isCompactLayout, mobileViewportMetrics.height, mobileViewportMetrics.top]);
+  }, [immersive, isCompactLayout, isMobileComposerFocused, mobileViewportMetrics.height, mobileViewportMetrics.top]);
 
   const sortedThreads = useMemo(
     () => [...threads].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)),
@@ -3431,7 +3431,7 @@ export default function AIChatWidget({
   return (
     <div
       ref={chatShellRef}
-      className={`gemini-chat-shell ${immersive ? "immersive-shell" : ""} ${isMobileComposerFocused ? "mobile-composer-focused" : ""}`.trim()}
+      className={`gemini-chat-shell ${immersive ? "immersive-shell" : ""} ${immersive && isMobileComposerFocused ? "mobile-composer-focused" : ""}`.trim()}
       style={mobileComposerShellStyle}
     >
       <aside

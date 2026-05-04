@@ -83,6 +83,18 @@ const buildNoticesQuery = ({ search = '', kind = '', includeDeleted = false, onl
     filters.push({ kind: normalizedKind });
   }
 
+  const strictEmailSender = String(process.env.NOTICE_ALLOWED_FROM || process.env.NOTICE_MAIL_USER || '')
+    .toLowerCase()
+    .trim();
+  if (strictEmailSender) {
+    filters.push({
+      $or: [
+        { source: { $ne: 'EMAIL' } },
+        { source: 'EMAIL', emailFrom: strictEmailSender }
+      ]
+    });
+  }
+
   if (!filters.length) return {};
   if (filters.length === 1) return filters[0];
   return { $and: filters };

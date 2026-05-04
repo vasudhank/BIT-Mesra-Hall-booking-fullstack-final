@@ -91,11 +91,16 @@ const isAutomatedMailboxMessage = (parsed, fromEmail) => {
 
 const getMailboxConfig = () => {
   const adminMailbox = String(process.env.EMAIL || '').toLowerCase().trim();
-  const user = String(process.env.NOTICE_MAIL_USER || adminMailbox || DEFAULT_TARGET_RECIPIENT).trim();
+  const explicitNoticeUser = String(process.env.NOTICE_MAIL_USER || '').toLowerCase().trim();
+  const user = String(explicitNoticeUser || adminMailbox || DEFAULT_TARGET_RECIPIENT).trim();
   const targetRecipient = String(process.env.NOTICE_TARGET_TO || user || DEFAULT_TARGET_RECIPIENT).toLowerCase().trim();
-  const password = String(process.env.NOTICE_MAIL_APP_PASSWORD || process.env.EMAIL_APP_PASSWORD || '').trim();
+  const password = String(
+    explicitNoticeUser
+      ? process.env.NOTICE_MAIL_APP_PASSWORD || ''
+      : process.env.NOTICE_MAIL_APP_PASSWORD || process.env.EMAIL_APP_PASSWORD || ''
+  ).trim();
   const host = String(process.env.NOTICE_MAIL_IMAP_HOST || process.env.MAIL_IMAP_HOST || 'imap.gmail.com').trim();
-  const allowedSender = String(process.env.NOTICE_ALLOWED_FROM || '').toLowerCase().trim();
+  const allowedSender = String(process.env.NOTICE_ALLOWED_FROM || explicitNoticeUser || '').toLowerCase().trim();
   const includeSent = String(process.env.NOTICE_MAIL_SYNC_INCLUDE_SENT || 'false').toLowerCase() === 'true';
   const rejectUnauthorized =
     String(
@@ -154,10 +159,14 @@ const processMessagesFromBox = async ({ conn, boxName, searchCriteria, cfg, mark
 
     const fromEmail = parseAddress(parsed.from);
     const recipients = collectRecipients(parsed);
+    const mailboxUser = String(cfg.user || '').toLowerCase().trim();
+    const sentByMailboxUser = mailboxUser && fromEmail === mailboxUser;
+    const sentToTargetRecipient = recipients.has(cfg.targetRecipient);
+    const isRelevantNoticeMail = sentToTargetRecipient || (cfg.includeSent && sentByMailboxUser);
 
     if (!fromEmail) continue;
     if (cfg.allowedSender && fromEmail !== cfg.allowedSender) continue;
-    if (!recipients.has(cfg.targetRecipient)) continue;
+    if (!isRelevantNoticeMail) continue;
     if (isAutomatedMailboxMessage(parsed, fromEmail)) continue;
 
     const messageId = String(parsed.messageId || `${boxName}:${cfg.user}:${msg.attributes?.uid || Date.now()}`).trim();
@@ -187,7 +196,7 @@ const syncMailbox = async () => {
     if (!missingCredentialWarningPrinted) {
       missingCredentialWarningPrinted = true;
       console.warn(
-        '[NoticeMailSync] disabled: missing mailbox credentials. Set NOTICE_MAIL_USER and NOTICE_MAIL_APP_PASSWORD (or EMAIL and EMAIL_APP_PASSWORD).'
+        '[NoticeMailSync] disabled: missing mailbox credentials. Set NOTICE_MAIL_USER and NOTICE_MAIL_APP_PASSWORD (or EMAIL and EMAIL_APP_PASSWORD). If NOTICE_MAIL_USER is set, NOTICE_MAIL_APP_PASSWORD is required.'
       );
     }
     return;
