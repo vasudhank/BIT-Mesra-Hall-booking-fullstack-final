@@ -34,7 +34,7 @@ const {
   reserveHallSlotAtomically,
   pullHallBookingsByRequestIds
 } = require('../services/bookingMutationService');
-const { createNotice, getNoticeClosures, listNotices } = require('../services/noticeService');
+const { createNotice, listNotices } = require('../services/noticeService');
 const { clearPendingAction } = require('../services/agentPendingActionService');
 
 require('dotenv').config();
@@ -271,7 +271,6 @@ const buildConflictLabel = (conflictType) => {
   const normalized = String(conflictType || '').trim().toUpperCase();
   if (normalized === 'TIME_CONFLICT' || normalized === 'APPROVED_BOOKING_CONFLICT') return 'TIME CONFLICT';
   if (normalized === 'DATE_CONFLICT') return 'DATE CONFLICT';
-  if (normalized === 'NOTICE_CLOSURE') return 'NOTICE CLOSURE';
   return 'NON-CONFLICTING';
 };
 
@@ -282,21 +281,6 @@ const classifyBookingRequestConflict = async (requestDoc, allPending = []) => {
       conflict: 'CONFLICTING',
       conflictType: 'HALL_NOT_FOUND',
       detail: 'Hall no longer exists.'
-    };
-  }
-
-  const noticeConflicts = await getNoticeClosures({
-    hallName: requestDoc.hall,
-    startDateTime: requestDoc.startDateTime,
-    endDateTime: requestDoc.endDateTime
-  });
-  if (noticeConflicts.length > 0) {
-    const first = noticeConflicts[0];
-    return {
-      conflict: 'CONFLICTING',
-      conflictType: 'NOTICE_CLOSURE',
-      detail: first?.title || first?.holidayName || 'Hall is closed for a notice/holiday.',
-      notices: noticeConflicts
     };
   }
 
@@ -757,16 +741,8 @@ router.post('/execute', async (req, res) => {
             const hasBookingConflict = (hallDoc.bookings || []).some((booking) =>
               overlaps(startDateTime, endDateTime, booking.startDateTime, booking.endDateTime)
             );
-            const noticeConflicts = await getNoticeClosures({
-              hallName: hallDoc.name,
-              startDateTime,
-              endDateTime
-            });
-            if (hasBookingConflict || noticeConflicts.length > 0) {
-              const reason = noticeConflicts.length > 0
-                ? `${hallDoc.name} is closed for the requested time range.`
-                : `${hallDoc.name} is already booked for the requested time range.`;
-              failMessages.push(reason);
+            if (hasBookingConflict) {
+              failMessages.push(`${hallDoc.name} is already booked for the requested time range.`);
               continue;
             }
 
@@ -908,12 +884,7 @@ router.post('/execute', async (req, res) => {
           const overlappingBookings = (hallDoc.bookings || []).filter((booking) =>
             overlaps(startDateTime, endDateTime, booking.startDateTime, booking.endDateTime)
           );
-          const noticeConflicts = await getNoticeClosures({
-            hallName: hallDoc.name,
-            startDateTime,
-            endDateTime
-          });
-          const hasConflict = overlappingBookings.length > 0 || noticeConflicts.length > 0;
+          const hasConflict = overlappingBookings.length > 0;
 
           const approvalToken = generateApprovalToken();
           const tokenExpiry = getTokenExpiry(15);
@@ -944,7 +915,7 @@ router.post('/execute', async (req, res) => {
                     startDateTime: booking.startDateTime,
                     endDateTime: booking.endDateTime
                   })),
-                  notices: noticeConflicts
+                  notices: []
                 }
               : {}
           });
@@ -1552,34 +1523,24 @@ router.post('/execute', async (req, res) => {
         const bookingEvents = sortedBookings
           .map((booking) => String(booking?.event || '').trim() || 'Booked')
           .filter(Boolean);
-        const closures = await getNoticeClosures({
-          hallName: hall.name,
-          startDateTime: activeRange.start,
-          endDateTime: activeRange.end
-        });
-
-        const isClosed = closures.length > 0;
         const isFilled = bookings.length > 0;
-        const status = isClosed ? 'CLOSED' : isFilled ? 'FILLED' : 'AVAILABLE';
+        const status = isFilled ? 'FILLED' : 'AVAILABLE';
         const bookingLabel = bookingEvents.length === 0
           ? 'None'
           : bookingEvents.length <= 2
             ? bookingEvents.join(', ')
             : `${bookingEvents.slice(0, 2).join(', ')} (+${bookingEvents.length - 2} more)`;
         const bookingTimingsText = bookingTimeRanges.length > 0 ? bookingTimeRanges.join(', ') : 'None';
-        const closureLabel = closures.length <= 1
-          ? (closures[0]?.title || closures[0]?.holidayName || 'None')
-          : `${closures.length} closures in selected range`;
 
         items.push({
           hall: hall.name,
           status,
           bookingStatus: isFilled ? 'BOOKED' : 'NOT_BOOKED',
-          closureStatus: isClosed ? 'CLOSED' : 'OPEN',
+          closureStatus: 'OPEN',
           currentEvent: bookingLabel,
           bookingTimings: bookingTimeRanges,
           bookingTimingsText,
-          closureReason: closureLabel
+          closureReason: 'None'
         });
       }
 

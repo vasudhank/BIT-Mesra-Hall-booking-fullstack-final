@@ -21,7 +21,6 @@ const {
   setPendingAction,
   clearPendingAction
 } = require('../services/agentPendingActionService');
-const { getNoticeClosures } = require('../services/noticeService');
 
 const MAX_ATTACHMENT_COUNT = 4;
 const MAX_ATTACHMENT_BYTES = 6 * 1024 * 1024;
@@ -2408,7 +2407,6 @@ const formatConflictPreviewLabel = (conflictLike) => {
   const normalized = String(conflictLike || '').trim().toUpperCase();
   if (normalized === 'TIME_CONFLICT' || normalized === 'APPROVED_BOOKING_CONFLICT') return 'TIME CONFLICT';
   if (normalized === 'DATE_CONFLICT') return 'DATE CONFLICT';
-  if (normalized === 'NOTICE_CLOSURE') return 'NOTICE CLOSURE';
   return 'NON-CONFLICTING';
 };
 
@@ -2416,19 +2414,6 @@ const classifyPendingConflictPreview = async (requestDoc, allPending = []) => {
   const hallDoc = await Hall.findOne({ name: requestDoc.hall }).select('name bookings');
   if (!hallDoc) {
     return { conflict: 'CONFLICTING', conflictType: 'HALL_NOT_FOUND', detail: 'Hall not found.' };
-  }
-
-  const noticeClosures = await getNoticeClosures({
-    hallName: requestDoc.hall,
-    startDateTime: requestDoc.startDateTime,
-    endDateTime: requestDoc.endDateTime
-  });
-  if (noticeClosures.length > 0) {
-    return {
-      conflict: 'CONFLICTING',
-      conflictType: 'NOTICE_CLOSURE',
-      detail: noticeClosures[0]?.title || noticeClosures[0]?.holidayName || 'Hall closed by notice.'
-    };
   }
 
   const approvedConflict = (hallDoc.bookings || []).find((booking) =>
@@ -2525,17 +2510,7 @@ const buildBookingConfirmationData = async (requests, userRole, allHalls) => {
           new Date(booking.startDateTime).getTime() < new Date(endDateTime).getTime()
           && new Date(booking.endDateTime).getTime() > new Date(startDateTime).getTime()
         );
-        const noticeClosures = await getNoticeClosures({
-          hallName: hallDoc.name,
-          startDateTime,
-          endDateTime
-        });
-
-        if (noticeClosures.length > 0) {
-          executionPath = userRole === 'ADMIN'
-            ? 'Blocked by closure notice'
-            : 'Will go to admin review (closure notice)';
-        } else if (overlapsExisting) {
+        if (overlapsExisting) {
           executionPath = userRole === 'ADMIN'
             ? 'Blocked by existing booking'
             : 'Will go to admin review (time conflict)';

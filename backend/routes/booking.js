@@ -24,7 +24,6 @@ const {
   sendDecisionToDepartment
 } = require('../services/emailService');
 const { runBookingCleanup } = require('../services/bookingCleanupService');
-const { getNoticeConflictsForRange } = require('../services/noticeService');
 
 const { generateApprovalToken, getTokenExpiry } = require('../utils/token');
 
@@ -172,15 +171,8 @@ router.post('/create_booking', async (req, res) => {
       isTimeOverlap(startDT, endDT, booking.startDateTime, booking.endDateTime)
     );
 
-    const noticeConflicts = await getNoticeConflictsForRange({
-      hallName: hallDoc.name,
-      startDateTime: startDT,
-      endDateTime: endDT
-    });
-
     const hasBookingConflict = conflictBookings.length > 0;
-    const hasNoticeConflict = noticeConflicts.length > 0;
-    const hasConflict = hasBookingConflict || hasNoticeConflict;
+    const hasConflict = hasBookingConflict;
     const serializedBookingConflicts = hasBookingConflict
       ? await serializeBookingConflicts(conflictBookings)
       : [];
@@ -192,7 +184,7 @@ router.post('/create_booking', async (req, res) => {
         conflicts: {
           hall: hallDoc.name,
           bookings: serializedBookingConflicts,
-          notices: noticeConflicts
+          notices: []
         }
       });
     }
@@ -221,7 +213,7 @@ router.post('/create_booking', async (req, res) => {
       conflictDetails: hasConflict
         ? {
             bookings: serializedBookingConflicts,
-            notices: noticeConflicts
+            notices: []
           }
         : {}
     });
@@ -338,7 +330,7 @@ router.post('/create_booking', async (req, res) => {
     );
 
     return res.status(201).json({
-      message: 'Conflict found (existing booking and/or closure notice). Booking request sent to admin for accept/reject.',
+      message: 'Conflict found (existing booking). Booking request sent to admin for accept/reject.',
       bookingRequest: saved
     });
   } catch (err) {

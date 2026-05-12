@@ -152,7 +152,7 @@ export default function AdminApproveDepartment() {
                                 type='submit'
                                 sx={{ backgroundColor: '#1976d2', fontWeight: 'bold' }}
                             >
-                                CREATE DEPARTMENT
+                                CREATE FACULTY
                             </Button>
                         </form>
                     </CardContent>

@@ -342,7 +342,8 @@ export default function Schedule() {
           limit: 500
         });
         if (!active) return;
-        setAllNotices(Array.isArray(noticesRes?.notices) ? noticesRes.notices : []);
+        const notices = Array.isArray(noticesRes?.notices) ? noticesRes.notices : [];
+        setAllNotices(notices.filter((notice) => !isClosureNotice(notice)));
       } catch (_) {
         if (active) {
           setAllNotices([]);

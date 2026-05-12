@@ -566,7 +566,7 @@ export default function DepartmentBookingCard(props) {
             Booking Conflict Detected
           </Typography>
           <Typography sx={{ mb: 1.5, color: "text.secondary" }}>
-            The selected hall/time overlaps with an existing booking or a closure notice. You can still send this request to admin.
+            The selected hall/time overlaps with an existing booking. You can still send this request to admin.
           </Typography>
 
           <Box sx={{ mb: 1.5 }}>
@@ -579,23 +579,6 @@ export default function DepartmentBookingCard(props) {
                   <Typography sx={{ fontWeight: 700 }}>{item.event || "Booked"}</Typography>
                   <Typography variant="body2">{formatDateTime(item.startDateTime)} - {formatDateTime(item.endDateTime)}</Typography>
                   {item.requestedBy && <Typography variant="caption">By: {item.requestedBy}</Typography>}
-                </Box>
-              ))
-            )}
-          </Box>
-
-          <Box sx={{ mb: 1.8 }}>
-            <Typography sx={{ fontWeight: 700 }}>Closure Notices</Typography>
-            {(conflictDetails?.notices || []).length === 0 ? (
-              <Typography variant="body2" color="text.secondary">No closure notice overlap found.</Typography>
-            ) : (
-              conflictDetails.notices.map((item, index) => (
-                <Box key={`notice-conf-${index}`} sx={{ borderLeft: "3px solid #b91c1c", pl: 1, py: 0.5, mb: 0.8, background: "rgba(185,28,28,0.08)" }}>
-                  <Typography sx={{ fontWeight: 700 }}>{item.holidayName || item.title || "Hall Closed"}</Typography>
-                  <Typography variant="body2">{formatDateTime(item.startDateTime)} - {formatDateTime(item.endDateTime)}</Typography>
-                  <Typography variant="caption">
-                    {item.closureAllHalls ? "All halls closed" : `Rooms: ${(item.rooms || []).join(", ") || props.data.name}`}
-                  </Typography>
                 </Box>
               ))
             )}
